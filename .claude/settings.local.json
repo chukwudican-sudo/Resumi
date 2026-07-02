@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(npm install *)",
+      "Bash(npm view *)",
+      "Bash(npm config *)",
+      "Bash(npm audit *)",
+      "Bash(python3 -c ' *)",
+      "Bash(npm run *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(chromium-cli --help)",
+      "Bash(node -e \"require\\('playwright'\\)\")",
+      "Bash(npm ls *)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(lsof -i :3000 -sTCP:LISTEN)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(kill -9 70635)",
+      "Bash(node smoke3_real_tailor.js)",
+      "Bash(tail -40 /tmp/resumi-dev.log)",
+      "Read(//private/tmp/**)",
+      "Bash(node smoke5_full_flow.js)",
+      "Bash(npx tsc *)",
+      "Bash(node smoke6_new_features.js)",
+      "Bash(node -e ' *)",
+      "Bash(node debug_popup.js)",
+      "Bash(node smoke7_full_e2e.js)"
+    ]
+  }
+}
