@@ -18,8 +18,8 @@
 \usepackage{fancyhdr}
 \usepackage[english]{babel}
 \usepackage{tabularx}
-% Dropped \input{glyphtounicode} + \pdfgentounicode=1 — SwiftLaTeX's pdftex can't
-% fetch glyphtounicode.tex, which aborts the compile (status 1). See latexEngine.ts.
+% Dropped \input{glyphtounicode} + \pdfgentounicode=1 — pdftex-only primitives
+% that tectonic's XeTeX engine rejects. See latexEngine.ts.
 
 
 %----------FONT OPTIONS----------

@@ -24,10 +24,9 @@ const PREAMBLE = String.raw`%-------------------------
 \usepackage{fancyhdr}
 \usepackage[english]{babel}
 \usepackage{tabularx}
-% ponytail: dropped \input{glyphtounicode} + \pdfgentounicode=1 — SwiftLaTeX's
-% pdftex can't fetch glyphtounicode.tex (not bundled, not on texlive2 server),
-% which aborts the compile (status 1). Cost: slightly weaker ATS glyph→unicode
-% mapping. Re-add if we ever bundle glyphtounicode.tex into public/swiftlatex.
+% ponytail: dropped \input{glyphtounicode} + \pdfgentounicode=1 — those are
+% pdftex-only primitives, and we compile with tectonic (XeTeX engine), which
+% errors on them. Cost: slightly weaker ATS glyph->unicode mapping.
 
 
 %----------FONT OPTIONS----------
