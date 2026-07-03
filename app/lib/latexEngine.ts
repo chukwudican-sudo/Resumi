@@ -24,7 +24,10 @@ const PREAMBLE = String.raw`%-------------------------
 \usepackage{fancyhdr}
 \usepackage[english]{babel}
 \usepackage{tabularx}
-\input{glyphtounicode}
+% ponytail: dropped \input{glyphtounicode} + \pdfgentounicode=1 — SwiftLaTeX's
+% pdftex can't fetch glyphtounicode.tex (not bundled, not on texlive2 server),
+% which aborts the compile (status 1). Cost: slightly weaker ATS glyph→unicode
+% mapping. Re-add if we ever bundle glyphtounicode.tex into public/swiftlatex.
 
 
 %----------FONT OPTIONS----------
@@ -62,9 +65,6 @@ const PREAMBLE = String.raw`%-------------------------
 \titleformat{\section}{
   \vspace{-4pt}\scshape\raggedright\large
 }{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
-
-% Ensure that generate pdf is machine readable/ATS parsable
-\pdfgentounicode=1
 
 %-------------------------
 % Custom commands
