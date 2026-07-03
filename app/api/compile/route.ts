@@ -40,6 +40,17 @@ export async function POST(req: NextRequest) {
         maxBuffer: 10 * 1024 * 1024,
       });
     } catch (err) {
+      // tectonic missing from PATH -> ENOENT: a config problem, not bad LaTeX.
+      if ((err as { code?: string }).code === 'ENOENT') {
+        return NextResponse.json(
+          {
+            error:
+              `tectonic not found (tried "${bin}"). Install it and ensure it is on ` +
+              `the server's PATH, or set TECTONIC_BIN to its absolute path.`,
+          },
+          { status: 500 },
+        );
+      }
       // tectonic writes the TeX error to stderr; surface it so the UI can show why.
       const log = (err as { stderr?: string }).stderr || String(err);
       return NextResponse.json({ error: 'LaTeX compilation failed', log }, { status: 422 });
