@@ -1,0 +1,3 @@
+# Adopt one canonical LaTeX format instead of preserving each upload's formatting
+
+The original tool preserved the user's own `.docx` layout byte-for-byte, editing only text inside existing paragraphs (`docxEngine.ts`). We are replacing that: every uploaded resume is now a **content source only** (a Source Resume), its original formatting is discarded, and its content is re-flowed into one canonical layout — Jake Gutierrez's LaTeX template (`assets/main.tex`). We accept losing per-user formatting fidelity in exchange for a single, consistently ATS-safe output (`\pdfgentounicode=1`) and a far simpler content model. The template's four Canonical Sections are the fixed spine; unmappable content is dropped with a warning, never silently.

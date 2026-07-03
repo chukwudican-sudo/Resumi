@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { estimateCostUsd } from '../../lib/pricing';
-import { buildParagraphPromptBlock, EXTRACTION_PROMPT, UNIVERSAL_RULES } from '../../lib/systemPrompt';
-import { buildTailoredDocx, extractParagraphs } from '../../lib/docxEngine';
-import type { ApiErrorPayload, DebugInfo } from '../../lib/types';
+import { EXTRACTION_PROMPT, SOURCE_EXTRACTION_PROMPT, UNIVERSAL_RULES } from '../../lib/systemPrompt';
+// extractParagraphs pulls plain text out of a .docx Source Resume for the
+// extract_resume mode. The old docx-tailoring path (buildTailoredDocx) is gone.
+import { extractParagraphs } from '../../lib/docxEngine';
+import { mockApiResponse } from '../../lib/mockApi';
+import type { ApiErrorPayload, ResumeStructure } from '../../lib/types';
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -30,21 +35,109 @@ function buildImageBlock(image: { base64: string; mimeType: string }) {
   };
 }
 
+// The ResumeStructure JSON-schema shape, shared by submit_source_extraction
+// (extract) and submit_tailored_resume (tailor) so the two stay consistent.
+const RESUME_STRUCTURE_SCHEMA = {
+  type: 'object' as const,
+  description: 'A resume as structured content (name, contact, sections, entries, bullets) — no layout.',
+  properties: {
+    name: { type: 'string', description: 'The person\'s full name. Empty string if not found.' },
+    contact: {
+      type: 'object',
+      description: 'Contact details. Omit any field that is not present.',
+      properties: {
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        linkedin: { type: 'string' },
+        github: { type: 'string' },
+        website: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+    summary: { type: 'string', description: 'Optional professional summary/objective. Omit if there is none.' },
+    education: {
+      type: 'array',
+      description: 'Education entries.',
+      items: {
+        type: 'object',
+        properties: {
+          school: { type: 'string' },
+          location: { type: 'string' },
+          degree: { type: 'string' },
+          dates: { type: 'string' },
+        },
+        required: ['school', 'location', 'degree', 'dates'],
+        additionalProperties: false,
+      },
+    },
+    experience: {
+      type: 'array',
+      description: 'Work experience entries.',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          dates: { type: 'string' },
+          org: { type: 'string' },
+          location: { type: 'string' },
+          bullets: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['title', 'dates', 'org', 'location', 'bullets'],
+        additionalProperties: false,
+      },
+    },
+    projects: {
+      type: 'array',
+      description: 'Project entries.',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          tech: { type: 'string' },
+          dates: { type: 'string' },
+          bullets: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['name', 'tech', 'dates', 'bullets'],
+        additionalProperties: false,
+      },
+    },
+    skills: {
+      type: 'array',
+      description: 'Technical skills grouped by category.',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string' },
+          items: { type: 'string', description: 'The skills in this category as a single string (e.g. comma-separated).' },
+        },
+        required: ['category', 'items'],
+        additionalProperties: false,
+      },
+    },
+    certifications: {
+      type: 'array',
+      description: 'Optional certifications. Omit if there are none.',
+      items: { type: 'string' },
+    },
+    awards: {
+      type: 'array',
+      description: 'Optional awards. Omit if there are none.',
+      items: { type: 'string' },
+    },
+  },
+  required: ['name', 'contact', 'education', 'experience', 'projects', 'skills'],
+  additionalProperties: false,
+};
+
 const TAILOR_TOOL: Anthropic.Tool = {
   name: 'submit_tailored_resume',
-  description: 'Submit the fully tailored resume paragraph text along with a change log, match score, structural change flags, and any warnings.',
+  description: 'Submit the fully tailored resume as an edited ResumeStructure along with a change log, match score, structural change flags, and any warnings.',
   input_schema: {
     type: 'object',
     properties: {
-      paragraphs: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Full paragraph array, same length and order as the input paragraph structure. Unchanged paragraphs returned verbatim.',
-      },
-      safeParagraphs: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Same length and order as paragraphs, but with any structural changes reverted to their original paragraph assignment. Identical to paragraphs if there were no structural changes.',
+      structure: {
+        ...RESUME_STRUCTURE_SCHEMA,
+        description: 'The tailored resume content as a ResumeStructure — the same shape as the input structure, with fields/bullets edited for the job. Name, contact, and dates must be identical to the input.',
       },
       log: {
         type: 'array',
@@ -83,7 +176,7 @@ const TAILOR_TOOL: Anthropic.Tool = {
           required: ['description', 'reason'],
           additionalProperties: false,
         },
-        description: 'Structural changes that require user approval before the resume is considered final. A structural change is: (1) moving content from one paragraph slot into a different paragraph slot — for example, pulling a bullet from one job entry and placing it in another, OR (2) substantively renaming a section header so its meaning changes (e.g. "Experience" → "Relevant Experience"). Regular bullet rewrites, skill reordering within a paragraph, or tightening of wording are NOT structural changes — do not include them here. If you made a structural change, you MUST add it here AND include a corresponding entry in safeParagraphs that reverts that specific change while keeping all other tailoring. Empty array if no structural changes were made.',
+        description: 'Structural changes that require user approval before the resume is considered final. A structural change is: (1) moving a bullet from one entry into a different entry — for example, pulling a bullet from one job/project and placing it in another, OR (2) substantively renaming or repurposing a section\'s meaning. Regular bullet rewrites, reordering skills within a category, or tightening of wording are NOT structural changes — do not include them here. Empty array if no structural changes were made.',
       },
       warnings: {
         type: 'array',
@@ -92,8 +185,7 @@ const TAILOR_TOOL: Anthropic.Tool = {
       },
     },
     required: [
-      'paragraphs',
-      'safeParagraphs',
+      'structure',
       'log',
       'matchScore',
       'missingRequirements',
@@ -125,16 +217,39 @@ const EXTRACT_TOOL: Anthropic.Tool = {
   },
 };
 
-const INSTRUCT_TOOL: Anthropic.Tool = {
-  name: 'submit_resume_update',
-  description: 'Submit the surgically updated resume paragraph text after acting on a single mid-session instruction.',
+const SOURCE_EXTRACTION_TOOL: Anthropic.Tool = {
+  name: 'submit_source_extraction',
+  description: 'Submit the extracted resume content as a ResumeStructure, along with whether the document was usable as a resume and, if not, the reason.',
   input_schema: {
     type: 'object',
     properties: {
-      paragraphs: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Full paragraph array, same length and order as the input. Only the relevant paragraph(s) change; everything else is returned verbatim.',
+      structure: {
+        ...RESUME_STRUCTURE_SCHEMA,
+        description: 'The extracted resume content. Return empty/default values if usable is false.',
+      },
+      usable: {
+        type: 'boolean',
+        description: 'True if the document is a readable resume that could be extracted. False if it is a scanned/image-only PDF with no text, blank/corrupt, or not a resume at all.',
+      },
+      reason: {
+        type: 'string',
+        description: 'Short plain-English reason when usable is false. Empty string when usable is true.',
+      },
+    },
+    required: ['structure', 'usable', 'reason'],
+    additionalProperties: false,
+  },
+};
+
+const INSTRUCT_TOOL: Anthropic.Tool = {
+  name: 'submit_resume_update',
+  description: 'Submit the surgically updated ResumeStructure after acting on a single mid-session instruction.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      structure: {
+        ...RESUME_STRUCTURE_SCHEMA,
+        description: 'The full updated resume content as a ResumeStructure — same shape as the input structure, with only the field(s) relevant to the instruction changed; everything else returned verbatim.',
       },
       log: {
         type: 'array',
@@ -150,7 +265,7 @@ const INSTRUCT_TOOL: Anthropic.Tool = {
         items: { type: 'string' },
       },
     },
-    required: ['paragraphs', 'log', 'estimatedPages', 'warnings'],
+    required: ['structure', 'log', 'estimatedPages', 'warnings'],
     additionalProperties: false,
   },
 };
@@ -181,11 +296,12 @@ function logRequestInputs(
     aboutMe: { base64?: string; mimeType?: string };
     rules: { base64?: string; mimeType?: string };
     jobPosting: { company?: string; role?: string; description?: string; images?: unknown[] };
-    paragraphs: { index: number; style: string; text: string; editable: boolean }[];
+    paragraphs?: { index: number; style: string; text: string; editable: boolean }[];
+    structureSummary?: string;
     content: any[];
   },
 ) {
-  const { aboutMe, rules, jobPosting, paragraphs, content } = args;
+  const { aboutMe, rules, jobPosting, paragraphs, structureSummary, content } = args;
   console.log(`\n[Resumi] ${label} — inputs being sent to Claude`);
   console.log(
     `  About Me PDF      : ${aboutMe?.base64 ? `present (${kb(aboutMe.base64)}, ${aboutMe.mimeType || 'application/pdf'}) — sent as a document block; content is opaque to the server, Claude reads it natively` : 'MISSING'}`,
@@ -197,14 +313,20 @@ function logRequestInputs(
     `  Job Posting       : company="${jobPosting?.company || '(none)'}", role="${jobPosting?.role || '(none)'}", description=${jobPosting?.description?.length || 0} chars, screenshots=${jobPosting?.images?.length || 0}`,
   );
   console.log(`  Job Posting text  : "${preview(jobPosting?.description)}"`);
-  console.log(`  Resume Paragraphs : ${paragraphs.length} extracted from the .docx —`);
-  paragraphs.forEach((p) => {
-    console.log(`    [${p.index}] (${p.style})${p.editable ? '' : ' [non-editable]'}: "${preview(p.text, 90)}"`);
-  });
+  if (structureSummary) {
+    console.log(`  Resume Structure  : ${structureSummary}`);
+  }
+  if (paragraphs) {
+    console.log(`  Resume Paragraphs : ${paragraphs.length} extracted from the .docx —`);
+    paragraphs.forEach((p) => {
+      console.log(`    [${p.index}] (${p.style})${p.editable ? '' : ' [non-editable]'}: "${preview(p.text, 90)}"`);
+    });
+  }
   console.log(`  Content blocks sent to messages.create(): [${content.map((c) => c.type).join(', ')}] (${content.length} total)`);
 }
 
 export async function GET() {
+  if (process.env.RESUMI_MOCK) return NextResponse.json({ status: 'ok' });
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ status: 'error' });
   }
@@ -218,6 +340,12 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // ponytail: offline mock — no Anthropic call, no key needed. See mockApi.ts.
+  if (process.env.RESUMI_MOCK) {
+    let mockBody: any;
+    try { mockBody = await request.json(); } catch { mockBody = {}; }
+    return NextResponse.json(mockApiResponse(mockBody));
+  }
   if (!process.env.ANTHROPIC_API_KEY) {
     return errorResponse(
       { type: 'auth', message: 'Your API key may be invalid or out of credits. Check console.anthropic.com.' },
@@ -278,15 +406,62 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (mode === 'instruct') {
-      const { instruction, currentDocxBase64, baseResumeBase64, aboutMe, rules, jobPosting } = body;
-      if (!instruction || !currentDocxBase64 || !baseResumeBase64) {
-        return errorResponse({ type: 'generic', message: 'Missing instruction or current resume content.' }, 400);
+    if (mode === 'extract_resume') {
+      const { file } = body;
+      if (!file?.base64 || !file?.mimeType) {
+        return errorResponse({ type: 'generic', message: 'No resume file to extract from.' }, 400);
       }
 
-      const currentBuffer = Buffer.from(currentDocxBase64, 'base64');
-      const originalBuffer = Buffer.from(baseResumeBase64, 'base64');
-      const paragraphs = await extractParagraphs(currentBuffer);
+      const content: any[] = [];
+      if (file.mimeType === 'application/pdf') {
+        const doc = buildDocumentBlock(file);
+        if (doc) content.push(doc);
+      } else if (file.mimeType === DOCX_MIME) {
+        // Claude cannot read .docx natively — parse the paragraph text out of the
+        // OOXML ourselves and send it as plain text.
+        const paragraphs = await extractParagraphs(Buffer.from(file.base64, 'base64'));
+        const text = paragraphs.map((p) => p.text).join('\n');
+        content.push({ type: 'text', text: `Uploaded resume (.docx) — extracted paragraph text:\n\n${text}` });
+      } else {
+        return errorResponse({ type: 'generic', message: 'Unsupported file type. Upload a PDF or Word (.docx) resume.' }, 400);
+      }
+
+      content.push({
+        type: 'text',
+        text: 'Read the resume above and extract its content into ResumeStructure using the submit_source_extraction tool.',
+      });
+
+      const response: any = await client.messages.create({
+        model: MODEL,
+        max_tokens: 4000,
+        output_config: { effort: 'low' },
+        system: SOURCE_EXTRACTION_PROMPT,
+        tools: [SOURCE_EXTRACTION_TOOL],
+        tool_choice: { type: 'tool', name: SOURCE_EXTRACTION_TOOL.name },
+        messages: [{ role: 'user', content }],
+      } as any);
+
+      const toolUse = response.content.find((block: any) => block.type === 'tool_use') as Anthropic.ToolUseBlock | undefined;
+      if (!toolUse) {
+        return errorResponse({ type: 'generic', message: 'The AI service is temporarily unavailable. Please try again.' }, 502);
+      }
+
+      const input = toolUse.input as { structure: ResumeStructure; usable: boolean; reason: string };
+      if (!input.usable) {
+        return errorResponse(
+          { type: 'generic', message: input.reason || "We couldn't read this file as a resume. Try a different PDF or .docx." },
+          400,
+        );
+      }
+
+      return NextResponse.json({ structure: input.structure });
+    }
+
+    if (mode === 'instruct') {
+      const { instruction, structure, aboutMe, rules, jobPosting } = body;
+      if (!instruction || !structure) {
+        return errorResponse({ type: 'generic', message: 'Missing instruction or current resume content.' }, 400);
+      }
 
       const content: any[] = [];
       const aboutMeDoc = buildDocumentBlock(aboutMe);
@@ -294,17 +469,22 @@ export async function POST(request: NextRequest) {
       const rulesDoc = buildDocumentBlock(rules);
       if (rulesDoc) content.push(rulesDoc);
 
+      const structureJson = JSON.stringify(structure, null, 2);
       content.push({
         type: 'text',
         text: [
-          buildParagraphPromptBlock(paragraphs),
+          'Current tailored resume — the Resume Structure (structured content, no layout):',
+          '```json',
+          structureJson,
+          '```',
           `Job posting — Company: ${jobPosting?.company || '(none)'}, Role: ${jobPosting?.role || '(none)'}\n${jobPosting?.description || '(no description provided)'}`,
-          `Alex's mid-session instruction: "${instruction}"`,
-          'Apply this instruction with a surgical edit — do not re-tailor the entire resume from scratch. Only touch the relevant paragraph(s).',
+          `Mid-session instruction: "${instruction}"`,
+          'Apply this single instruction as a surgical edit to the structure — only touch the relevant field(s), and return the full structure via the submit_resume_update tool. Do not re-tailor the entire resume from scratch.',
         ].join('\n\n'),
       });
 
-      logRequestInputs('Instruct', { aboutMe, rules, jobPosting, paragraphs, content });
+      const structureSummary = `name="${structure.name || '(none)'}", education=${(structure.education || []).length}, experience=${(structure.experience || []).length}, projects=${(structure.projects || []).length}, skills=${(structure.skills || []).length} categories`;
+      logRequestInputs('Instruct', { aboutMe, rules, jobPosting, structureSummary, content });
       console.log(`  Instruction       : "${instruction}"`);
 
       const response: any = await client.messages.create({
@@ -322,8 +502,7 @@ export async function POST(request: NextRequest) {
         return errorResponse({ type: 'generic', message: 'The AI service is temporarily unavailable. Please try again.' }, 502);
       }
 
-      const input = toolUse.input as { paragraphs: string[]; log: string[]; estimatedPages: number; warnings: string[] };
-      const updatedDocx = await buildTailoredDocx(originalBuffer, input.paragraphs || []);
+      const input = toolUse.input as { structure: ResumeStructure; log: string[]; estimatedPages: number; warnings: string[] };
 
       const usage = {
         inputTokens: response.usage.input_tokens,
@@ -332,7 +511,7 @@ export async function POST(request: NextRequest) {
       };
 
       return NextResponse.json({
-        updatedDocxBase64: updatedDocx.toString('base64'),
+        structure: input.structure,
         log: input.log || [],
         estimatedPages: input.estimatedPages,
         warnings: input.warnings || [],
@@ -341,14 +520,11 @@ export async function POST(request: NextRequest) {
     }
 
     // mode === 'tailor' (default)
-    const { aboutMe, rules, jobPosting, baseResume } = body;
+    const { aboutMe, rules, jobPosting, structure } = body;
 
-    if (!aboutMe?.base64 || !baseResume?.base64 || !jobPosting) {
-      return errorResponse({ type: 'generic', message: 'Missing required documents. Make sure About Me and Base Resume are uploaded.' }, 400);
+    if (!aboutMe?.base64 || !structure || !jobPosting) {
+      return errorResponse({ type: 'generic', message: 'Missing required inputs. Make sure About Me and a Source Resume are provided.' }, 400);
     }
-
-    const originalBuffer = Buffer.from(baseResume.base64, 'base64');
-    const paragraphs = await extractParagraphs(originalBuffer);
 
     const content: any[] = [];
 
@@ -362,15 +538,20 @@ export async function POST(request: NextRequest) {
       if (image?.base64) content.push(buildImageBlock(image));
     }
 
+    const structureJson = JSON.stringify(structure, null, 2);
     const textParts = [
-      buildParagraphPromptBlock(paragraphs),
+      "Source Resume — the current Resume Structure (structured content, no layout). This is the resume of record. Edit its fields and bullets to tailor it; keep the same overall shape:",
+      '```json',
+      structureJson,
+      '```',
       `Job posting — Company: ${jobPosting.company || '(not provided)'}, Role: ${jobPosting.role || '(not provided)'}\n${jobPosting.description || '(no pasted text — see attached screenshots, if any)'}`,
-      'Produce the tailored resume now. Read the About Me PDF and Resume Rules PDF (attached above) and the job posting (text and/or screenshots) before writing anything.',
+      'Produce the tailored resume now by returning an edited ResumeStructure via the submit_tailored_resume tool. Read the About Me PDF and Resume Rules PDF (attached above) and the job posting (text and/or screenshots) before writing anything.',
     ];
 
     content.push({ type: 'text', text: textParts.join('\n\n') });
 
-    logRequestInputs('Tailor', { aboutMe, rules, jobPosting, paragraphs, content });
+    const structureSummary = `name="${structure.name || '(none)'}", education=${(structure.education || []).length}, experience=${(structure.experience || []).length}, projects=${(structure.projects || []).length}, skills=${(structure.skills || []).length} categories`;
+    logRequestInputs('Tailor', { aboutMe, rules, jobPosting, structureSummary, content });
 
     const response: any = await client.messages.create({
       model: MODEL,
@@ -388,8 +569,7 @@ export async function POST(request: NextRequest) {
     }
 
     const input = toolUse.input as {
-      paragraphs: string[];
-      safeParagraphs: string[];
+      structure: ResumeStructure;
       log: string[];
       matchScore: number;
       missingRequirements: string[];
@@ -400,44 +580,6 @@ export async function POST(request: NextRequest) {
       warnings: string[];
     };
 
-    // Compute which paragraphs Claude actually changed (for the debug panel).
-    const changedIndices: number[] = [];
-    for (let i = 0; i < paragraphs.length; i++) {
-      const original = paragraphs[i].text.trim();
-      const returned = ((input.paragraphs || [])[i] ?? '').trim();
-      if (original !== returned) changedIndices.push(i);
-    }
-
-    const debugInfo: DebugInfo = {
-      sentAt: new Date().toISOString(),
-      aboutMePresent: Boolean(aboutMe?.base64),
-      aboutMeSizeKb: aboutMe?.base64 ? Math.round((aboutMe.base64.length * 0.75) / 1024) : 0,
-      rulesPresent: Boolean(rules?.base64),
-      rulesSizeKb: rules?.base64 ? Math.round((rules.base64.length * 0.75) / 1024) : 0,
-      jobCompany: jobPosting.company || '',
-      jobRole: jobPosting.role || '',
-      jobDescriptionChars: (jobPosting.description || '').length,
-      jobDescriptionPreview: (jobPosting.description || '').slice(0, 200),
-      jobImageCount: images.length,
-      paragraphCount: paragraphs.length,
-      editableParagraphCount: paragraphs.filter((p) => p.editable).length,
-      paragraphsPreview: paragraphs
-        .slice(0, 5)
-        .map((p) => `[${p.index}] (${p.style})${p.editable ? '' : ' [non-editable]'}: ${p.text.slice(0, 60)}`)
-        .join('\n'),
-      claudeParagraphsReturned: (input.paragraphs || []).length,
-      claudeChangedCount: changedIndices.length,
-      claudeChangedIndices: changedIndices,
-      claudeLogPreview: (input.log || []).slice(0, 3).join(' | ').slice(0, 200),
-      claudeMatchScore: input.matchScore ?? null,
-      claudeVague: Boolean(input.vague),
-    };
-
-    const [tailoredDocx, safeDocx] = await Promise.all([
-      buildTailoredDocx(originalBuffer, input.paragraphs || []),
-      buildTailoredDocx(originalBuffer, input.safeParagraphs || input.paragraphs || []),
-    ]);
-
     const usage = {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
@@ -445,8 +587,7 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json({
-      tailoredDocxBase64: tailoredDocx.toString('base64'),
-      safeDocxBase64: safeDocx.toString('base64'),
+      structure: input.structure,
       log: input.log || [],
       matchScore: input.matchScore,
       missingRequirements: input.missingRequirements || [],
@@ -456,7 +597,6 @@ export async function POST(request: NextRequest) {
       structuralChanges: input.structuralChanges || [],
       warnings: input.warnings || [],
       usage,
-      debugInfo,
     });
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {

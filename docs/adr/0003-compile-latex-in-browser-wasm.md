@@ -1,0 +1,3 @@
+# Compile LaTeX to PDF in the browser via WASM
+
+The rendered LaTeX is compiled to PDF on the user's device using a WASM TeX engine (e.g. SwiftLaTeX / tectonic-wasm), not on a server. This preserves the app's stated privacy model — nothing but the Claude API call leaves the browser — and adds zero backend and no per-compile cost. We rejected a hosted LaTeX compile API (it would ship the user's full resume content to a third party, breaking that privacy promise) and a serverless `tectonic` function (a TeX toolchain strains Vercel's function size/time limits and needs on-demand package fetching). The accepted cost is a large one-time WASM/TeX asset download and first-compile latency, acceptable for a single-user tool.

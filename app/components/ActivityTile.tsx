@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Modal from './Modal';
 import { DebugInfo, StructuralChange, TokenUsage } from '../lib/types';
 
@@ -19,8 +19,6 @@ interface ActivityTileProps {
   warnings: string[];
   debugInfo: DebugInfo | null;
   onClear: () => void;
-  onApprove: (id: string) => void;
-  onRevert: (id: string) => void;
   onSend: (instruction: string) => Promise<void>;
   sending: boolean;
 }
@@ -40,8 +38,6 @@ export default function ActivityTile({
   warnings,
   debugInfo,
   onClear,
-  onApprove,
-  onRevert,
   onSend,
   sending,
 }: ActivityTileProps) {
@@ -50,7 +46,6 @@ export default function ActivityTile({
   const [message, setMessage] = useState('');
   const [confirmingClear, setConfirmingClear] = useState(false);
 
-  const pendingChanges = useMemo(() => structuralChanges.filter((change) => change.status === 'pending'), [structuralChanges]);
   const unread = log.length;
   const showVagueGate = vague && !vagueAcknowledged;
 
@@ -140,26 +135,12 @@ export default function ActivityTile({
             ) : null}
           </div>
 
-          {pendingChanges.map((change) => (
+          {/* ponytail: structural changes are now read-only informational items.
+              The Approve/Revert flow was removed with the docx safe-copy it relied on. */}
+          {structuralChanges.map((change) => (
             <div key={change.id} className="rounded-3xl border border-warning/30 bg-warning/10 px-5 py-4">
               <p className="text-warning">⚠ Structural change: {change.description}</p>
               <p className="mt-1 text-slate-300">Reason: {change.reason}</p>
-              <div className="mt-3 flex gap-3">
-                <button
-                  type="button"
-                  className="rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-slate-950 hover:bg-blue-500"
-                  onClick={() => onApprove(change.id)}
-                >
-                  Approve
-                </button>
-                <button
-                  type="button"
-                  className="rounded-full border border-slate-700 bg-slate-900 px-4 py-1.5 text-sm text-slate-200 hover:border-slate-500"
-                  onClick={() => onRevert(change.id)}
-                >
-                  Revert
-                </button>
-              </div>
             </div>
           ))}
 

@@ -1,9 +1,9 @@
 import JSZip from 'jszip';
-import { DOMParser, XMLSerializer, type Document, type Element } from '@xmldom/xmldom';
+import { DOMParser, type Document, type Element } from '@xmldom/xmldom';
 
-// Server-side only. Manipulates the raw OOXML inside a .docx so the AI can
-// change paragraph TEXT while every Word style, font, margin, and spacing
-// stays byte-for-byte identical to the uploaded base resume.
+// Server-side only. Reads the raw OOXML inside a .docx to pull out paragraph
+// text, so a .docx Source Resume can be handed to Claude as plain content for
+// resume-structure extraction.
 
 const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 
@@ -61,45 +61,4 @@ export async function extractParagraphs(docxBuffer: Buffer): Promise<DocxParagra
       editable: getTextRuns(p).length > 0 && text.trim().length > 0,
     };
   });
-}
-
-/**
- * Rebuilds a .docx from the ORIGINAL template, replacing only the text inside
- * existing paragraphs. `newTexts[i]` becomes paragraph i's full text; entries
- * equal to the original (or paragraphs with no editable run) are left
- * untouched. No paragraph is ever added, removed, or reordered.
- */
-export async function buildTailoredDocx(originalDocxBuffer: Buffer, newTexts: string[]): Promise<Buffer> {
-  const { zip, doc } = await loadDocumentXml(originalDocxBuffer);
-  const paragraphs = getParagraphElements(doc);
-
-  paragraphs.forEach((p, index) => {
-    const newText = newTexts[index];
-    if (newText === undefined) return;
-
-    const originalText = getParagraphText(p);
-    if (newText === originalText) return;
-
-    const runs = getTextRuns(p);
-    if (runs.length === 0) return; // empty/spacer paragraph — never inject text here
-
-    const [firstRun, ...restRuns] = runs;
-    const firstT = firstRun.getElementsByTagNameNS(W_NS, 't')[0];
-    firstT.setAttribute('xml:space', 'preserve');
-    while (firstT.firstChild) firstT.removeChild(firstT.firstChild);
-    firstT.appendChild(doc.createTextNode(newText));
-
-    // Clear (don't remove) any other text runs in the same paragraph so old
-    // content doesn't linger alongside the new text.
-    restRuns.forEach((run) => {
-      Array.from(run.getElementsByTagNameNS(W_NS, 't')).forEach((t) => {
-        while (t.firstChild) t.removeChild(t.firstChild);
-      });
-    });
-  });
-
-  const newXml = new XMLSerializer().serializeToString(doc);
-  zip.file('word/document.xml', newXml);
-  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-  return buffer;
 }
