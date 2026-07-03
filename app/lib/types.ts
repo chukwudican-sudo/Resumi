@@ -14,11 +14,14 @@ export const emptyDocumentFile: DocumentFileState = {
   mimeType: '',
 };
 
+// Tracks the Source Resume upload for the panel's own UI (name, timestamp,
+// loaded/warning state). The uploaded bytes are NOT retained here — the file is
+// sent once for extraction and only the resulting Resume Structure is kept
+// (resumi-source-structure).
 export interface BaseResumeState {
   loaded: boolean;
   fileName: string;
   updatedAt: string;
-  base64: string;
   warning: string | null;
 }
 
@@ -26,7 +29,6 @@ export const emptyBaseResume: BaseResumeState = {
   loaded: false,
   fileName: '',
   updatedAt: '',
-  base64: '',
   warning: null,
 };
 
@@ -90,7 +92,6 @@ export interface SessionState {
   log: string[];
   structuralChanges: StructuralChange[];
   usage: TokenUsage | null;
-  safeDocxBase64: string | null;
   warnings: string[];
   // True for the entire span of a tailor request (first-time or re-tailor).
   // Drives the tab-title reset and the mid-tailoring recovery banner — if
@@ -101,11 +102,12 @@ export interface SessionState {
   // session — shows the "Updating with new session..." overlay on Review.
   updating: boolean;
   backgroundError: ApiErrorPayload | null;
-  // Increments each time a new .docx is generated (initial tailor resets to 1;
-  // each re-tailor or instruction update increments by 1). Drives the Version N
-  // badge and "Generated X ago" label on the download section.
-  docxVersion: number;
-  docxGeneratedAt: string;
+  // Increments each time a new tailored Resume Structure is generated (initial
+  // tailor resets to 1; each re-tailor or instruction update increments by 1).
+  // Drives the Version N badge and "Generated X ago" label on the download
+  // section.
+  resumeVersion: number;
+  resumeGeneratedAt: string;
 }
 
 export const emptySession: SessionState = {
@@ -122,13 +124,12 @@ export const emptySession: SessionState = {
   log: [],
   structuralChanges: [],
   usage: null,
-  safeDocxBase64: null,
   warnings: [],
   tailoring: false,
   updating: false,
   backgroundError: null,
-  docxVersion: 0,
-  docxGeneratedAt: '',
+  resumeVersion: 0,
+  resumeGeneratedAt: '',
 };
 
 export type ApiErrorType = 'network' | 'auth' | 'generic' | 'timeout';
@@ -158,4 +159,16 @@ export interface DebugInfo {
 export interface ApiErrorPayload {
   type: ApiErrorType;
   message: string;
+}
+
+export interface ResumeStructure {
+  name: string;
+  contact: { phone?: string; email?: string; linkedin?: string; github?: string; website?: string };
+  summary?: string;
+  education: { school: string; location: string; degree: string; dates: string }[];
+  experience: { title: string; dates: string; org: string; location: string; bullets: string[] }[];
+  projects: { name: string; tech: string; dates: string; bullets: string[] }[];
+  skills: { category: string; items: string }[];
+  certifications?: string[];
+  awards?: string[];
 }

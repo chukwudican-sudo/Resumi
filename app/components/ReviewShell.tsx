@@ -1,22 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import ActivityTile from './ActivityTile';
 import Header from './Header';
 import Modal from './Modal';
 import Toast from './Toast';
-import DocxPreview from './DocxPreview';
+import LatexPdfPreview from './LatexPdfPreview';
+import { renderResumeLatex } from '../lib/latexEngine';
+import { compileLatexToPdf } from '../lib/compileLatex';
 import { buildDefaultFilenameBase, sanitizeFilenameInput } from '../lib/filename';
-import { base64ToBlob, downloadBlob } from '../lib/base64';
+import { downloadBlob } from '../lib/base64';
 import {
   ApiErrorPayload,
-  BaseResumeState,
   DebugInfo,
   DocumentFileState,
+  ResumeStructure,
   SessionState,
-  emptyBaseResume,
   emptyDocumentFile,
   emptySession,
 } from '../lib/types';
@@ -34,10 +35,10 @@ function getRelativeTime(isoDate: string): string {
 
 export default function ReviewShell() {
   const router = useRouter();
-  const [baseResume] = useLocalStorageState<BaseResumeState>('resumi-base-resume', emptyBaseResume);
+  const [sourceStructure] = useLocalStorageState<ResumeStructure | null>('resumi-source-structure', null);
   const [aboutMe] = useLocalStorageState<DocumentFileState>('resumi-about-me', emptyDocumentFile);
   const [resumeRules] = useLocalStorageState<DocumentFileState>('resumi-resume-rules', emptyDocumentFile);
-  const [tailoredDocxBase64, setTailoredDocxBase64] = useLocalStorageState<string>('resumi-tailored-docx', '');
+  const [tailoredStructure, setTailoredStructure] = useLocalStorageState<ResumeStructure | null>('resumi-tailored-structure', null);
   const [session, setSession] = useLocalStorageState<SessionState>('resumi-session', emptySession);
   const [userName] = useLocalStorageState<string>('resumi_user_name', '');
   const [debugInfo] = useLocalStorageState<DebugInfo | null>('resumi-debug-info', null);
@@ -51,6 +52,11 @@ export default function ReviewShell() {
   const [relativeTime, setRelativeTime] = useState('');
   const [downloadPulse, setDownloadPulse] = useState(false);
   const prevDocxVersionRef = useRef<number>(0);
+
+  // Render both structures into the canonical Template (Jake Gutierrez LaTeX).
+  // LatexPdfPreview compiles these to PDFs in the browser (debounced).
+  const originalLatex = useMemo(() => (sourceStructure ? renderResumeLatex(sourceStructure) : ''), [sourceStructure]);
+  const tailoredLatex = useMemo(() => (tailoredStructure ? renderResumeLatex(tailoredStructure) : ''), [tailoredStructure]);
 
   useEffect(() => {
     setFilenameBase(buildDefaultFilenameBase(userName, session.role, session.company));
@@ -75,16 +81,16 @@ export default function ReviewShell() {
 
   // Keep "Generated X ago" label fresh — recalculate every 30 seconds.
   useEffect(() => {
-    setRelativeTime(getRelativeTime(session.docxGeneratedAt));
-    const id = setInterval(() => setRelativeTime(getRelativeTime(session.docxGeneratedAt)), 30_000);
+    setRelativeTime(getRelativeTime(session.resumeGeneratedAt));
+    const id = setInterval(() => setRelativeTime(getRelativeTime(session.resumeGeneratedAt)), 30_000);
     return () => clearInterval(id);
-  }, [session.docxGeneratedAt]);
+  }, [session.resumeGeneratedAt]);
 
   // Pulse the download button whenever a new version lands.
   // Skip the very first render (prevDocxVersionRef = 0) so we don't pulse
   // on initial page load — only on actual version increments.
   useEffect(() => {
-    const version = session.docxVersion;
+    const version = session.resumeVersion;
     if (version > 0 && version !== prevDocxVersionRef.current) {
       const shouldPulse = prevDocxVersionRef.current > 0;
       prevDocxVersionRef.current = version;
@@ -95,7 +101,7 @@ export default function ReviewShell() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.docxVersion]);
+  }, [session.resumeVersion]);
 
   async function handleSendInstruction(instruction: string) {
     setSending(true);
@@ -106,8 +112,7 @@ export default function ReviewShell() {
         body: JSON.stringify({
           mode: 'instruct',
           instruction,
-          currentDocxBase64: tailoredDocxBase64,
-          baseResumeBase64: baseResume.base64,
+          structure: tailoredStructure,
           aboutMe: { base64: aboutMe.base64, mimeType: aboutMe.mimeType },
           rules: { base64: resumeRules.base64, mimeType: resumeRules.mimeType },
           jobPosting: { company: session.company, role: session.role, description: session.jobDescription },
@@ -118,7 +123,7 @@ export default function ReviewShell() {
         setApiError(data.error || { type: 'generic', message: 'The AI service is temporarily unavailable. Please try again.' });
         return;
       }
-      setTailoredDocxBase64(data.updatedDocxBase64);
+      setTailoredStructure(data.structure);
       setSession({
         ...session,
         estimatedPages: data.estimatedPages ?? session.estimatedPages,
@@ -131,8 +136,8 @@ export default function ReviewShell() {
               costUsd: (session.usage?.costUsd || 0) + data.usage.costUsd,
             }
           : session.usage,
-        docxVersion: (session.docxVersion || 0) + 1,
-        docxGeneratedAt: new Date().toISOString(),
+        resumeVersion: (session.resumeVersion || 0) + 1,
+        resumeGeneratedAt: new Date().toISOString(),
       });
       setToastMessage('Instruction applied — preview updated.');
     } catch {
@@ -142,34 +147,27 @@ export default function ReviewShell() {
     }
   }
 
-  function handleApprove(id: string) {
-    setSession({
-      ...session,
-      structuralChanges: session.structuralChanges.map((change) => (change.id === id ? { ...change, status: 'approved' } : change)),
-    });
-  }
-
-  function handleRevert(id: string) {
-    if (session.safeDocxBase64) {
-      setTailoredDocxBase64(session.safeDocxBase64);
-    }
-    setSession({
-      ...session,
-      structuralChanges: session.structuralChanges.map((change) =>
-        change.status === 'pending' ? { ...change, status: 'reverted' } : change,
-      ),
-      log: [...session.log, `Reverted structural change: ${session.structuralChanges.find((c) => c.id === id)?.description ?? ''}`],
-    });
-  }
+  // ponytail: the structural-change Approve/Revert mechanism was removed along
+  // with the docx safe-copy it depended on. structuralChanges now surface as
+  // read-only informational items in the ActivityTile. If a per-change
+  // accept/undo flow is wanted again, it can return here.
 
   function handleClearLog() {
     setSession({ ...session, log: [], warnings: [] });
   }
 
-  function handleDownload() {
-    const filename = `${sanitizeFilenameInput(filenameBase) || 'Resume'}.docx`;
-    downloadBlob(base64ToBlob(tailoredDocxBase64), filename);
-    setToastMessage(`Downloaded — ${filename}`);
+  async function handleDownload() {
+    if (!tailoredStructure) return;
+    const filename = `${sanitizeFilenameInput(filenameBase) || 'Resume'}.pdf`;
+    try {
+      const blob = await compileLatexToPdf(renderResumeLatex(tailoredStructure));
+      downloadBlob(blob, filename);
+      setToastMessage(`Downloaded — ${filename}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "We couldn't compile this resume to a PDF.";
+      setPreviewError(message);
+      setApiError({ type: 'generic', message: "We couldn't build the PDF for download. Please try again." });
+    }
   }
 
   if (!session.complete) {
@@ -214,7 +212,7 @@ export default function ReviewShell() {
               <p className="text-xs text-slate-400">Read-only · scroll to see full document</p>
             </div>
             <div className="h-[800px] overflow-auto rounded-2xl">
-              <DocxPreview base64={baseResume.base64} />
+              <LatexPdfPreview latex={originalLatex} />
             </div>
           </section>
 
@@ -224,7 +222,7 @@ export default function ReviewShell() {
               <p className="text-xs text-slate-400">Read-only · scroll to see full document</p>
             </div>
             <div className="h-[800px] overflow-auto rounded-2xl">
-              <DocxPreview base64={tailoredDocxBase64} onError={setPreviewError} />
+              <LatexPdfPreview latex={tailoredLatex} onError={setPreviewError} />
             </div>
 
             {sending ? (
@@ -247,14 +245,14 @@ export default function ReviewShell() {
                   onChange={(event) => setFilenameBase(sanitizeFilenameInput(event.target.value))}
                   className="w-full bg-transparent px-4 py-3 text-white outline-none"
                 />
-                <span className="pr-4 text-slate-500">.docx</span>
+                <span className="pr-4 text-slate-500">.pdf</span>
               </div>
             </div>
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex items-center gap-2">
-                {session.docxVersion > 0 ? (
+                {session.resumeVersion > 0 ? (
                   <span className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs text-slate-400">
-                    Version {session.docxVersion}
+                    Version {session.resumeVersion}
                   </span>
                 ) : null}
                 <button
@@ -262,7 +260,7 @@ export default function ReviewShell() {
                   className={`inline-flex items-center justify-center rounded-3xl bg-accent px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-blue-500${downloadPulse ? ' animate-download-pulse' : ''}`}
                   onClick={handleDownload}
                 >
-                  ✦ Download .docx
+                  ✦ Download .pdf
                 </button>
               </div>
               {relativeTime ? (
@@ -270,7 +268,7 @@ export default function ReviewShell() {
               ) : null}
             </div>
           </div>
-          <p className="text-xs text-slate-500">Open in Microsoft Word to make edits and export as PDF.</p>
+          <p className="text-xs text-slate-500">Describe any further edits in the AI Activity tile below — the preview and download update automatically.</p>
         </div>
 
         <ActivityTile
@@ -288,8 +286,6 @@ export default function ReviewShell() {
           warnings={session.warnings}
           debugInfo={debugInfo}
           onClear={handleClearLog}
-          onApprove={handleApprove}
-          onRevert={handleRevert}
           onSend={handleSendInstruction}
           sending={sending}
         />

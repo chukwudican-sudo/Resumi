@@ -19,22 +19,6 @@
   color: #e2e8f0;
 }
 
-/* docx-preview renders the real Word document (with its own margins) into
-   this container. White background, no extra padding or inner border-radius
-   so the white fills flush to the parent wrapper's rounded corners — prevents
-   the dark "film" gap that appeared when both the wrapper and container had
-   their own rounding + padding. */
-.docx-preview-container {
-  background: #ffffff;
-  color: #111827;
-  min-height: 100%;
-}
-
-.docx-preview-container .docx-preview {
-  background: #ffffff !important;
-  box-shadow: none !important;
-}
-
 html, body {
   min-height: 100%;
   scroll-behavior: smooth;

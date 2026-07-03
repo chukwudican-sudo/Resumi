@@ -17,6 +17,7 @@ import {
   DebugInfo,
   DocumentFileState,
   JobPostingState,
+  ResumeStructure,
   SessionState,
   StructuralChange,
   emptyBaseResume,
@@ -30,8 +31,9 @@ export default function WorkspaceShell() {
   const [aboutMe, setAboutMe] = useLocalStorageState<DocumentFileState>('resumi-about-me', emptyDocumentFile);
   const [resumeRules, setResumeRules] = useLocalStorageState<DocumentFileState>('resumi-resume-rules', emptyDocumentFile);
   const [baseResume, setBaseResume] = useLocalStorageState<BaseResumeState>('resumi-base-resume', emptyBaseResume);
+  const [sourceStructure, setSourceStructure] = useLocalStorageState<ResumeStructure | null>('resumi-source-structure', null);
   const [jobPosting, setJobPosting] = useLocalStorageState<JobPostingState>('resumi-job-posting', emptyJobPosting);
-  const [, setTailoredDocxBase64] = useLocalStorageState<string>('resumi-tailored-docx', '');
+  const [, setTailoredStructure] = useLocalStorageState<ResumeStructure | null>('resumi-tailored-structure', null);
   const [, setDebugInfo] = useLocalStorageState<DebugInfo | null>('resumi-debug-info', null);
   const [session, setSession] = useLocalStorageState<SessionState>('resumi-session', emptySession);
 
@@ -49,12 +51,23 @@ export default function WorkspaceShell() {
     return () => window.removeEventListener(STORAGE_WARNING_EVENT, handleWarning);
   }, []);
 
+  // Gate on the extracted source structure, not the raw upload: tailoring reads
+  // resumi-source-structure, so that's what must be present.
   const canTailor = useMemo(
-    () => aboutMe.loaded && baseResume.loaded && jobPosting.loaded,
-    [aboutMe.loaded, baseResume.loaded, jobPosting.loaded],
+    () => aboutMe.loaded && sourceStructure !== null && jobPosting.loaded,
+    [aboutMe.loaded, sourceStructure, jobPosting.loaded],
   );
 
   async function performTailorRequest(jobSnapshot: JobPostingState) {
+    if (!sourceStructure) {
+      setApiError({
+        type: 'generic',
+        message: "We couldn't read your resume's structure yet. Re-upload your Source Resume and wait for it to finish processing.",
+      });
+      setSession((prev) => ({ ...prev, tailoring: false }));
+      return;
+    }
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), 3 * 60 * 1000);
@@ -67,7 +80,7 @@ export default function WorkspaceShell() {
           mode: 'tailor',
           aboutMe: { base64: aboutMe.base64, mimeType: aboutMe.mimeType },
           rules: { base64: resumeRules.base64, mimeType: resumeRules.mimeType },
-          baseResume: { base64: baseResume.base64 },
+          structure: sourceStructure,
           jobPosting: {
             company: jobSnapshot.company,
             role: jobSnapshot.role,
@@ -89,7 +102,7 @@ export default function WorkspaceShell() {
       }
 
       if (data.debugInfo) setDebugInfo(data.debugInfo);
-      setTailoredDocxBase64(data.tailoredDocxBase64);
+      setTailoredStructure(data.structure || null);
       const structuralChanges: StructuralChange[] = (data.structuralChanges || []).map(
         (change: { description: string; reason: string }, index: number) => ({
           id: `${Date.now()}-${index}`,
@@ -116,10 +129,9 @@ export default function WorkspaceShell() {
         log: data.log || [],
         structuralChanges,
         usage: data.usage,
-        safeDocxBase64: data.safeDocxBase64,
         warnings: data.warnings || [],
-        docxVersion: 1,
-        docxGeneratedAt: new Date().toISOString(),
+        resumeVersion: 1,
+        resumeGeneratedAt: new Date().toISOString(),
       }));
       setJobPosting(emptyJobPosting);
       setRequestComplete(true);
@@ -174,7 +186,7 @@ export default function WorkspaceShell() {
             state={resumeRules}
             onUpload={setResumeRules}
           />
-          <BaseResumePanel state={baseResume} onUpload={setBaseResume} />
+          <BaseResumePanel state={baseResume} onUpload={setBaseResume} onStructureExtracted={setSourceStructure} />
           <JobPostingPanel state={jobPosting} onChange={setJobPosting} />
         </div>
 
