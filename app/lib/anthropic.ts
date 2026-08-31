@@ -77,13 +77,23 @@ export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaude
 
   const client = new Anthropic();
 
+  // The system prompt is the stable part of every request, so it carries the
+  // cache breakpoint. Anything volatile must stay in the user content or the
+  // prefix changes each turn and nothing is ever reused. Below the model's
+  // minimum cacheable length this is simply ignored, so it is safe to always
+  // send. Watch usage.cacheReadTokens: a persistent zero across turns means
+  // something volatile has leaked into the system prompt.
+  const system = [
+    { type: 'text' as const, text: opts.system, cache_control: { type: 'ephemeral' as const } },
+  ];
+
   // `output_config` is not in the SDK's published request type yet, hence the
   // cast. Confined to this one place instead of every call site.
   const response: any = await client.messages.create({
     model,
     max_tokens: opts.maxTokens ?? config.maxTokens,
     output_config: { effort: opts.effort ?? config.effort },
-    system: opts.system,
+    system,
     tools: [opts.tool],
     tool_choice: { type: 'tool', name: opts.tool.name },
     messages: [{ role: 'user', content: opts.content }],

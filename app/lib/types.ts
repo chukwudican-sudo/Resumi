@@ -140,6 +140,86 @@ export interface ApiErrorPayload {
   message: string;
 }
 
+// ── Interview model ────────────────────────────────────────────────────────
+// The interview collects atomic facts rather than finished bullets. Bullets are
+// composed from facts at the end, which is what lets the question generator see
+// that an entry is missing a number or a team size and ask about exactly that.
+//
+// These are shaped as rows on purpose: the persistence swap in a later
+// milestone should move them to Postgres without redesigning them.
+
+export type FactCategory =
+  | 'action'      // what they did
+  | 'metric'      // a number that shows size or change
+  | 'scope'       // team size, users served, budget, surface owned
+  | 'tooling'     // languages, frameworks, services
+  | 'outcome'     // what changed as a result
+  | 'context'     // constraints, why it mattered
+  | 'skill'       // a capability, not tied to one entry
+  | 'credential'  // degree, certification, award
+  | 'preference'  // how they want the resume written
+  | 'identity';   // name, contact, location
+
+export type FactSource = 'interview' | 'resume_import' | 'linkedin' | 'github' | 'manual';
+
+export type EntryKind = 'experience' | 'project' | 'education';
+
+export interface ProfileEntry {
+  id: string;
+  kind: EntryKind;
+  title?: string;
+  org?: string;
+  location?: string;
+  datesDisplay?: string;
+  /** 0 is most recent. Drives both resume order and question priority. */
+  orderIndex: number;
+  source: FactSource;
+}
+
+export interface Fact {
+  id: string;
+  /** null for facts that belong to the person rather than one entry. */
+  entryId: string | null;
+  category: FactCategory;
+  text: string;
+  /** Whether the text carries a real quantity. A metric fact without one does not close a metric gap. */
+  hasNumber: boolean;
+  confidence: number;
+  source: FactSource;
+  sourceTurnId: string | null;
+  status: 'active' | 'archived' | 'superseded';
+}
+
+export type InterviewPhase = 'identity' | 'breadth' | 'depth' | 'skills';
+
+export interface InterviewQuestion {
+  text: string;
+  /** Shown to the user so the interview explains itself. */
+  why: string;
+  targets: { entryId: string | null; category: FactCategory };
+  kind: 'open' | 'numeric' | 'choice';
+  choices?: string[];
+  skippable: boolean;
+}
+
+export interface InterviewTurn {
+  id: string;
+  idx: number;
+  question: InterviewQuestion;
+  rawAnswer: string;
+  skipped: boolean;
+}
+
+export interface InterviewSession {
+  id: string;
+  status: 'active' | 'paused' | 'completed' | 'abandoned';
+  phase: InterviewPhase;
+  turns: InterviewTurn[];
+  pendingQuestion: InterviewQuestion | null;
+  startedAt: string;
+  completedAt: string | null;
+}
+
 export interface ResumeStructure {
   name: string;
   contact: { phone?: string; email?: string; linkedin?: string; github?: string; website?: string };
