@@ -140,6 +140,38 @@ export interface ApiErrorPayload {
   message: string;
 }
 
+// ── Onboarding ─────────────────────────────────────────────────────────────
+
+/**
+ * What we ask before getting out of the way.
+ *
+ * Deliberately two fields. Asking more up front is what drives people off, and
+ * everything else about them is collected later by the thing that is already
+ * good at it — the questions, or their uploaded resume.
+ */
+export type CareerStage = 'internship' | 'new_grad' | 'experienced';
+
+export interface OnboardingState {
+  completed: boolean;
+  stage: CareerStage | '';
+  /** Free text: "backend", "data science", "product design". Optional. */
+  targetField: string;
+  completedAt: string;
+}
+
+export const emptyOnboarding: OnboardingState = {
+  completed: false,
+  stage: '',
+  targetField: '',
+  completedAt: '',
+};
+
+export const CAREER_STAGE_LABELS: Record<CareerStage, string> = {
+  internship: 'Looking for an internship',
+  new_grad: 'New grad / early career',
+  experienced: 'Experienced hire',
+};
+
 // ── Interview model ────────────────────────────────────────────────────────
 // The interview collects atomic facts rather than finished bullets. Bullets are
 // composed from facts at the end, which is what lets the question generator see

@@ -27,7 +27,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { state?: InterviewState; answer?: string | null; skipped?: boolean };
+  let body: {
+    state?: InterviewState;
+    answer?: string | null;
+    skipped?: boolean;
+    goal?: { stage: string; targetField: string };
+  };
   try {
     body = await request.json();
   } catch {
@@ -40,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runTurn(state, body.answer ?? null, Boolean(body.skipped));
+    const result = await runTurn(state, body.answer ?? null, Boolean(body.skipped), body.goal);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {

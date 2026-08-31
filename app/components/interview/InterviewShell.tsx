@@ -9,11 +9,13 @@ import { useLocalStorageState } from '../../hooks/useLocalStorageState';
 // cannot be bundled for the browser.
 import { MAX_TURNS, emptyInterviewState, type InterviewState } from '../../lib/interview/state';
 import { computeCoverage } from '../../lib/interview/coverage';
-import type {
-  ApiErrorPayload,
-  BaseResumeState,
-  Fact,
-  ResumeStructure,
+import {
+  emptyOnboarding,
+  type ApiErrorPayload,
+  type BaseResumeState,
+  type Fact,
+  type OnboardingState,
+  type ResumeStructure,
 } from '../../lib/types';
 import AnswerComposer from './AnswerComposer';
 import ChatTranscript from './ChatTranscript';
@@ -34,6 +36,7 @@ export default function InterviewShell() {
   const [, setBaseResume] = useLocalStorageState<BaseResumeState>('resumi-base-resume', {
     loaded: false, fileName: '', updatedAt: '', warning: null,
   });
+  const [onboarding] = useLocalStorageState<OnboardingState>('resumi-onboarding', emptyOnboarding);
 
   const [thinking, setThinking] = useState(false);
   const [composing, setComposing] = useState(false);
@@ -65,7 +68,12 @@ export default function InterviewShell() {
       const response = await fetch('/api/interview/turn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state, answer, skipped }),
+        body: JSON.stringify({
+          state,
+          answer,
+          skipped,
+          goal: { stage: onboarding.stage, targetField: onboarding.targetField },
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -101,7 +109,7 @@ export default function InterviewShell() {
       setSourceStructure(data.structure as ResumeStructure);
       setBaseResume({
         loaded: true,
-        fileName: 'Built from your interview',
+        fileName: 'Built from your answers',
         updatedAt: new Date().toISOString(),
         warning: null,
       });
@@ -110,7 +118,7 @@ export default function InterviewShell() {
         setComposeWarnings(data.warnings);
         return;
       }
-      router.push('/');
+      router.push('/profile');
     } catch {
       setApiError({ type: 'network', message: 'Your internet connection dropped. Please check your connection.' });
     } finally {
@@ -131,7 +139,7 @@ export default function InterviewShell() {
       <Shell>
         <div className="mx-auto max-w-2xl">
           <section className="resume-card p-8 text-center shadow-lg shadow-slate-950/10">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Interview</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">A few questions</p>
             <h2 className="mt-4 text-3xl font-semibold text-white">Let&rsquo;s build your profile</h2>
             <p className="mx-auto mt-4 max-w-lg text-sm text-slate-400">
               Answer a handful of questions about your work and we&rsquo;ll turn them into a resume. No document
@@ -144,7 +152,7 @@ export default function InterviewShell() {
               disabled={thinking}
               className="mt-8 inline-flex items-center justify-center rounded-3xl bg-accent px-8 py-4 text-lg font-semibold text-slate-950 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700"
             >
-              {thinking ? 'Starting…' : 'Start the interview'}
+              {thinking ? 'Starting…' : 'Start'}
             </button>
           </section>
           {apiError ? <ErrorModal error={apiError} onClose={() => setApiError(null)} /> : null}
@@ -159,7 +167,7 @@ export default function InterviewShell() {
       <Shell>
         <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="resume-card p-8 shadow-lg shadow-slate-950/10">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Interview complete</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">All done</p>
             <h2 className="mt-4 text-2xl font-semibold text-white">
               {state.facts.length} things captured across {state.entries.length}{' '}
               {state.entries.length === 1 ? 'entry' : 'entries'}
@@ -176,10 +184,10 @@ export default function InterviewShell() {
                 </ul>
                 <button
                   type="button"
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push('/profile')}
                   className="mt-4 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-blue-500"
                 >
-                  Continue to workspace
+                  See my profile
                 </button>
               </div>
             ) : (
@@ -245,7 +253,7 @@ export default function InterviewShell() {
         {apiError ? <ErrorModal error={apiError} onClose={() => setApiError(null)} /> : null}
         {confirmRestart ? (
           <Modal
-            title="Start the interview over?"
+            title="Start over?"
             message="Everything captured so far will be cleared. This cannot be undone."
             actions={[
               { label: 'Cancel', onClick: () => setConfirmRestart(false) },
@@ -286,7 +294,7 @@ export default function InterviewShell() {
                 onDraftChange={setDraft}
                 onSubmit={(answer) => takeTurn(answer)}
                 onSkip={() => takeTurn('', true)}
-                onFinish={() => setState({ ...state, finished: true, finishReason: 'You ended the interview.', pendingQuestion: null })}
+                onFinish={() => setState({ ...state, finished: true, finishReason: 'You ended it here.', pendingQuestion: null })}
               />
             </div>
           ) : null}
@@ -312,7 +320,7 @@ export default function InterviewShell() {
       {apiError ? <ErrorModal error={apiError} onClose={() => setApiError(null)} /> : null}
       {confirmRestart ? (
         <Modal
-          title="Start the interview over?"
+          title="Start over?"
           message="Everything captured so far will be cleared. This cannot be undone."
           actions={[
             { label: 'Cancel', onClick: () => setConfirmRestart(false) },
@@ -331,7 +339,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Header
           active="interview"
           title="Tell us about your work"
-          subtitle="A few questions, and we'll build your resume profile from your answers."
+          subtitle="Answer what you can — we'll build your resume profile from it."
         />
         {children}
       </div>

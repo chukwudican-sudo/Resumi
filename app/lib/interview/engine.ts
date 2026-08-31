@@ -166,7 +166,14 @@ function makeId(prefix: string): string {
  *
  * `answer` is null on the opening turn, when there is nothing to react to yet.
  */
-export async function runTurn(state: InterviewState, answer: string | null, skipped = false): Promise<RunTurnResult> {
+export interface TurnGoal { stage: string; targetField: string }
+
+export async function runTurn(
+  state: InterviewState,
+  answer: string | null,
+  skipped = false,
+  goal?: TurnGoal,
+): Promise<RunTurnResult> {
   const coverageBefore = computeCoverage(state.entries, state.facts);
 
   const message = buildTurnMessage({
@@ -178,6 +185,7 @@ export async function runTurn(state: InterviewState, answer: string | null, skip
     latestAnswer: answer,
     turnCount: state.turns.length,
     maxTurns: MAX_TURNS,
+    goal,
   });
 
   let { toolInput, usage } = await callClaude<RawTurnOutput>({
