@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Modal from './Modal';
-import { DebugInfo, StructuralChange, TokenUsage } from '../lib/types';
+import { StructuralChange, TokenUsage } from '../lib/types';
 
 interface ActivityTileProps {
   matchScore: number | null;
@@ -17,7 +17,6 @@ interface ActivityTileProps {
   structuralChanges: StructuralChange[];
   usage: TokenUsage | null;
   warnings: string[];
-  debugInfo: DebugInfo | null;
   onClear: () => void;
   onSend: (instruction: string) => Promise<void>;
   sending: boolean;
@@ -36,13 +35,11 @@ export default function ActivityTile({
   structuralChanges,
   usage,
   warnings,
-  debugInfo,
   onClear,
   onSend,
   sending,
 }: ActivityTileProps) {
   const [visible, setVisible] = useState(true);
-  const [debugOpen, setDebugOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [confirmingClear, setConfirmingClear] = useState(false);
 
@@ -143,78 +140,6 @@ export default function ActivityTile({
               <p className="mt-1 text-slate-300">Reason: {change.reason}</p>
             </div>
           ))}
-
-          <div className="rounded-3xl border border-slate-800 bg-slate-900 px-5 py-4">
-            <button
-              type="button"
-              onClick={() => setDebugOpen((o) => !o)}
-              className="flex w-full items-center justify-between text-left text-xs text-slate-400 hover:text-slate-200"
-            >
-              <span className="font-semibold uppercase tracking-widest">Debug — last tailor session</span>
-              <span>{debugOpen ? '▲ Hide' : '▼ Show'}</span>
-            </button>
-
-            {debugOpen ? (
-              <div className="mt-4 space-y-4 text-xs text-slate-400">
-                {debugInfo ? (
-                  <>
-                    <div>
-                      <p className="mb-1 font-semibold text-slate-300">Inputs sent to Claude</p>
-                      <p>About Me PDF: {debugInfo.aboutMePresent ? `✓ present (${debugInfo.aboutMeSizeKb}KB)` : '✗ not uploaded'}</p>
-                      <p>Resume Rules: {debugInfo.rulesPresent ? `✓ present (${debugInfo.rulesSizeKb}KB)` : '— not provided (optional)'}</p>
-                      <p>
-                        Job Posting: {debugInfo.jobCompany || '(company not set)'} · {debugInfo.jobRole || '(role not set)'}
-                      </p>
-                      <p>
-                        Description: {debugInfo.jobDescriptionChars > 0 ? `✓ ${debugInfo.jobDescriptionChars.toLocaleString()} chars` : '✗ empty'}
-                        {debugInfo.jobDescriptionChars > 0 ? ` — "${debugInfo.jobDescriptionPreview.slice(0, 120)}${debugInfo.jobDescriptionPreview.length > 120 ? '…' : ''}"` : ''}
-                      </p>
-                      <p>Screenshots: {debugInfo.jobImageCount > 0 ? `✓ ${debugInfo.jobImageCount} attached` : '— none'}</p>
-                      <p>
-                        Resume: {debugInfo.paragraphCount} paragraphs total, {debugInfo.editableParagraphCount} editable
-                      </p>
-                      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-xl bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-400">
-                        {debugInfo.paragraphsPreview}
-                        {debugInfo.paragraphCount > 5 ? `\n… (${debugInfo.paragraphCount - 5} more paragraphs)` : ''}
-                      </pre>
-                    </div>
-
-                    <div>
-                      <p className="mb-1 font-semibold text-slate-300">Claude's response</p>
-                      <p>Paragraphs returned: {debugInfo.claudeParagraphsReturned}</p>
-                      <p>
-                        Changed:{' '}
-                        <span className={debugInfo.claudeChangedCount === 0 ? 'text-warning' : 'text-accent'}>
-                          {debugInfo.claudeChangedCount} of {debugInfo.editableParagraphCount} editable paragraphs
-                        </span>
-                        {debugInfo.claudeChangedIndices.length > 0
-                          ? ` (indices: ${debugInfo.claudeChangedIndices.join(', ')})`
-                          : ''}
-                      </p>
-                      <p>Match score: {debugInfo.claudeMatchScore !== null ? `${debugInfo.claudeMatchScore}%` : 'n/a'}</p>
-                      <p>Vague detection: {debugInfo.claudeVague ? '⚠ flagged as vague' : '✓ not vague'}</p>
-                      {debugInfo.claudeLogPreview ? (
-                        <p className="mt-1">Log preview: "{debugInfo.claudeLogPreview}{debugInfo.claudeLogPreview.length >= 200 ? '…' : ''}"</p>
-                      ) : null}
-                    </div>
-
-                    {usage ? (
-                      <div>
-                        <p className="mb-1 font-semibold text-slate-300">Tokens &amp; cost</p>
-                        <p>Input: {usage.inputTokens.toLocaleString()} tokens</p>
-                        <p>Output: {usage.outputTokens.toLocaleString()} tokens</p>
-                        <p>Estimated cost: ~${usage.costUsd.toFixed(4)}</p>
-                      </div>
-                    ) : null}
-
-                    <p className="text-slate-600">Session at {new Date(debugInfo.sentAt).toLocaleString()}</p>
-                  </>
-                ) : (
-                  <p className="text-slate-500">No debug data yet — complete a tailor session first.</p>
-                )}
-              </div>
-            ) : null}
-          </div>
 
           <div className="rounded-3xl border border-slate-800 bg-slate-900 px-5 py-4">
             <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">

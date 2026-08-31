@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
-import { emptySession, SessionState } from '../lib/types';
+import { emptySession, ResumeStructure, SessionState } from '../lib/types';
+import Modal from './Modal';
 import StatusDot from './StatusDot';
 import SettingsModal from './SettingsModal';
 import SystemPromptModal from './SystemPromptModal';
@@ -14,10 +16,19 @@ interface HeaderProps {
 }
 
 export default function Header({ active, title, subtitle }: HeaderProps) {
-  const [session] = useLocalStorageState<SessionState>('resumi-session', emptySession);
+  const router = useRouter();
+  const [session, setSession] = useLocalStorageState<SessionState>('resumi-session', emptySession);
+  const [, setTailoredStructure] = useLocalStorageState<ResumeStructure | null>('resumi-tailored-structure', null);
   const [userName, setUserName] = useLocalStorageState<string>('resumi_user_name', '');
   const [showSettings, setShowSettings] = useState(false);
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [showNewSessionConfirm, setShowNewSessionConfirm] = useState(false);
+
+  function handleNewSession() {
+    setSession(emptySession);
+    setTailoredStructure(null);
+    router.push('/');
+  }
 
   useEffect(() => {
     if (session.tailoring) {
@@ -62,6 +73,16 @@ export default function Header({ active, title, subtitle }: HeaderProps) {
           </span>
         )}
 
+        {active === 'review' && session.complete ? (
+          <button
+            type="button"
+            onClick={() => setShowNewSessionConfirm(true)}
+            className="rounded-full border border-slate-700 bg-slate-900 px-4 py-3 text-slate-300 hover:border-slate-500 hover:text-white"
+          >
+            New Session
+          </button>
+        ) : null}
+
         <div className="ml-1 flex items-center gap-3 border-l border-slate-800 pl-3">
           <StatusDot />
           <button
@@ -87,6 +108,16 @@ export default function Header({ active, title, subtitle }: HeaderProps) {
         <SettingsModal initialName={userName} onSave={setUserName} onClose={() => setShowSettings(false)} />
       ) : null}
       {showSystemPrompt ? <SystemPromptModal onClose={() => setShowSystemPrompt(false)} /> : null}
+      {showNewSessionConfirm ? (
+        <Modal
+          title="Start a new session?"
+          message="Your tailored resume will be cleared. Your Source Resume, About Me, and Rules will stay."
+          actions={[
+            { label: 'Cancel', onClick: () => setShowNewSessionConfirm(false) },
+            { label: 'Start new session', variant: 'primary', onClick: () => { setShowNewSessionConfirm(false); handleNewSession(); } },
+          ]}
+        />
+      ) : null}
     </header>
   );
 }

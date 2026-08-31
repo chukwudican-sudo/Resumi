@@ -66,14 +66,3 @@ Read the resume carefully and populate the ResumeStructure faithfully:
 
 USABILITY: If the document is a readable resume, set "usable" to true and fill in "structure". If it is NOT usable — a scanned or image-only PDF with no extractable text, a blank/corrupt file, or a document that is clearly not a resume at all — set "usable" to false and give a short, plain-English "reason" (e.g. "This PDF appears to be a scanned image with no readable text." or "This file doesn't look like a resume."). When usable is false, the structure will be ignored, so you may return empty values for it.`;
 
-export function buildParagraphPromptBlock(paragraphs: { index: number; style: string; text: string; editable: boolean }[]): string {
-  const lines = paragraphs.map(
-    (p) => `[${p.index}] (${p.style})${p.editable ? '' : ' [non-editable — return unchanged]'}: ${p.text}`,
-  );
-  return [
-    "Base resume — exact paragraph structure from Alex's Word document. This is the ONLY structure you may work within:",
-    ...lines,
-    '',
-    `Return a "paragraphs" array with EXACTLY ${paragraphs.length} entries, in this same order. For each index, return either the original text unchanged or new tailored text for that exact paragraph slot. Never add, remove, merge, or reorder slots. Non-editable paragraphs must be returned exactly as given.`,
-  ].join('\n');
-}

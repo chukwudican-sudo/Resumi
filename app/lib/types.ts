@@ -69,12 +69,16 @@ export interface StructuralChange {
   id: string;
   description: string;
   reason: string;
-  status: 'pending' | 'approved' | 'reverted';
+  status: 'pending';
 }
 
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
+  // Cached tokens are billed separately and are not counted in inputTokens.
+  // Optional because sessions persisted before caching was added won't have them.
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   costUsd: number;
 }
 
@@ -98,10 +102,8 @@ export interface SessionState {
   // this is still true on a fresh page load, the previous attempt never
   // got to clear it, which only happens if the tab/browser closed mid-request.
   tailoring: boolean;
-  // True only for a background re-tailor kicked off from a completed
-  // session — shows the "Updating with new session..." overlay on Review.
+  // True only during a background re-tailor — kept for RecoveryBanner compatibility.
   updating: boolean;
-  backgroundError: ApiErrorPayload | null;
   // Increments each time a new tailored Resume Structure is generated (initial
   // tailor resets to 1; each re-tailor or instruction update increments by 1).
   // Drives the Version N badge and "Generated X ago" label on the download
@@ -127,34 +129,11 @@ export const emptySession: SessionState = {
   warnings: [],
   tailoring: false,
   updating: false,
-  backgroundError: null,
   resumeVersion: 0,
   resumeGeneratedAt: '',
 };
 
 export type ApiErrorType = 'network' | 'auth' | 'generic' | 'timeout';
-
-export interface DebugInfo {
-  sentAt: string;
-  aboutMePresent: boolean;
-  aboutMeSizeKb: number;
-  rulesPresent: boolean;
-  rulesSizeKb: number;
-  jobCompany: string;
-  jobRole: string;
-  jobDescriptionChars: number;
-  jobDescriptionPreview: string;
-  jobImageCount: number;
-  paragraphCount: number;
-  editableParagraphCount: number;
-  paragraphsPreview: string;
-  claudeParagraphsReturned: number;
-  claudeChangedCount: number;
-  claudeChangedIndices: number[];
-  claudeLogPreview: string;
-  claudeMatchScore: number | null;
-  claudeVague: boolean;
-}
 
 export interface ApiErrorPayload {
   type: ApiErrorType;
