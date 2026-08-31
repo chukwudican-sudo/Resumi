@@ -176,11 +176,27 @@ export interface TurnContext {
   latestAnswer: string | null;
   turnCount: number;
   maxTurns: number;
+  /** What they told onboarding they're looking for, if anything. */
+  goal?: { stage: string; targetField: string };
 }
 
 /** Builds the single user message for one interview turn. */
 export function buildTurnMessage(ctx: TurnContext): string {
-  const sections = [
+  const sections: string[] = [];
+
+  // Goes first so it colours every question. Knowing someone is after a backend
+  // internship rather than a senior design role changes which details are worth
+  // digging for, right from the opening question.
+  if (ctx.goal?.stage || ctx.goal?.targetField) {
+    sections.push(
+      '[WHAT THEY ARE LOOKING FOR]',
+      [ctx.goal.stage, ctx.goal.targetField].filter(Boolean).join(' — '),
+      'Weight your questions towards what matters for this kind of role. Do not mention this back to them as though it were news.',
+      '',
+    );
+  }
+
+  sections.push(
     '[PROFILE SO FAR]',
     renderProfile(ctx.entries, ctx.facts),
     '',
@@ -197,7 +213,7 @@ export function buildTurnMessage(ctx: TurnContext): string {
     `Current phase: ${ctx.phase} — ${PHASE_OBJECTIVES[ctx.phase]}`,
     `Turn ${ctx.turnCount + 1} of at most ${ctx.maxTurns}.`,
     '',
-  ];
+  );
 
   if (ctx.latestAnswer === null) {
     sections.push(

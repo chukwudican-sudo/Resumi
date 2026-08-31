@@ -49,6 +49,25 @@ export default function WorkspaceShell() {
     return () => window.removeEventListener(STORAGE_WARNING_EVENT, handleWarning);
   }, []);
 
+  // Send first-time visitors to onboarding rather than an empty workspace they
+  // have no way to fill.
+  //
+  // Reads storage directly instead of using the hooks above: those start at
+  // their default and only pick up the real value on a second render, so
+  // reading their state here would bounce people who already have a profile.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('resumi-onboarding');
+      const onboarded = raw ? JSON.parse(raw)?.completed === true : false;
+      const structure = window.localStorage.getItem('resumi-source-structure');
+      const hasProfile = Boolean(structure) && structure !== 'null';
+      if (!onboarded && !hasProfile) router.replace('/onboarding');
+    } catch {
+      // A broken or unavailable localStorage should not trap anyone on a
+      // redirect loop — leave them in the workspace.
+    }
+  }, [router]);
+
   // Gate on the extracted source structure, not the raw upload: tailoring reads
   // resumi-source-structure, so that's what must be present. About Me is not
   // required — a profile built through the interview never has one, and the

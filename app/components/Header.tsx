@@ -10,7 +10,12 @@ import StatusDot from './StatusDot';
 import SettingsModal from './SettingsModal';
 import SystemPromptModal from './SystemPromptModal';
 
-export type NavKey = 'interview' | 'workspace' | 'review';
+/**
+ * `interview` and `onboarding` are valid page identities but deliberately have
+ * no nav entry: both are things you pass through, not places you return to.
+ * Profile is where that data actually lives.
+ */
+export type NavKey = 'profile' | 'workspace' | 'review' | 'interview' | 'onboarding';
 
 /**
  * The nav, as data. Adding a route is one entry here rather than another
@@ -24,7 +29,7 @@ const NAV_ITEMS: {
   enabled?: (session: SessionState) => boolean;
   disabledHint?: string;
 }[] = [
-  { key: 'interview', href: '/interview', label: 'Interview' },
+  { key: 'profile', href: '/profile', label: 'Profile' },
   { key: 'workspace', href: '/', label: 'Workspace' },
   {
     key: 'review',
