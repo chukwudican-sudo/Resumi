@@ -80,7 +80,15 @@ function mockInstruct(structure: ResumeStructure, instruction: string) {
   };
 }
 
-/** Returns the response body for a mocked /api/claude POST. */
+/**
+ * Returns the response body for a mocked /api/claude POST, or null for an
+ * unknown mode.
+ *
+ * Null rather than a default tailor response so mock mode rejects an unknown
+ * mode exactly as the real dispatch table does — a mock that silently accepted
+ * anything would hide mode typos during offline testing, which is precisely
+ * when they are cheapest to catch.
+ */
 export function mockApiResponse(body: any) {
   switch (body?.mode) {
     case 'extract':
@@ -90,7 +98,8 @@ export function mockApiResponse(body: any) {
     case 'instruct':
       return mockInstruct(body.structure || SAMPLE_STRUCTURE, body.instruction || '');
     case 'tailor':
-    default:
       return mockTailor(body.structure || SAMPLE_STRUCTURE, body.jobPosting);
+    default:
+      return null;
   }
 }
