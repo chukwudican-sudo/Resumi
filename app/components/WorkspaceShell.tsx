@@ -14,7 +14,6 @@ import { STORAGE_WARNING_EVENT } from '../lib/storage';
 import {
   ApiErrorPayload,
   BaseResumeState,
-  DebugInfo,
   DocumentFileState,
   JobPostingState,
   ResumeStructure,
@@ -34,7 +33,6 @@ export default function WorkspaceShell() {
   const [sourceStructure, setSourceStructure] = useLocalStorageState<ResumeStructure | null>('resumi-source-structure', null);
   const [jobPosting, setJobPosting] = useLocalStorageState<JobPostingState>('resumi-job-posting', emptyJobPosting);
   const [, setTailoredStructure] = useLocalStorageState<ResumeStructure | null>('resumi-tailored-structure', null);
-  const [, setDebugInfo] = useLocalStorageState<DebugInfo | null>('resumi-debug-info', null);
   const [session, setSession] = useLocalStorageState<SessionState>('resumi-session', emptySession);
 
   const [loading, setLoading] = useState(false);
@@ -101,7 +99,6 @@ export default function WorkspaceShell() {
         return;
       }
 
-      if (data.debugInfo) setDebugInfo(data.debugInfo);
       setTailoredStructure(data.structure || null);
       const structuralChanges: StructuralChange[] = (data.structuralChanges || []).map(
         (change: { description: string; reason: string }, index: number) => ({
@@ -116,7 +113,6 @@ export default function WorkspaceShell() {
         complete: true,
         tailoring: false,
         updating: false,
-        backgroundError: null,
         company: jobSnapshot.company,
         role: jobSnapshot.role,
         jobDescription: jobSnapshot.description,

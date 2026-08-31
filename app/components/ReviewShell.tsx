@@ -14,7 +14,6 @@ import { buildDefaultFilenameBase, sanitizeFilenameInput } from '../lib/filename
 import { downloadBlob } from '../lib/base64';
 import {
   ApiErrorPayload,
-  DebugInfo,
   DocumentFileState,
   ResumeStructure,
   SessionState,
@@ -41,8 +40,6 @@ export default function ReviewShell() {
   const [tailoredStructure, setTailoredStructure] = useLocalStorageState<ResumeStructure | null>('resumi-tailored-structure', null);
   const [session, setSession] = useLocalStorageState<SessionState>('resumi-session', emptySession);
   const [userName] = useLocalStorageState<string>('resumi_user_name', '');
-  const [debugInfo] = useLocalStorageState<DebugInfo | null>('resumi-debug-info', null);
-
   const [sending, setSending] = useState(false);
   const [apiError, setApiError] = useState<ApiErrorPayload | null>(null);
   const [filenameBase, setFilenameBase] = useState(() => buildDefaultFilenameBase(userName, session.role, session.company));
@@ -284,7 +281,6 @@ export default function ReviewShell() {
           structuralChanges={session.structuralChanges}
           usage={session.usage}
           warnings={session.warnings}
-          debugInfo={debugInfo}
           onClear={handleClearLog}
           onSend={handleSendInstruction}
           sending={sending}
