@@ -50,10 +50,12 @@ export default function WorkspaceShell() {
   }, []);
 
   // Gate on the extracted source structure, not the raw upload: tailoring reads
-  // resumi-source-structure, so that's what must be present.
+  // resumi-source-structure, so that's what must be present. About Me is not
+  // required — a profile built through the interview never has one, and the
+  // structure alone is enough to tailor from.
   const canTailor = useMemo(
-    () => aboutMe.loaded && sourceStructure !== null && jobPosting.loaded,
-    [aboutMe.loaded, sourceStructure, jobPosting.loaded],
+    () => sourceStructure !== null && jobPosting.loaded,
+    [sourceStructure, jobPosting.loaded],
   );
 
   async function performTailorRequest(jobSnapshot: JobPostingState) {
@@ -191,7 +193,15 @@ export default function WorkspaceShell() {
         ) : null}
 
         <div className="mt-10 flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-950/90 p-6 text-center shadow-xl shadow-slate-950/30">
-          <p className="text-sm text-slate-400">About Me, Base Resume, and a Job Posting are required — Resume Rules is optional.</p>
+          <p className="text-sm text-slate-400">
+            You need a resume profile and a job posting.{' '}
+            {sourceStructure ? null : (
+              <>
+                <a href="/interview" className="text-accent hover:underline">Answer a few questions</a> or upload a resume below.{' '}
+              </>
+            )}
+            About Me and Resume Rules are optional — they help, but aren&rsquo;t required.
+          </p>
           <TailorButton loading={loading} disabled={!canTailor} onClick={runTailor} />
         </div>
       </div>
