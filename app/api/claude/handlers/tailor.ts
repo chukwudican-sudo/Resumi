@@ -27,9 +27,13 @@ interface TailorResult {
 export async function handleTailor(body: any) {
   const { aboutMe, rules, jobPosting, structure } = body;
 
-  if (!aboutMe?.base64 || !structure || !jobPosting) {
+  // About Me is optional. The structure is the resume of record — it can come
+  // from an uploaded resume or from the interview — and the About Me PDF only
+  // ever enriched it. Requiring it would lock out anyone who built their
+  // profile by being interviewed instead of by uploading a document.
+  if (!structure || !jobPosting) {
     return errorResponse(
-      { type: 'generic', message: 'Missing required inputs. Make sure About Me and a Source Resume are provided.' },
+      { type: 'generic', message: 'Missing required inputs. Build or upload a resume profile first, then add a job posting.' },
       400,
     );
   }
@@ -54,7 +58,9 @@ export async function handleTailor(body: any) {
       JSON.stringify(structure, null, 2),
       '```',
       `Job posting — Company: ${jobPosting.company || '(not provided)'}, Role: ${jobPosting.role || '(not provided)'}\n${jobPosting.description || '(no pasted text — see attached screenshots, if any)'}`,
-      'Produce the tailored resume now by returning an edited ResumeStructure via the submit_tailored_resume tool. Read the About Me PDF and Resume Rules PDF (attached above) and the job posting (text and/or screenshots) before writing anything.',
+      aboutMe?.base64
+        ? 'Produce the tailored resume now by returning an edited ResumeStructure via the submit_tailored_resume tool. Read the About Me PDF and any Resume Rules PDF attached above, plus the job posting, before writing anything.'
+        : 'Produce the tailored resume now by returning an edited ResumeStructure via the submit_tailored_resume tool. No About Me PDF was provided — this profile was built directly, so the structure above is your only source for what this person has done. Tailor within it and do not invent anything to fill gaps.',
     ].join('\n\n'),
   });
 

@@ -12,11 +12,11 @@ import type {
 import { computeCoverage, isCoverageSufficient, type CoverageReport } from './coverage';
 import { INTERVIEW_PROMPT, buildTurnMessage } from './prompt';
 import { findDuplicate, type AskedQuestion } from './similarity';
+import { MAX_TURNS, MIN_TURNS_BEFORE_DONE, PHASE_TURN_CAPS, nextPhase, type InterviewState } from './state';
 import { hasMeaningfulNumber } from './taxonomy';
 
-/** Interview length bounds. The model advises; these decide. */
-export const MIN_TURNS_BEFORE_DONE = 6;
-export const MAX_TURNS = 25;
+// Re-exported so server-side callers can pull everything from one module.
+export { MAX_TURNS, MIN_TURNS_BEFORE_DONE, emptyInterviewState, type InterviewState } from './state';
 
 const FACT_CATEGORIES: FactCategory[] = [
   'action', 'metric', 'scope', 'tooling', 'outcome',
@@ -132,50 +132,6 @@ interface RawTurnOutput {
   phaseAdvance: boolean;
   done: boolean;
   doneReason: string;
-}
-
-const PHASE_ORDER: InterviewPhase[] = ['identity', 'breadth', 'depth', 'skills'];
-
-/**
- * Most turns a phase may consume before it advances regardless of what the
- * model says. Without this the interview can sit in one phase re-asking around
- * the same ground, which is precisely how it starts to feel like a form.
- */
-const PHASE_TURN_CAPS: Record<InterviewPhase, number> = {
-  identity: 3,
-  breadth: 4,
-  depth: 14,
-  skills: 4,
-};
-
-function nextPhase(phase: InterviewPhase): InterviewPhase {
-  const i = PHASE_ORDER.indexOf(phase);
-  return i < PHASE_ORDER.length - 1 ? PHASE_ORDER[i + 1] : phase;
-}
-
-export interface InterviewState {
-  entries: ProfileEntry[];
-  facts: Fact[];
-  turns: InterviewTurn[];
-  phase: InterviewPhase;
-  /** Turn index the current phase began at, used to enforce PHASE_TURN_CAPS. */
-  phaseStartedAtTurn: number;
-  pendingQuestion: InterviewQuestion | null;
-  finished: boolean;
-  finishReason: string;
-}
-
-export function emptyInterviewState(): InterviewState {
-  return {
-    entries: [],
-    facts: [],
-    turns: [],
-    phase: 'identity',
-    phaseStartedAtTurn: 0,
-    pendingQuestion: null,
-    finished: false,
-    finishReason: '',
-  };
 }
 
 export interface RunTurnResult {

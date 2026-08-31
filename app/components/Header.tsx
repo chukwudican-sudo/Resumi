@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocalStorageState } from '../hooks/useLocalStorageState';
 import { emptySession, ResumeStructure, SessionState } from '../lib/types';
@@ -9,8 +10,33 @@ import StatusDot from './StatusDot';
 import SettingsModal from './SettingsModal';
 import SystemPromptModal from './SystemPromptModal';
 
+export type NavKey = 'interview' | 'workspace' | 'review';
+
+/**
+ * The nav, as data. Adding a route is one entry here rather than another
+ * hand-written branch in the JSX below.
+ */
+const NAV_ITEMS: {
+  key: NavKey;
+  href: string;
+  label: string;
+  /** When absent the tab is always reachable. */
+  enabled?: (session: SessionState) => boolean;
+  disabledHint?: string;
+}[] = [
+  { key: 'interview', href: '/interview', label: 'Interview' },
+  { key: 'workspace', href: '/', label: 'Workspace' },
+  {
+    key: 'review',
+    href: '/review',
+    label: 'Review',
+    enabled: (session) => session.complete,
+    disabledHint: 'Complete a tailoring session to unlock Review',
+  },
+];
+
 interface HeaderProps {
-  active: 'workspace' | 'review';
+  active: NavKey;
   title: string;
   subtitle: string;
 }
@@ -51,27 +77,35 @@ export default function Header({ active, title, subtitle }: HeaderProps) {
         <p className="mt-2 text-sm text-slate-400">{subtitle}</p>
       </div>
       <nav className="flex items-center gap-3 text-sm text-slate-400">
-        {active === 'workspace' ? (
-          <span className="rounded-full bg-slate-900/80 px-4 py-3 text-white">Workspace</span>
-        ) : (
-          <a href="/" className="rounded-full bg-slate-800 px-4 py-3 text-slate-300 hover:bg-slate-700">
-            Workspace
-          </a>
-        )}
-        {active === 'review' ? (
-          <span className="rounded-full bg-slate-900/80 px-4 py-3 text-white">Review</span>
-        ) : session.complete ? (
-          <a href="/review" className="rounded-full bg-slate-800 px-4 py-3 text-slate-300 hover:bg-slate-700">
-            Review
-          </a>
-        ) : (
-          <span
-            className="cursor-not-allowed rounded-full bg-slate-900/40 px-4 py-3 text-slate-600"
-            title="Complete a tailoring session to unlock Review"
-          >
-            Review
-          </span>
-        )}
+        {NAV_ITEMS.map((item) => {
+          if (item.key === active) {
+            return (
+              <span key={item.key} className="rounded-full bg-slate-900/80 px-4 py-3 text-white">
+                {item.label}
+              </span>
+            );
+          }
+          if (item.enabled && !item.enabled(session)) {
+            return (
+              <span
+                key={item.key}
+                className="cursor-not-allowed rounded-full bg-slate-900/40 px-4 py-3 text-slate-600"
+                title={item.disabledHint}
+              >
+                {item.label}
+              </span>
+            );
+          }
+          return (
+            <Link
+              key={item.key}
+              href={item.href}
+              className="rounded-full bg-slate-800 px-4 py-3 text-slate-300 hover:bg-slate-700"
+            >
+              {item.label}
+            </Link>
+          );
+        })}
 
         {active === 'review' && session.complete ? (
           <button
