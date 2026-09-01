@@ -211,8 +211,18 @@ export const EXTRACT_TOOL: Anthropic.Tool = {
         type: 'string',
         description: 'The full relevant job description — responsibilities, requirements, qualifications, nice-to-haves. Boilerplate, benefits, and legal text stripped out. Empty string if no usable job content was found.',
       },
+      location: {
+        type: 'string',
+        description: 'Where the role is based, or "Remote". Empty string if not stated.',
+      },
+      requirements: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'The concrete, named things this role asks for, each as a short canonical term: a language, framework, tool, platform, or a specific named skill — "Docker", "Kubernetes", "GraphQL", "Postgres", "CI/CD", "distributed systems". One term per entry, no sentences, no soft skills, no seniority. These are counted across every posting the person saves to find what they keep being asked for and never mention, so consistent naming matters more than completeness: prefer the common name for a thing over the posting\'s phrasing of it.',
+      },
     },
-    required: ['company', 'role', 'description'],
+    required: ['company', 'role', 'description', 'location', 'requirements'],
     additionalProperties: false,
   },
 };
