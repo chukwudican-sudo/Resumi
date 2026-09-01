@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 36px; height: 62px; border-bottom: 1px solid #EDE9E2; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 38px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+        </svg>
+        <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <span style="font-size: 14px; color: #1A1815; border-bottom: 2px solid #2F5D50; padding: 20px 0 18px;">Applications</span>
+        <span style="font-size: 14px; color: #C0BAB1;">Insights</span>
+        <span style="font-size: 14px; color: #8A8680;">Profile</span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="font-size: 13px; color: #8A8680;">5 free applications</span>
+      <div style="width: 28px; height: 28px; border-radius: 50%; background: #E7EBE8; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #2F5D50;">AN</div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 48px 36px;">
+    <div style="width: 100%; max-width: 900px; display: grid; grid-template-columns: 1.25fr 1fr; gap: 64px; align-items: center;">
+
+      <div>
+        <span style="font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: #2F5D50;">Your profile is ready</span>
+        <h1 style="margin: 16px 0 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 50px; line-height: 1.06; letter-spacing: -0.015em;">
+          Now find the <span style="font-style: italic; color: #2F5D50;">first</span> one.
+        </h1>
+        <p style="margin: 20px 0 0; font-size: 16px; line-height: 1.65; color: #57544E; max-width: 400px;">
+          Paste in a job posting and Resumi rewrites your resume around it. Everything you make stays here &mdash; most people end up with thirty or forty.
+        </p>
+
+        <button style="display: flex; align-items: center; gap: 10px; margin-top: 32px; padding: 15px 26px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FBFAF8" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+          Add a job posting
+        </button>
+
+        <div style="display: flex; align-items: center; gap: 9px; margin-top: 18px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A39B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path>
+            <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path>
+          </svg>
+          <span style="font-size: 13.5px; color: #8A8680;">A link works too &mdash; we&rsquo;ll read the posting from it</span>
+        </div>
+      </div>
+
+      <!-- getting started, the traditional post-onboarding checklist -->
+      <div style="border: 1px solid #E9E5DE; border-radius: 8px; background: #FFFFFF; padding: 26px; box-shadow: 0 1px 24px rgba(26,24,21,0.04);">
+        <div style="display: flex; align-items: baseline; justify-content: space-between;">
+          <span style="font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #A8A39B;">Getting set up</span>
+          <span style="font-size: 12.5px; color: #8A8680;">1 of 4</span>
+        </div>
+
+        <div style="height: 3px; border-radius: 2px; background: #EDEAE3; margin-top: 12px; overflow: hidden;">
+          <div style="height: 100%; width: 25%; border-radius: 2px; background: #2F5D50;"></div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 20px;">
+          <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+            <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 0;">
+              <span style="{{s.mark}}">
+                <sc-if value="{{s.done}}" hint-placeholder-val="{{true}}">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 6L9 17l-5-5"></path>
+                  </svg>
+                </sc-if>
+              </span>
+              <span style="display: flex; flex-direction: column; gap: 3px;">
+                <span style="{{s.titleStyle}}">{{s.title}}</span>
+                <span style="font-size: 13px; line-height: 1.5; color: #A8A39B;">{{s.detail}}</span>
+              </span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const steps = [
+      { title: 'Build your profile', detail: '24 details across 3 entries', done: true },
+      { title: 'Add your first job posting', detail: 'Paste the text or drop in a link', done: false },
+      { title: 'Download a tailored resume', detail: 'Check it, then send it', done: false },
+      { title: 'Mark it as applied', detail: 'So we can remind you to follow up', done: false },
+    ].map((s) => ({
+      ...s,
+      mark:
+        'display: flex; align-items: center; justify-content: center; width: 19px; height: 19px;' +
+        'border-radius: 50%; flex-shrink: 0; margin-top: 1px; ' +
+        (s.done ? 'background: #2F5D50;' : 'background: #FFFFFF; border: 1.5px solid #DCD8D0;'),
+      titleStyle: 'font-size: 14.5px; ' + (s.done ? 'color: #8A8680;' : 'color: #1A1815;'),
+    }));
+    return { steps };
+  }
+}
+</script>
+</body>
+</html>

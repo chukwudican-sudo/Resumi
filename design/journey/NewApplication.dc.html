@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 62px; border-bottom: 1px solid #EDE9E2; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#57544E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+      </svg>
+      <span style="font-size: 14.5px; color: #57544E;">Applications</span>
+    </div>
+    <span style="font-size: 13px; color: #8A8680;">2 of 5 free left</span>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; justify-content: center; padding: 44px 36px; overflow: hidden;">
+    <div style="width: 100%; max-width: 660px; display: flex; flex-direction: column;">
+
+      <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1.08;">
+        What are you applying <span style="font-style: italic; color: #2F5D50;">for</span>?
+      </h1>
+      <p style="margin: 12px 0 0; font-size: 15px; color: #57544E;">
+        A link, the text, or screenshots &mdash; whatever is easiest.
+      </p>
+
+      <!-- link first: fewest keystrokes -->
+      <div style="display: flex; align-items: center; gap: 10px; margin-top: 28px; padding: 13px 15px; border: 1px solid #E0DCD4; border-radius: 6px; background: #FFFFFF;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A8680" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+          <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path>
+          <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path>
+        </svg>
+        <input type="text" placeholder="Paste a link to the posting" style="flex-grow: 1; border: none; font-family: inherit; font-size: 15px; color: #1A1815; outline: none; background: none;">
+        <button style="padding: 7px 15px; border: 1px solid #DDD8D0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13.5px; color: #57544E; cursor: pointer;">Fetch</button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 14px; margin: 18px 0;">
+        <div style="flex-grow: 1; height: 1px; background: #E9E5DE;"></div>
+        <span style="font-size: 12.5px; color: #B5B0A8;">or paste it yourself</span>
+        <div style="flex-grow: 1; height: 1px; background: #E9E5DE;"></div>
+      </div>
+
+      <div style="border: 1px solid #E0DCD4; border-radius: 6px; background: #FFFFFF; overflow: hidden;">
+        <textarea placeholder="Paste the job posting here…" style="width: 100%; box-sizing: border-box; min-height: 150px; padding: 18px; border: none; resize: none; font-family: inherit; font-size: 14.5px; line-height: 1.6; color: #1A1815; outline: none;"></textarea>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 11px 15px; border-top: 1px solid #F2EFE9; background: #FCFBF9;">
+          <button style="display: flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid #E0DCD4; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13px; color: #57544E; cursor: pointer;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#57544E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path>
+            </svg>
+            Screenshots
+          </button>
+          <span style="font-size: 12px; color: #B5B0A8;">Images work if the posting will not copy</span>
+        </div>
+      </div>
+
+      <!-- what it read back -->
+      <div style="display: grid; grid-template-columns: 1.3fr 1fr 0.9fr; gap: 12px; margin-top: 18px;">
+        <sc-for list="{{fields}}" as="f" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 12.5px; color: #8A8680;">{{f.label}}</label>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid #E0DCD4; border-radius: 4px; background: #FFFFFF; min-height: 42px; box-sizing: border-box;">
+              <span style="{{f.valueStyle}}">{{f.value}}</span>
+              <sc-if value="{{f.detected}}" hint-placeholder-val="{{true}}">
+                <span style="padding: 2px 7px; border-radius: 3px; background: #EDF2EF; font-size: 10.5px; color: #2F5D50; white-space: nowrap;">read</span>
+              </sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- the thing that saves people later -->
+      <div style="display: flex; align-items: flex-start; gap: 11px; margin-top: 20px; padding: 14px 16px; border-radius: 5px; background: #F5F3EF;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A8680" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;">
+          <path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path>
+        </svg>
+        <span style="font-size: 13.5px; line-height: 1.6; color: #6B6862;">
+          We keep a copy of this posting. Listings come down within weeks &mdash; you will want it back the day before an interview.
+        </span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 26px; padding-top: 22px; border-top: 1px solid #EBE7E0;">
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6L9 17l-5-5"></path>
+          </svg>
+          <span style="font-size: 13.5px; color: #57544E;">Tailoring from your profile &middot; 24 details</span>
+        </div>
+        <button style="padding: 14px 30px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">
+          Tailor my resume
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const filled = 'font-size: 14.5px; color: #1A1815;';
+    const empty = 'font-size: 14.5px; color: #C0BAB1;';
+    return {
+      fields: [
+        { label: 'Role', value: 'Backend Engineering Intern', detected: true, valueStyle: filled },
+        { label: 'Company', value: 'Shopify', detected: true, valueStyle: filled },
+        { label: 'Closes', value: 'Add a date', detected: false, valueStyle: empty },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
