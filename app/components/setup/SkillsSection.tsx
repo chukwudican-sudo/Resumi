@@ -15,7 +15,7 @@ export default function SkillsSection({
   onSaved,
 }: {
   groups: SkillGroup[];
-  onSaved: (next: SkillGroup[]) => void;
+  onSaved: () => void;
 }) {
   const [rows, setRows] = useState<SkillGroup[]>(
     groups.length ? groups : [{ category: 'Languages', items: '' }],
@@ -27,7 +27,7 @@ export default function SkillsSection({
     startTransition(async () => {
       const clean = rows.filter((r) => r.items.trim());
       await saveSkills(clean);
-      onSaved(clean);
+      onSaved();
       setSaved(true);
     });
   }

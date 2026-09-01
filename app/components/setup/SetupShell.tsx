@@ -30,17 +30,21 @@ export default function SetupShell({
 }) {
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('contact');
-  const [entries, setEntries] = useState(initialEntries);
-  const [facts, setFacts] = useState(initialFacts);
   const [contact, setContact] = useState(initialContact);
   const [, startTransition] = useTransition();
+
+  // Entries and facts come straight from props rather than being copied into
+  // state. router.refresh() re-renders the server component and hands down new
+  // props, but a client component keeps its own state across that — so a copy
+  // would still show the list as it was before the save, and an entry someone
+  // just added would not appear until a full reload.
+  const entries = initialEntries;
+  const facts = initialFacts;
 
   const status = useMemo(() => sectionStatus(entries, facts), [entries, facts]);
   const resume = useMemo(() => buildResume(entries, facts), [entries, facts]);
   const doneCount = status.filter((s) => s.done).length;
 
-  // The server is the source of truth, but re-reading after every keystroke
-  // would make the preview lag behind typing. Local state mirrors the write.
   function afterSave() {
     startTransition(() => router.refresh());
   }
@@ -120,36 +124,19 @@ export default function SetupShell({
               <ContactSection
                 contact={contact}
                 onChange={setContact}
-                onSaved={(next) => {
-                  setFacts((f) => [
-                    ...f.filter((x) => x.category !== 'identity'),
-                    { category: 'identity', text: `Name: ${next.name}` },
-                    { category: 'identity', text: `Email: ${next.email}` },
-                    { category: 'identity', text: `Phone: ${next.phone}` },
-                    { category: 'identity', text: `Location: ${next.location}` },
-                    { category: 'identity', text: `LinkedIn: ${next.linkedin}` },
-                    { category: 'identity', text: `Website: ${next.website}` },
-                  ].filter((x) => !x.text.endsWith(': ')));
-                  afterSave();
-                }}
+                onSaved={afterSave}
                 onNext={() => setSection('experience')}
               />
             ) : section === 'skills' ? (
               <SkillsSection
                 groups={skillGroups}
-                onSaved={(next) => {
-                  setFacts((f) => [
-                    ...f.filter((x) => x.category !== 'skill'),
-                    ...next.map((g) => ({ category: 'skill', text: `${g.category}: ${g.items}` })),
-                  ]);
-                  afterSave();
-                }}
+                onSaved={afterSave}
               />
             ) : (
               <EntrySection
                 kind={section === 'experience' ? 'experience' : section === 'education' ? 'education' : 'project'}
                 entries={entries}
-                onChange={(next) => { setEntries(next); afterSave(); }}
+                onChange={afterSave}
                 onNext={() =>
                   setSection(section === 'experience' ? 'education' : section === 'education' ? 'projects' : 'skills')
                 }

@@ -1,6 +1,6 @@
 import SetupShell from '../components/setup/SetupShell';
 import type { Contact } from '../components/setup/ContactSection';
-import type { EntryWithBullets } from '../lib/buildResume';
+import { entryFromRow, type EntryWithBullets } from '../lib/buildResume';
 import { requireUserId } from '../server/auth';
 import { getResumeInputs, getUser } from '../server/db/repository';
 
@@ -12,18 +12,7 @@ export default async function SetupPage() {
     getUser(userId),
   ]);
 
-  const entries: EntryWithBullets[] = entryRows.map((e) => ({
-    id: e.id,
-    kind: e.kind as EntryWithBullets['kind'],
-    title: e.title ?? undefined,
-    org: e.org ?? undefined,
-    location: e.location ?? undefined,
-    datesDisplay: e.datesDisplay ?? undefined,
-    orderIndex: e.orderIndex,
-    source: e.source as EntryWithBullets['source'],
-    bullets: (e.bullets as string[]) ?? [],
-    tech: e.tech,
-  }));
+  const entries: EntryWithBullets[] = entryRows.map(entryFromRow);
 
   const pick = (label: string) =>
     factRows

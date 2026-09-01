@@ -29,7 +29,7 @@ export default function ContactSection({
 }: {
   contact: Contact;
   onChange: (c: Contact) => void;
-  onSaved: (c: Contact) => void;
+  onSaved: () => void;
   onNext: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -38,7 +38,7 @@ export default function ContactSection({
   function save(andContinue: boolean) {
     startTransition(async () => {
       await saveContactAndRefresh(contact);
-      onSaved(contact);
+      onSaved();
       setSaved(true);
       if (andContinue) onNext();
     });

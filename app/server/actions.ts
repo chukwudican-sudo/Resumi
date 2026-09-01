@@ -12,7 +12,7 @@ import {
   setOnboardingGoal as setGoalRow,
   upsertEntry as upsertEntryRow,
 } from './db/repository';
-import { buildResume, type EntryWithBullets } from '../lib/buildResume';
+import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
 import { profileStrength } from '../lib/profileStrength';
 
 /**
@@ -80,18 +80,7 @@ export async function saveContactDetails(details: {
  */
 async function refreshMasterResume(userId: string) {
   const { entryRows, factRows } = await getResumeInputs(userId);
-  const entries: EntryWithBullets[] = entryRows.map((e) => ({
-    id: e.id,
-    kind: e.kind as EntryWithBullets['kind'],
-    title: e.title ?? undefined,
-    org: e.org ?? undefined,
-    location: e.location ?? undefined,
-    datesDisplay: e.datesDisplay ?? undefined,
-    orderIndex: e.orderIndex,
-    source: e.source as EntryWithBullets['source'],
-    bullets: (e.bullets as string[]) ?? [],
-    tech: e.tech,
-  }));
+  const entries: EntryWithBullets[] = entryRows.map(entryFromRow);
 
   const structure = buildResume(entries, factRows);
   await saveMasterResume(userId, structure, profileStrength(structure));
@@ -107,6 +96,16 @@ export interface EntryInput {
   datesDisplay: string;
   tech: string;
   bullets: string[];
+  dates: {
+    startMonth: number | null;
+    startYear: number | null;
+    endMonth: number | null;
+    endYear: number | null;
+    isCurrent: boolean;
+  };
+  place: { city: string | null; region: string | null; country: string | null };
+  url: string;
+  extra: Record<string, string>;
 }
 
 export async function saveEntry(entry: EntryInput) {

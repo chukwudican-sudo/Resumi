@@ -337,6 +337,13 @@ export async function upsertEntry(
     datesDisplay: string;
     tech: string;
     bullets: string[];
+    dates: {
+      startMonth: number | null; startYear: number | null;
+      endMonth: number | null; endYear: number | null; isCurrent: boolean;
+    };
+    place: { city: string | null; region: string | null; country: string | null };
+    url: string;
+    extra: Record<string, string>;
   },
 ): Promise<string> {
   const bullets = entry.bullets.map((b) => b.trim()).filter(Boolean);
@@ -346,7 +353,12 @@ export async function upsertEntry(
       .update(profileEntries)
       .set({
         title: entry.title, org: entry.org, location: entry.location,
-        datesDisplay: entry.datesDisplay, tech: entry.tech,
+        datesDisplay: entry.datesDisplay, tech: entry.tech, url: entry.url,
+        city: entry.place.city, region: entry.place.region, country: entry.place.country,
+        startMonth: entry.dates.startMonth, startYear: entry.dates.startYear,
+        endMonth: entry.dates.endMonth, endYear: entry.dates.endYear,
+        isCurrent: entry.dates.isCurrent,
+        extra: entry.extra,
         bullets, updatedAt: new Date(),
       })
       .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, entry.id)))
@@ -368,7 +380,12 @@ export async function upsertEntry(
   await db.insert(profileEntries).values({
     id, userId, kind: entry.kind,
     title: entry.title, org: entry.org, location: entry.location,
-    datesDisplay: entry.datesDisplay, tech: entry.tech,
+    datesDisplay: entry.datesDisplay, tech: entry.tech, url: entry.url,
+    city: entry.place.city, region: entry.place.region, country: entry.place.country,
+    startMonth: entry.dates.startMonth, startYear: entry.dates.startYear,
+    endMonth: entry.dates.endMonth, endYear: entry.dates.endYear,
+    isCurrent: entry.dates.isCurrent,
+    extra: entry.extra,
     bullets, orderIndex: next, source: 'manual',
   });
   await markProfileStale(userId);

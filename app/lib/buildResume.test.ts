@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from './buildResume';
+import { buildResume, entryFromRow, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from './buildResume';
 
 let seq = 0;
 function entry(over: Partial<EntryWithBullets> = {}): EntryWithBullets {
@@ -123,4 +123,42 @@ test('a resume is usable once someone is reachable and has done something', () =
     false,
     'no email means nobody can reply',
   );
+});
+
+test('entryFromRow carries every stored column through to the resume', () => {
+  // The bug this pins: the row-to-entry mapping was written out by hand in two
+  // places, and when the structured date and place columns were added neither
+  // copy was updated. Types stayed happy — every dropped field is optional —
+  // so a date typed into the form saved correctly and then came back blank.
+  const row = {
+    id: 'e1',
+    kind: 'experience',
+    title: 'Backend Engineering Intern',
+    org: 'Northbound',
+    location: null,
+    datesDisplay: null,
+    orderIndex: 0,
+    source: 'manual',
+    bullets: ['Rebuilt the payment retry pipeline'],
+    tech: null,
+    url: null,
+    city: 'Toronto',
+    region: 'ON',
+    country: 'Canada',
+    startMonth: 5,
+    startYear: 2025,
+    endMonth: 8,
+    endYear: 2025,
+    isCurrent: false,
+    extra: { employment: 'Internship' },
+  };
+
+  const built = buildResume([entryFromRow(row)], contactFacts);
+  assert.equal(built.experience[0].dates, 'May 2025 – Aug 2025');
+  assert.equal(built.experience[0].location, 'Toronto, ON, Canada');
+
+  // Anything the row holds and the entry does not is a column being dropped.
+  const entryKeys = new Set(Object.keys(entryFromRow(row)));
+  const missing = Object.keys(row).filter((k) => !entryKeys.has(k));
+  assert.deepEqual(missing, [], `columns dropped in conversion: ${missing.join(', ')}`);
 });

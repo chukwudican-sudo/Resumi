@@ -1,3 +1,4 @@
+import { formatDates, formatPlace, recencyKey } from './entryFormat';
 import type { ProfileEntry, ResumeStructure } from './types';
 
 /**
@@ -16,6 +17,84 @@ import type { ProfileEntry, ResumeStructure } from './types';
 export interface EntryWithBullets extends ProfileEntry {
   bullets: string[];
   tech?: string | null;
+  url?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  startMonth?: number | null;
+  startYear?: number | null;
+  endMonth?: number | null;
+  endYear?: number | null;
+  isCurrent?: boolean;
+  extra?: Record<string, string> | null;
+}
+
+/**
+ * A `profile_entries` row as the resume wants it.
+ *
+ * Lives here rather than at each call site because it was duplicated in two
+ * places and both silently dropped the structured date and place columns when
+ * they were added — dates saved fine and then disappeared on the next read.
+ * One conversion means a new column can only be forgotten once.
+ */
+export function entryFromRow(row: {
+  id: string;
+  kind: string;
+  title: string | null;
+  org: string | null;
+  location: string | null;
+  datesDisplay: string | null;
+  orderIndex: number;
+  source: string;
+  bullets: unknown;
+  tech: string | null;
+  url: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  startMonth: number | null;
+  startYear: number | null;
+  endMonth: number | null;
+  endYear: number | null;
+  isCurrent: boolean | null;
+  extra: unknown;
+}): EntryWithBullets {
+  return {
+    id: row.id,
+    kind: row.kind as EntryWithBullets['kind'],
+    title: row.title ?? undefined,
+    org: row.org ?? undefined,
+    location: row.location ?? undefined,
+    datesDisplay: row.datesDisplay ?? undefined,
+    orderIndex: row.orderIndex,
+    source: row.source as EntryWithBullets['source'],
+    bullets: (row.bullets as string[]) ?? [],
+    tech: row.tech,
+    url: row.url,
+    city: row.city,
+    region: row.region,
+    country: row.country,
+    startMonth: row.startMonth,
+    startYear: row.startYear,
+    endMonth: row.endMonth,
+    endYear: row.endYear,
+    isCurrent: row.isCurrent ?? false,
+    extra: (row.extra as Record<string, string> | null) ?? null,
+  };
+}
+
+function datesOf(e: EntryWithBullets) {
+  return {
+    startMonth: e.startMonth ?? null,
+    startYear: e.startYear ?? null,
+    endMonth: e.endMonth ?? null,
+    endYear: e.endYear ?? null,
+    isCurrent: e.isCurrent ?? false,
+  };
+}
+
+function placeOf(e: EntryWithBullets) {
+  return { city: e.city ?? null, region: e.region ?? null, country: e.country ?? null };
 }
 
 /** Contact details are stored as `Label: value` identity facts. */
@@ -59,8 +138,18 @@ function readSkills(facts: ContactFact[]): { category: string; items: string }[]
 
 export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): ResumeStructure {
   const contact = readContact(facts);
+  // Most recent first, by the dates people actually gave — falling back to the
+  // order they were added when an entry has none, so an undated entry does not
+  // silently jump to the top of a resume.
   const byKind = (kind: string) =>
-    entries.filter((e) => e.kind === kind).sort((a, b) => a.orderIndex - b.orderIndex);
+    entries
+      .filter((e) => e.kind === kind)
+      .sort((a, b) => {
+        const diff = recencyKey(datesOf(b)) - recencyKey(datesOf(a));
+        return diff !== 0 ? diff : a.orderIndex - b.orderIndex;
+      });
+
+  const home = readContact(facts).location.split(',').pop()?.trim() || null;
 
   return {
     name: contact.name,
@@ -72,21 +161,21 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
     },
     education: byKind('education').map((e) => ({
       school: e.org ?? '',
-      location: e.location ?? '',
-      degree: e.title ?? '',
-      dates: e.datesDisplay ?? '',
+      location: formatPlace(placeOf(e), e.location, home),
+      degree: [e.title, e.extra?.honours].filter(Boolean).join(' · '),
+      dates: formatDates(datesOf(e), 'education', e.datesDisplay),
     })),
     experience: byKind('experience').map((e) => ({
       title: e.title ?? '',
       org: e.org ?? '',
-      location: e.location ?? '',
-      dates: e.datesDisplay ?? '',
+      location: formatPlace(placeOf(e), e.location, home),
+      dates: formatDates(datesOf(e), 'experience', e.datesDisplay),
       bullets: e.bullets ?? [],
     })),
     projects: byKind('project').map((e) => ({
       name: e.title ?? '',
-      tech: e.tech ?? '',
-      dates: e.datesDisplay ?? '',
+      tech: [e.tech, e.url].filter(Boolean).join(' · '),
+      dates: formatDates(datesOf(e), 'project', e.datesDisplay),
       bullets: e.bullets ?? [],
     })),
     skills: readSkills(facts),

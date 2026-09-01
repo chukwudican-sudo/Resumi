@@ -87,9 +87,39 @@ export const profileEntries = pgTable('profile_entries', {
   kind: text('kind').notNull(),
   title: text('title'),
   org: text('org'),
+  /**
+   * Where, in three parts.
+   *
+   * A resume normally prints "Toronto, ON" and adds the country only when the
+   * application crosses a border — so the pieces are stored separately and the
+   * rendering decides, rather than asking someone to guess the format.
+   */
+  city: text('city'),
+  region: text('region'),
+  country: text('country'),
+  /** Kept for entries imported from a resume, where only a string was available. */
   location: text('location'),
-  /** Verbatim, as the person said it — never reformatted. */
+
+  /**
+   * When, as numbers.
+   *
+   * Free text produced a resume where one job read "May – Aug 2025" and the
+   * next "Summer 2025" — inconsistency a reader notices and reads as
+   * carelessness. Stored as parts, formatted in one place.
+   */
+  startMonth: integer('start_month'),
+  startYear: integer('start_year'),
+  endMonth: integer('end_month'),
+  endYear: integer('end_year'),
+  /** Still there, or still studying. Renders as "Present" / "Expected". */
+  isCurrent: boolean('is_current').notNull().default(false),
+  /** Fallback for imported entries whose dates could not be parsed. */
   datesDisplay: text('dates_display'),
+
+  /** Where to see it. Projects mostly. */
+  url: text('url'),
+  /** Optional extras a section may carry — GPA, honours, employment type. */
+  extra: jsonb('extra').notNull().default({}),
   /** 0 is most recent. Drives both resume order and which gaps get asked about first. */
   orderIndex: integer('order_index').notNull().default(0),
   /**
