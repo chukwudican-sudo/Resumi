@@ -30,7 +30,12 @@ RULES
 9. Aim for one page unless the person clearly has enough experience for two.
 
 PROVENANCE
-For every bullet you write, record which fact ids it came from in bulletSources. A bullet with no supporting fact ids is not allowed. If you find yourself wanting to write something you cannot cite, leave it out.`;
+For every bullet you write, record which fact ids it came from in bulletSources. A bullet with no supporting fact ids is not allowed. If you find yourself wanting to write something you cannot cite, leave it out.
+
+WARNINGS
+Warnings are read by the person, not by a developer. Write them as plain sentences addressed to them, and never mention fact ids, entry ids, or anything else internal — "the storefront bullet may be mixing up two different things" is useful, "bullet references fact_ab12 inferred from fact_cd34" is not.
+
+Raise a warning when: an entry has no measurable outcome, two roles have overlapping dates that may be a mistake, contact details are missing, or something you were told sounds like a target rather than something that happened. Phrase each one so it is obvious what the person would need to tell you to resolve it.`;
 
 const COMPOSE_TOOL: Anthropic.Tool = {
   name: 'submit_composed_profile',
@@ -149,6 +154,22 @@ export async function composeProfile(entries: ProfileEntry[], facts: Fact[]): Pr
  * fact. Anything listed here is unsupported by the interview and should be
  * surfaced to the user rather than shipped quietly into their resume.
  */
+/**
+ * Strips internal ids out of anything shown to the person.
+ *
+ * The prompt asks the model not to mention them, but it is holding a list of
+ * ids and citing them is a natural thing to do, so the instruction alone is not
+ * worth relying on. Belt and braces on the one boundary where an id leaking is
+ * visible to a user.
+ */
+export function cleanWarning(text: string): string {
+  return text
+    .replace(/\b(?:fact|entry|turn)_[A-Za-z0-9]+\b/g, 'one of your answers')
+    .replace(/\s*\((?:inferred from|from|cited from)[^)]*\)/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function findUncitedBullets(result: ComposeResult, facts: Fact[]): string[] {
   const factIds = new Set(facts.map((f) => f.id));
   const cited = new Map<string, string[]>();

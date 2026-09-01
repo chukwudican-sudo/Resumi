@@ -168,11 +168,17 @@ function makeId(prefix: string): string {
  */
 export interface TurnGoal { stage: string; targetField: string }
 
+export interface TurnOptions {
+  goal?: TurnGoal;
+  /** Points raised by the draft that this run is meant to settle. */
+  openQuestions?: string[];
+}
+
 export async function runTurn(
   state: InterviewState,
   answer: string | null,
   skipped = false,
-  goal?: TurnGoal,
+  options: TurnOptions = {},
 ): Promise<RunTurnResult> {
   const coverageBefore = computeCoverage(state.entries, state.facts);
 
@@ -185,7 +191,8 @@ export async function runTurn(
     latestAnswer: answer,
     turnCount: state.turns.length,
     maxTurns: MAX_TURNS,
-    goal,
+    goal: options.goal,
+    openQuestions: options.openQuestions,
   });
 
   let { toolInput, usage } = await callClaude<RawTurnOutput>({

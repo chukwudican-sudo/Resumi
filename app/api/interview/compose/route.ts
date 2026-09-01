@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { NoToolUseError } from '../../../lib/anthropic';
-import { composeProfile, findUncitedBullets } from '../../../lib/interview/compose';
+import { cleanWarning, composeProfile, findUncitedBullets } from '../../../lib/interview/compose';
 import type { Fact, ProfileEntry } from '../../../lib/types';
 import { errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // A bullet the model could not trace to a fact is one it invented. Surface
     // it as a warning rather than letting it pass silently into the resume.
     const uncited = findUncitedBullets(result, facts);
-    const warnings = [...result.warnings];
+    const warnings = result.warnings.map(cleanWarning).filter(Boolean);
     if (uncited.length) {
       warnings.push(
         `${uncited.length} bullet${uncited.length === 1 ? '' : 's'} could not be traced back to anything you said. Check ${uncited.length === 1 ? 'it' : 'them'} before using this resume: ${uncited.map((b) => `"${b}"`).join('; ')}`,

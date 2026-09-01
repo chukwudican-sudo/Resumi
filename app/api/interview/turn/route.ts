@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     answer?: string | null;
     skipped?: boolean;
     goal?: { stage: string; targetField: string };
+    openQuestions?: string[];
   };
   try {
     body = await request.json();
@@ -45,7 +46,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runTurn(state, body.answer ?? null, Boolean(body.skipped), body.goal);
+    const result = await runTurn(state, body.answer ?? null, Boolean(body.skipped), {
+      goal: body.goal,
+      openQuestions: Array.isArray(body.openQuestions) ? body.openQuestions : undefined,
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
