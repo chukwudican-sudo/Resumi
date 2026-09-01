@@ -1,77 +1,3 @@
-export interface DocumentFileState {
-  loaded: boolean;
-  fileName: string;
-  updatedAt: string;
-  base64: string;
-  mimeType: string;
-}
-
-export const emptyDocumentFile: DocumentFileState = {
-  loaded: false,
-  fileName: '',
-  updatedAt: '',
-  base64: '',
-  mimeType: '',
-};
-
-// Tracks the Source Resume upload for the panel's own UI (name, timestamp,
-// loaded/warning state). The uploaded bytes are NOT retained here — the file is
-// sent once for extraction and only the resulting Resume Structure is kept
-// (resumi-source-structure).
-export interface BaseResumeState {
-  loaded: boolean;
-  fileName: string;
-  updatedAt: string;
-  warning: string | null;
-}
-
-export const emptyBaseResume: BaseResumeState = {
-  loaded: false,
-  fileName: '',
-  updatedAt: '',
-  warning: null,
-};
-
-export interface JobPostingImage {
-  id: string;
-  fileName: string;
-  base64: string;
-  mimeType: string;
-}
-
-export interface JobPostingState {
-  company: string;
-  role: string;
-  description: string;
-  images: JobPostingImage[];
-  companyAutoDetected: boolean;
-  roleAutoDetected: boolean;
-  extracted: boolean;
-  needsReExtraction: boolean;
-  loaded: boolean;
-  updatedAt: string;
-}
-
-export const emptyJobPosting: JobPostingState = {
-  company: '',
-  role: '',
-  description: '',
-  images: [],
-  companyAutoDetected: false,
-  roleAutoDetected: false,
-  extracted: false,
-  needsReExtraction: false,
-  loaded: false,
-  updatedAt: '',
-};
-
-export interface StructuralChange {
-  id: string;
-  description: string;
-  reason: string;
-  status: 'pending';
-}
-
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
@@ -81,57 +7,6 @@ export interface TokenUsage {
   cacheWriteTokens?: number;
   costUsd: number;
 }
-
-export interface SessionState {
-  complete: boolean;
-  company: string;
-  role: string;
-  jobDescription: string;
-  matchScore: number | null;
-  missingRequirements: string[];
-  estimatedPages: number | null;
-  vague: boolean;
-  vagueReason: string;
-  vagueAcknowledged: boolean;
-  log: string[];
-  structuralChanges: StructuralChange[];
-  usage: TokenUsage | null;
-  warnings: string[];
-  // True for the entire span of a tailor request (first-time or re-tailor).
-  // Drives the tab-title reset and the mid-tailoring recovery banner — if
-  // this is still true on a fresh page load, the previous attempt never
-  // got to clear it, which only happens if the tab/browser closed mid-request.
-  tailoring: boolean;
-  // True only during a background re-tailor — kept for RecoveryBanner compatibility.
-  updating: boolean;
-  // Increments each time a new tailored Resume Structure is generated (initial
-  // tailor resets to 1; each re-tailor or instruction update increments by 1).
-  // Drives the Version N badge and "Generated X ago" label on the download
-  // section.
-  resumeVersion: number;
-  resumeGeneratedAt: string;
-}
-
-export const emptySession: SessionState = {
-  complete: false,
-  company: '',
-  role: '',
-  jobDescription: '',
-  matchScore: null,
-  missingRequirements: [],
-  estimatedPages: null,
-  vague: false,
-  vagueReason: '',
-  vagueAcknowledged: false,
-  log: [],
-  structuralChanges: [],
-  usage: null,
-  warnings: [],
-  tailoring: false,
-  updating: false,
-  resumeVersion: 0,
-  resumeGeneratedAt: '',
-};
 
 export type ApiErrorType = 'network' | 'auth' | 'generic' | 'timeout';
 
@@ -150,21 +25,6 @@ export interface ApiErrorPayload {
  * good at it — the questions, or their uploaded resume.
  */
 export type CareerStage = 'internship' | 'new_grad' | 'experienced';
-
-export interface OnboardingState {
-  completed: boolean;
-  stage: CareerStage | '';
-  /** Free text: "backend", "data science", "product design". Optional. */
-  targetField: string;
-  completedAt: string;
-}
-
-export const emptyOnboarding: OnboardingState = {
-  completed: false,
-  stage: '',
-  targetField: '',
-  completedAt: '',
-};
 
 export const CAREER_STAGE_LABELS: Record<CareerStage, string> = {
   internship: 'Looking for an internship',

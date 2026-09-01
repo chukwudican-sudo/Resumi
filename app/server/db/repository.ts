@@ -1,8 +1,12 @@
-import { and, desc, eq, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { db } from './client';
+import type { ResumeStructure } from '../../lib/types';
 import {
   applications,
+  documents,
   facts,
+  interviewSessions,
+  interviewTurns,
   jobPostings,
   profileEntries,
   profiles,
@@ -127,6 +131,80 @@ export async function saveComposedProfile(
     });
 }
 
+/**
+ * Replaces the profile with one read out of an uploaded resume.
+ *
+ * The entries become real rows, not just JSON inside the profile, because the
+ * questions later need something to attach facts to — that is what lets an
+ * uploaded resume be topped up rather than merely stored.
+ *
+ * A transaction: a half-written profile with no entries would show someone a
+ * resume the rest of the app cannot reason about.
+ */
+export async function replaceProfileFromResume(
+  userId: string,
+  structure: ResumeStructure,
+  strength: number,
+  fileName: string,
+) {
+  await db.transaction(async (tx) => {
+    await tx.delete(profileEntries).where(
+      and(eq(profileEntries.userId, userId), eq(profileEntries.source, 'resume_import')),
+    );
+
+    const rows: (typeof profileEntries.$inferInsert)[] = [];
+    (structure.experience ?? []).forEach((e, i) => {
+      rows.push({
+        id: newId('entry'), userId, kind: 'experience',
+        title: e.title, org: e.org, location: e.location, datesDisplay: e.dates,
+        orderIndex: i, source: 'resume_import',
+      });
+    });
+    (structure.projects ?? []).forEach((p, i) => {
+      rows.push({
+        id: newId('entry'), userId, kind: 'project',
+        title: p.name, org: p.tech, datesDisplay: p.dates,
+        orderIndex: i, source: 'resume_import',
+      });
+    });
+    (structure.education ?? []).forEach((e, i) => {
+      rows.push({
+        id: newId('entry'), userId, kind: 'education',
+        title: e.degree, org: e.school, location: e.location, datesDisplay: e.dates,
+        orderIndex: i, source: 'resume_import',
+      });
+    });
+    if (rows.length) await tx.insert(profileEntries).values(rows);
+
+    await tx
+      .insert(profiles)
+      .values({
+        id: newId('prof'), userId,
+        resumeStructure: structure as object,
+        bulletSources: [],
+        strength,
+        composedAt: new Date(),
+        stale: false,
+      })
+      .onConflictDoUpdate({
+        target: profiles.userId,
+        set: {
+          resumeStructure: structure as object,
+          strength,
+          composedAt: new Date(),
+          stale: false,
+          updatedAt: new Date(),
+        },
+      });
+
+    await tx.insert(documents).values({
+      id: newId('doc'), userId, kind: 'source_resume',
+      fileName, mimeType: 'application/pdf', sizeBytes: 0,
+      storagePath: '(not retained)', extractedAt: new Date(),
+    });
+  });
+}
+
 export async function markProfileStale(userId: string) {
   await db.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
 }
@@ -139,6 +217,113 @@ export async function getActiveRules(userId: string) {
     .from(rules)
     .where(and(eq(rules.userId, userId), eq(rules.active, true)))
     .orderBy(rules.orderIndex);
+}
+
+// ── Interview ──────────────────────────────────────────────────────────────
+
+/** The live session, if there is one. At most one exists per person. */
+export async function getActiveInterview(userId: string) {
+  const [row] = await db
+    .select()
+    .from(interviewSessions)
+    .where(and(eq(interviewSessions.userId, userId), inArray(interviewSessions.status, ['active', 'paused'])))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function getInterviewTurns(sessionId: string) {
+  return db
+    .select()
+    .from(interviewTurns)
+    .where(eq(interviewTurns.sessionId, sessionId))
+    .orderBy(interviewTurns.idx);
+}
+
+export async function startInterview(userId: string, openQuestions: string[] = []) {
+  const existing = await getActiveInterview(userId);
+  if (existing) return existing;
+
+  const [row] = await db
+    .insert(interviewSessions)
+    .values({ id: newId('sess'), userId, openQuestions })
+    .returning();
+  return row;
+}
+
+/**
+ * Records one completed turn and everything it produced, in a transaction.
+ *
+ * All of it or none: a turn whose facts were saved but whose question was not
+ * would ask the same thing again on the next load, and one whose question was
+ * saved without its facts would silently lose what the person just said.
+ */
+export async function saveInterviewTurn(
+  userId: string,
+  sessionId: string,
+  turn: {
+    idx: number;
+    question: unknown;
+    rawAnswer: string;
+    skipped: boolean;
+  } | null,
+  newEntries: { id: string; kind: string; title?: string; org?: string; location?: string; datesDisplay?: string; orderIndex: number }[],
+  newFacts: { id: string; entryId: string | null; category: string; text: string; hasNumber: boolean; confidence: number; sourceTurnId: string | null }[],
+  session: { phase: string; phaseStartedAtTurn: number; pendingQuestion: unknown; finished: boolean },
+) {
+  await db.transaction(async (tx) => {
+    if (turn) {
+      await tx
+        .insert(interviewTurns)
+        .values({
+          id: newId('turn'),
+          sessionId,
+          idx: turn.idx,
+          question: turn.question as object,
+          rawAnswer: turn.rawAnswer,
+          skipped: turn.skipped,
+        })
+        // The unique (session, idx) index makes a double-submit a no-op rather
+        // than a duplicated turn.
+        .onConflictDoNothing();
+    }
+
+    if (newEntries.length) {
+      await tx.insert(profileEntries).values(
+        newEntries.map((e) => ({
+          id: e.id, userId, kind: e.kind,
+          title: e.title, org: e.org, location: e.location, datesDisplay: e.datesDisplay,
+          orderIndex: e.orderIndex, source: 'interview' as const,
+        })),
+      );
+    }
+
+    if (newFacts.length) {
+      await tx.insert(facts).values(
+        newFacts.map((f) => ({
+          id: f.id, userId, entryId: f.entryId,
+          category: f.category, text: f.text,
+          hasNumber: f.hasNumber, confidence: f.confidence,
+          source: 'interview' as const, sourceTurnId: f.sourceTurnId,
+        })),
+      );
+    }
+
+    await tx
+      .update(interviewSessions)
+      .set({
+        phase: session.phase,
+        phaseStartedAtTurn: session.phaseStartedAtTurn,
+        pendingQuestion: session.pendingQuestion as object,
+        turnCount: turn ? turn.idx + 1 : 0,
+        status: session.finished ? 'completed' : 'active',
+        completedAt: session.finished ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(interviewSessions.id, sessionId));
+
+    // Anything new the person said makes the composed resume out of date.
+    await tx.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
+  });
 }
 
 // ── Applications ───────────────────────────────────────────────────────────

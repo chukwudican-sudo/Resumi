@@ -1,10 +1,6 @@
-import WorkspaceShell from '../components/WorkspaceShell';
-import AppFrame from '../components/AppFrame';
+import { redirect } from 'next/navigation';
 
+/** Superseded by the applications list. Kept so old links do not dead-end. */
 export default function WorkspacePage() {
-  return (
-    <AppFrame>
-      <WorkspaceShell />
-    </AppFrame>
-  );
+  redirect('/applications');
 }
