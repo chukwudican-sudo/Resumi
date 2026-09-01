@@ -117,6 +117,46 @@ export async function seedIdentityFacts(userId: string, name: string | null, ema
   if (rows.length) await db.insert(facts).values(rows).onConflictDoNothing();
 }
 
+/**
+ * Saves the contact block someone filled in during onboarding.
+ *
+ * Stored as identity facts rather than columns so composing reads them the same
+ * way it reads everything else — one path from "something the person told us"
+ * to "a line on the resume", with no second mechanism to keep in step.
+ *
+ * Replaces rather than appends: this is a form someone can come back and
+ * correct, and two conflicting phone numbers is worse than none.
+ */
+export async function saveContactDetails(
+  userId: string,
+  details: { label: string; value: string }[],
+) {
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(facts)
+      .where(and(eq(facts.userId, userId), eq(facts.category, 'identity'), eq(facts.source, 'manual')));
+
+    const rows = details
+      .filter((d) => d.value.trim())
+      .map((d) => ({
+        id: newId('fact'),
+        userId,
+        entryId: null,
+        category: 'identity',
+        text: `${d.label}: ${d.value.trim()}`,
+        hasNumber: false,
+        confidence: 1,
+        source: 'manual' as const,
+        sourceTurnId: null,
+      }));
+
+    if (rows.length) await tx.insert(facts).values(rows);
+
+    // The resume no longer reflects what we know about them.
+    await tx.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
+  });
+}
+
 /** How much the profile knows, for the reassurance line before tailoring. */
 export async function countFacts(userId: string): Promise<number> {
   const [row] = await db

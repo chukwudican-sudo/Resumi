@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUserId } from './auth';
 import {
   markApplied as markAppliedRow,
+  saveContactDetails as saveContactRow,
   setOnboardingGoal as setGoalRow,
 } from './db/repository';
 
@@ -32,4 +33,33 @@ export async function markApplicationApplied(applicationId: string) {
   await markAppliedRow(userId, applicationId);
   revalidatePath('/applications');
   revalidatePath(`/applications/${applicationId}`);
+}
+
+/**
+ * The contact block from onboarding.
+ *
+ * Every field is optional except the ones the account already supplied, and
+ * nothing is validated beyond trimming — a resume is not a form to be policed,
+ * and rejecting an unusual phone format would be worse than printing it.
+ */
+export async function saveContactDetails(details: {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedin: string;
+  website: string;
+}) {
+  const userId = await requireUserId();
+
+  await saveContactRow(userId, [
+    { label: 'Name', value: details.name },
+    { label: 'Email', value: details.email },
+    { label: 'Phone', value: details.phone },
+    { label: 'Location', value: details.location },
+    { label: 'LinkedIn', value: details.linkedin },
+    { label: 'Website', value: details.website },
+  ]);
+
+  revalidatePath('/profile');
 }
