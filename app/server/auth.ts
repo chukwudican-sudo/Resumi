@@ -42,3 +42,38 @@ export async function ensureUser(userId: string, email: string, displayName?: st
   if (existing) return existing;
   return upsertUser(userId, email, displayName);
 }
+
+/**
+ * Makes sure the signed-in person has a row, and returns it.
+ *
+ * Deliberately ordered so the expensive part runs once per user rather than
+ * once per request: the id comes from the session token, the existence check is
+ * a primary-key lookup, and only a genuine miss reaches for Clerk's API to
+ * fetch the email. In practice that is a new account's first page load.
+ *
+ * This is a safety net, not the main path — the webhook is. But the webhook
+ * needs a public URL, so in local development it is the only thing that makes
+ * a signed-in person exist in the database at all.
+ */
+export async function syncCurrentUser() {
+  const userId = await currentUserId();
+  if (!userId) return null;
+
+  const existing = await getUser(userId);
+  if (existing) return existing;
+
+  const { currentUser } = await import('@clerk/nextjs/server');
+  const clerkUser = await currentUser();
+  if (!clerkUser) return null;
+
+  const email =
+    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ??
+    clerkUser.emailAddresses[0]?.emailAddress;
+  if (!email) {
+    console.error(`[Resumi] Clerk user ${userId} has no email address; cannot create their row.`);
+    return null;
+  }
+
+  const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
+  return upsertUser(userId, email, name || undefined);
+}
