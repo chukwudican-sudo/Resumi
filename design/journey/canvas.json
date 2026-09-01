@@ -1,0 +1,47 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 3900,
+      "title": "1 \u00b7 Landing",
+      "expand": "fill"
+    },
+    {
+      "file": "SignUp.dc.html",
+      "x": 1380,
+      "y": 0,
+      "w": 1280,
+      "h": 880,
+      "title": "2 \u00b7 Sign up"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "running-order",
+      "x": 0,
+      "y": -300,
+      "w": 500,
+      "text": "THE JOURNEY, IN ORDER\n\n1 Landing        \u2190 here\n2 Sign up        \u2190 here\n3 Welcome\n4 Your goal\n5 Build profile\n6 Questions\n7 Applications (empty)\n8 New application\n9 Tailoring\n10 Review\n11 Applications (full)\n12 Profile\n\nScreens land on this canvas as we work through them."
+    },
+    {
+      "id": "landing-note",
+      "x": 540,
+      "y": -300,
+      "w": 520,
+      "text": "WHY THIS HEADLINE\n\n\"You'll apply to forty jobs. You'll tailor maybe five.\" names the behaviour rather than pitching the product \u2014 the reader recognises themselves before they have been sold anything. Italic serif carries the turn in the sentence.\n\nSTRUCTURE\n\nNumbered sections (01\u201304) give the page a spine, so it reads as an argument rather than a stack of blocks.\n\nThe product shot sits directly under the hero and bleeds off the bottom edge \u2014 the page shows the tool before it describes it.\n\nTwo dark bands (the numbers, the closing call) break up a long light page and give it rhythm. The close inverts the button so the last thing on screen is the loudest.\n\nThe stats are real and sourced. Cost carries a [YOUR PRICE] placeholder \u2014 fill it before launch rather than letting a made-up number ship."
+    },
+    {
+      "id": "signup-note",
+      "x": 1380,
+      "y": -200,
+      "w": 460,
+      "text": "One field, or one button. Nothing is asked here that the flow asks better later \u2014 no name, no role, no password if they use Google.\n\nThe line about deleting your data sits above the fold on purpose: this is the screen where someone decides whether to hand over their work history."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

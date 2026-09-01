@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 880px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 64px; border-bottom: 1px solid #E9E5DE; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 40px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+        </svg>
+        <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <span style="font-size: 14.5px; color: #8A8680;">Applications</span>
+        <span style="font-size: 14.5px; color: #1A1815; border-bottom: 2px solid #2F5D50; padding: 21px 0 19px;">Profile</span>
+      </div>
+    </div>
+    <div style="width: 30px; height: 30px; border-radius: 50%; background: #E7EBE8; display: flex; align-items: center; justify-content: center; font-size: 12.5px; color: #2F5D50;">AN</div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 40px; display: flex; gap: 32px; justify-content: center; overflow: hidden;">
+
+    <div style="width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 22px;">
+
+      <div>
+        <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 38px; line-height: 1.1;">Alex Ndubuisi</h1>
+        <p style="margin: 9px 0 0; font-size: 14.5px; color: #57544E;">alex@example.com &middot; Toronto, ON</p>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 13px; padding: 17px 19px; border: 1px solid #EADFC4; border-radius: 5px; background: #FDF9F0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8A6414" stroke-width="1.7" stroke-linecap="round" style="flex-shrink: 0; margin-top: 1px;">
+          <path d="M12 9v4M12 17h.01"></path>
+          <path d="M10.3 3.9L2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 14px; color: #6B4E10;">Two roles have no measurable results</span>
+          <span style="font-size: 13.5px; line-height: 1.55; color: #8A6414;">Numbers are what make a resume land. Four questions would fix both.</span>
+        </div>
+        <button style="margin-left: auto; flex-shrink: 0; padding: 8px 15px; border: 1px solid #E0CFA0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13px; color: #6B4E10; cursor: pointer; white-space: nowrap;">
+          Answer
+        </button>
+      </div>
+
+      <sc-for list="{{sections}}" as="sec" hint-placeholder-count="3">
+        <div style="border: 1px solid #E9E5DE; border-radius: 6px; background: #FFFFFF; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #F2EFE9;">
+            <span style="font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A8680;">{{sec.title}}</span>
+            <span style="font-size: 13px; color: #A8A39B;">{{sec.count}}</span>
+          </div>
+          <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
+            <sc-for list="{{sec.entries}}" as="e" hint-placeholder-count="2">
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 14px;">
+                  <span style="font-size: 14.5px; color: #1A1815;">{{e.title}}</span>
+                  <span style="font-size: 13px; color: #A8A39B; white-space: nowrap;">{{e.dates}}</span>
+                </div>
+                <span style="font-size: 13.5px; color: #8A8680;">{{e.org}}</span>
+                <span style="{{e.flagStyle}}">{{e.flag}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+
+    </div>
+
+    <div style="width: 250px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px;">
+      <div style="border: 1px solid #E9E5DE; border-radius: 6px; background: #FFFFFF; padding: 19px;">
+        <span style="font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A8680;">Profile strength</span>
+        <div style="display: flex; align-items: baseline; gap: 7px; margin-top: 11px;">
+          <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 34px; line-height: 1;">72</span>
+          <span style="font-size: 14px; color: #8A8680;">/ 100</span>
+        </div>
+        <div style="height: 4px; border-radius: 2px; background: #EDEAE3; margin-top: 13px; overflow: hidden;">
+          <div style="height: 100%; width: 72%; border-radius: 2px; background: #2F5D50;"></div>
+        </div>
+        <p style="margin: 13px 0 0; font-size: 13px; line-height: 1.55; color: #8A8680;">
+          A stronger profile means less editing after every tailor.
+        </p>
+      </div>
+
+      <button style="padding: 12px 16px; border: 1px solid #DDD8D0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 14px; color: #1A1815; cursor: pointer;">
+        Add more detail
+      </button>
+      <button style="padding: 12px 16px; border: 1px solid #DDD8D0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 14px; color: #57544E; cursor: pointer;">
+        Replace with a file
+      </button>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const flagBase = 'font-size: 12.5px; margin-top: 2px; ';
+    const mk = (title, org, dates, flag) => ({
+      title, org, dates,
+      flag: flag || 'Quantified',
+      flagStyle: flagBase + (flag ? 'color: #A07A16;' : 'color: #6E8F82;'),
+    });
+
+    return {
+      sections: [
+        {
+          title: 'Experience', count: '2 roles',
+          entries: [
+            mk('Backend Engineering Intern', 'Northbound', 'May – Aug 2025', null),
+            mk('Teaching Assistant', 'Ontario Tech University', 'Sep 2024 – Apr 2025', 'No numbers yet'),
+          ],
+        },
+        {
+          title: 'Projects', count: '3 projects',
+          entries: [
+            mk('Resumi', 'Personal project', '2026', null),
+            mk('MealApp', 'Personal project', 'May 2026 – Present', 'No numbers yet'),
+          ],
+        },
+        {
+          title: 'Education', count: '1',
+          entries: [mk('BSc Software Engineering', 'Ontario Tech University', 'Expected 2028', null)],
+        },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

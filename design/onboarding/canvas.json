@@ -1,0 +1,24 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1000, "h": 760, "title": "1 · Welcome" },
+    { "file": "Goal.dc.html", "x": 1080, "y": 0, "w": 1000, "h": 760, "title": "2 · What you're after" },
+    { "file": "BuildProfile.dc.html", "x": 2160, "y": 0, "w": 1000, "h": 760, "title": "3 · Build your profile" }
+  ],
+  "annotations": [
+    {
+      "id": "direction",
+      "x": 0,
+      "y": -150,
+      "w": 420,
+      "text": "Calm and premium.\n\nInstrument Serif for headings, IBM Plex Sans for everything else. Warm off-white ground, deep green accent used sparingly — one action per screen carries it.\n\nA deliberate break from the current dark theme."
+    },
+    {
+      "id": "note-upload-primary",
+      "x": 2160,
+      "y": -150,
+      "w": 420,
+      "text": "Upload is visually primary because it is the fastest route to a finished profile — but the questions path is a full card, not a small link, since it is the differentiator and shouldn't read as a fallback."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
