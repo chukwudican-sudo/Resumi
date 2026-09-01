@@ -92,6 +92,17 @@ export const profileEntries = pgTable('profile_entries', {
   datesDisplay: text('dates_display'),
   /** 0 is most recent. Drives both resume order and which gaps get asked about first. */
   orderIndex: integer('order_index').notNull().default(0),
+  /**
+   * The lines the person wrote themselves, in their own words.
+   *
+   * These ARE the master resume — it renders from entries deterministically, so
+   * what someone types appears immediately with no model involved and no
+   * waiting. Facts are something else: detail gathered by the questions, used
+   * to make tailoring better rather than to write the resume.
+   */
+  bullets: jsonb('bullets').notNull().default([]),
+  /** Free text for what a project was built with; unused for jobs. */
+  tech: text('tech'),
   source: text('source').notNull().default('interview'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
