@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { markApplicationApplied } from '../../server/actions';
 import type { ResumeStructure } from '../../lib/types';
 import ResumePaper from './ResumePaper';
+import StrengthenPanel from './StrengthenPanel';
 
 interface Props {
   applicationId: string;
@@ -188,6 +189,12 @@ export default function ApplicationView({ applicationId, status, posting, resume
                     </div>
                   ) : null}
 
+                  <StrengthenPanel
+                    applicationId={applicationId}
+                    missingCount={resume.missingRequirements.length}
+                    onImproved={tailor}
+                  />
+
                   {resume.missingRequirements.length > 0 ? (
                     <div className="rounded-md border border-flag-line bg-flag-bg p-[18px]">
                       <div className="flex items-center gap-2.5">
@@ -208,8 +215,8 @@ export default function ApplicationView({ applicationId, status, posting, resume
                         ))}
                       </div>
                       <p className="mt-3 text-[12.5px] leading-snug text-flag">
-                        If you have touched any of these, say so in the questions and it goes in. If
-                        not, leave it &mdash; nothing gets invented.
+                        If you have touched any of these, say so above and it goes in. If not,
+                        leave it &mdash; nothing gets invented.
                       </p>
                     </div>
                   ) : null}
