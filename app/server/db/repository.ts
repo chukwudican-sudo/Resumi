@@ -87,6 +87,15 @@ export async function getProfileEntries(userId: string) {
     .orderBy(profileEntries.kind, profileEntries.orderIndex);
 }
 
+/** How much the profile knows, for the reassurance line before tailoring. */
+export async function countFacts(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(facts)
+    .where(and(eq(facts.userId, userId), eq(facts.status, 'active')));
+  return row?.n ?? 0;
+}
+
 export async function getActiveFacts(userId: string) {
   return db
     .select()
@@ -383,6 +392,48 @@ export async function getDueFollowUps(userId: string) {
 }
 
 /**
+ * Saves a posting and opens an application against it, together.
+ *
+ * One transaction: an application pointing at a posting that failed to save
+ * would show as a row with no job attached, which is worse than not creating it.
+ */
+export async function createApplication(
+  userId: string,
+  posting: {
+    company: string | null;
+    role: string | null;
+    location: string | null;
+    description: string | null;
+    sourceUrl: string | null;
+    requirements: string[];
+  },
+): Promise<string> {
+  const postingId = newId('post');
+  const applicationId = newId('app');
+
+  await db.transaction(async (tx) => {
+    await tx.insert(jobPostings).values({
+      id: postingId,
+      userId,
+      company: posting.company,
+      role: posting.role,
+      location: posting.location,
+      description: posting.description,
+      sourceUrl: posting.sourceUrl,
+      requirements: posting.requirements,
+    });
+    await tx.insert(applications).values({
+      id: applicationId,
+      userId,
+      postingId,
+      status: 'draft',
+    });
+  });
+
+  return applicationId;
+}
+
+/**
  * The applications list with everything the page needs, in one query.
  *
  * The match score comes from the newest resume for each application, pulled in
@@ -442,6 +493,52 @@ export async function getLatestResume(userId: string, applicationId: string) {
     .orderBy(desc(resumes.version))
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * Records a generated resume against its application.
+ *
+ * A new row per version rather than an update: it makes comparison and undo
+ * free, and it means an instruction edit can never destroy the thing it was
+ * meant to improve.
+ */
+export async function saveResume(
+  userId: string,
+  applicationId: string,
+  data: {
+    structure: unknown;
+    matchScore: number | null;
+    missingRequirements: string[];
+    log: string[];
+    warnings: string[];
+    estimatedPages: number | null;
+  },
+): Promise<string> {
+  const previous = await getLatestResume(userId, applicationId);
+  const id = newId('res');
+
+  await db.insert(resumes).values({
+    id,
+    userId,
+    applicationId,
+    mode: 'tailored',
+    structure: data.structure as object,
+    matchScore: data.matchScore,
+    missingRequirements: data.missingRequirements,
+    log: data.log,
+    warnings: data.warnings,
+    estimatedPages: data.estimatedPages,
+    version: (previous?.version ?? 0) + 1,
+    parentResumeId: previous?.id ?? null,
+    status: 'complete',
+  });
+
+  await db
+    .update(applications)
+    .set({ updatedAt: new Date() })
+    .where(and(eq(applications.userId, userId), eq(applications.id, applicationId)));
+
+  return id;
 }
 
 // ── Insights ───────────────────────────────────────────────────────────────
