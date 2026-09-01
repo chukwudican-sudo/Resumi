@@ -248,6 +248,15 @@ export async function getInterviewTurns(sessionId: string) {
     .orderBy(interviewTurns.idx);
 }
 
+/**
+ * Starts an interview, or returns the one already running.
+ *
+ * The check-then-insert is not enough on its own: two requests can both find no
+ * session and both try to create one — which React's development double-invoke
+ * makes reliable rather than rare. The partial unique index is what actually
+ * enforces "one live interview per person", so the conflict is expected and the
+ * loser simply reads back the winner's row.
+ */
 export async function startInterview(userId: string, openQuestions: string[] = []) {
   const existing = await getActiveInterview(userId);
   if (existing) return existing;
@@ -255,8 +264,10 @@ export async function startInterview(userId: string, openQuestions: string[] = [
   const [row] = await db
     .insert(interviewSessions)
     .values({ id: newId('sess'), userId, openQuestions })
+    .onConflictDoNothing()
     .returning();
-  return row;
+
+  return row ?? (await getActiveInterview(userId));
 }
 
 /**

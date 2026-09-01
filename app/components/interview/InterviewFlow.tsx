@@ -67,8 +67,17 @@ export default function InterviewFlow({
 
   // Ask the opening question the moment someone lands, rather than making them
   // click Start on a screen they already chose to be on.
+  //
+  // Guarded by a ref because React invokes effects twice in development, which
+  // would otherwise fire two opening turns — and two turns means two questions
+  // asked and one answer lost.
+  const openingAsked = useRef(false);
   useEffect(() => {
-    if (!initial.started && !question) void takeTurn(null, false);
+    if (openingAsked.current) return;
+    if (!initial.started && !question) {
+      openingAsked.current = true;
+      void takeTurn(null, false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
