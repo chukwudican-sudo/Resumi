@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
-import { getUser, upsertUser } from './db/repository';
+import { getUser, seedIdentityFacts, upsertUser } from './db/repository';
 
 /**
  * Who is asking.
@@ -75,5 +75,11 @@ export async function syncCurrentUser() {
   }
 
   const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim();
-  return upsertUser(userId, email, name || undefined);
+  const row = await upsertUser(userId, email, name || undefined);
+
+  // Hand the interview what the account already knows, so its first question is
+  // about their work rather than their name.
+  await seedIdentityFacts(userId, name || null, email);
+
+  return row;
 }

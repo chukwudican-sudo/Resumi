@@ -87,6 +87,36 @@ export async function getProfileEntries(userId: string) {
     .orderBy(profileEntries.kind, profileEntries.orderIndex);
 }
 
+/**
+ * Records what the account already tells us, so the interview never asks for it.
+ *
+ * Someone who signed in with Google has handed over their name and email
+ * already. Opening a conversation by asking for either is the fastest way to
+ * signal that nothing is being paid attention to — and it violates the one rule
+ * the interview leans on hardest, on its very first question.
+ *
+ * Written once, at account creation. Anything the person later corrects in the
+ * conversation supersedes these rather than colliding with them.
+ */
+export async function seedIdentityFacts(userId: string, name: string | null, email: string | null) {
+  const rows: (typeof facts.$inferInsert)[] = [];
+  if (name?.trim()) {
+    rows.push({
+      id: newId('fact'), userId, entryId: null,
+      category: 'identity', text: `Name: ${name.trim()}`,
+      hasNumber: false, confidence: 1, source: 'manual', sourceTurnId: null,
+    });
+  }
+  if (email?.trim()) {
+    rows.push({
+      id: newId('fact'), userId, entryId: null,
+      category: 'identity', text: `Email: ${email.trim()}`,
+      hasNumber: false, confidence: 1, source: 'manual', sourceTurnId: null,
+    });
+  }
+  if (rows.length) await db.insert(facts).values(rows).onConflictDoNothing();
+}
+
 /** How much the profile knows, for the reassurance line before tailoring. */
 export async function countFacts(userId: string): Promise<number> {
   const [row] = await db
