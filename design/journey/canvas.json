@@ -199,7 +199,6 @@
     }
   ],
   "launch": {
-    "view": "focused",
-    "file": "Review.dc.html"
+    "view": "canvas"
   }
 }
