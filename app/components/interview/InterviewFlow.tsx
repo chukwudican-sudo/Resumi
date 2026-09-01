@@ -45,7 +45,6 @@ export default function InterviewFlow({
     turnCount: number;
     coverage: number;
     phase: InterviewPhase;
-    started: boolean;
   };
 }) {
   const router = useRouter();
@@ -65,19 +64,19 @@ export default function InterviewFlow({
   const [composing, setComposing] = useState(false);
   const textarea = useRef<HTMLTextAreaElement | null>(null);
 
-  // Ask the opening question the moment someone lands, rather than making them
-  // click Start on a screen they already chose to be on.
+  // Fetch a question whenever there is none to show, rather than only when no
+  // session exists. A session can legitimately have no pending question — it was
+  // just created, or a previous turn failed after saving but before storing the
+  // next one — and keying off "has a session" left those hanging on a spinner
+  // forever with no request in flight.
   //
-  // Guarded by a ref because React invokes effects twice in development, which
-  // would otherwise fire two opening turns — and two turns means two questions
-  // asked and one answer lost.
+  // The ref guard stays because React invokes effects twice in development, and
+  // two opening turns means two questions asked and one answer lost.
   const openingAsked = useRef(false);
   useEffect(() => {
-    if (openingAsked.current) return;
-    if (!initial.started && !question) {
-      openingAsked.current = true;
-      void takeTurn(null, false);
-    }
+    if (openingAsked.current || question) return;
+    openingAsked.current = true;
+    void takeTurn(null, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
