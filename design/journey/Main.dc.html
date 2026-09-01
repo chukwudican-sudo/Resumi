@@ -1,0 +1,380 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815;">
+
+  <!-- ───────── nav ───────── -->
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 56px; height: 74px; border-bottom: 1px solid #EDE9E2;">
+    <div style="display: flex; align-items: center; gap: 9px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+        <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+      </svg>
+      <span style="font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 28px;">
+      <span style="font-size: 14px; color: #8A8680;">How it works</span>
+      <span style="font-size: 14px; color: #8A8680;">Pricing</span>
+      <span style="font-size: 14px; color: #57544E;">Sign in</span>
+      <button style="padding: 10px 20px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">Get started</button>
+    </div>
+  </div>
+
+  <!-- ───────── hero ───────── -->
+  <div style="position: relative; overflow: hidden; padding: 88px 56px 0;">
+    <div style="max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center;">
+
+      <div style="display: flex; align-items: center; gap: 9px; padding: 6px 14px 6px 8px; border: 1px solid #E2DED6; border-radius: 100px; background: #FFFFFF;">
+        <span style="padding: 2px 8px; border-radius: 100px; background: #EDF2EF; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #2F5D50;">New</span>
+        <span style="font-size: 13px; color: #57544E;">Build your profile by answering questions &mdash; no resume needed</span>
+      </div>
+
+      <h1 style="margin: 26px 0 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 72px; line-height: 1.02; letter-spacing: -0.02em; text-wrap: pretty;">
+        You&rsquo;ll apply to forty jobs.<br>
+        You&rsquo;ll tailor <span style="font-style: italic; color: #2F5D50;">maybe five</span>.
+      </h1>
+
+      <p style="margin: 28px 0 0; max-width: 540px; font-size: 18px; line-height: 1.6; color: #57544E; text-wrap: pretty;">
+        Resumi rewrites your resume around each posting you paste in &mdash; in about a minute, using only what is already true about you.
+      </p>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-top: 38px;">
+        <button style="padding: 16px 32px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 15.5px; font-weight: 500; cursor: pointer;">
+          Build my profile
+        </button>
+        <span style="font-size: 14px; color: #8A8680;">Free for your first five applications</span>
+      </div>
+    </div>
+
+    <!-- product shot, bleeding off the bottom -->
+    <div style="max-width: 1000px; margin: 68px auto -1px; border: 1px solid #E2DED6; border-radius: 8px 8px 0 0; background: #FFFFFF; box-shadow: 0 -1px 40px rgba(26, 24, 21, 0.07); overflow: hidden;">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 22px; height: 48px; border-bottom: 1px solid #EFEBE4;">
+        <div style="display: flex; align-items: center; gap: 22px;">
+          <span style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #8A8680;">Resumi</span>
+          <span style="font-size: 12.5px; color: #1A1815;">Applications</span>
+          <span style="font-size: 12.5px; color: #B5B0A8;">Profile</span>
+        </div>
+        <div style="width: 22px; height: 22px; border-radius: 50%; background: #E7EBE8;"></div>
+      </div>
+
+      <div style="padding: 22px;">
+        <div style="display: grid; grid-template-columns: 2.4fr 1fr 1fr 1fr; gap: 14px; padding: 0 14px 11px;">
+          <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A8A39B;">Role</span>
+          <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A8A39B;">Match</span>
+          <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A8A39B;">Status</span>
+          <span style="font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #A8A39B;">Updated</span>
+        </div>
+        <sc-for list="{{previewRows}}" as="row" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: 2.4fr 1fr 1fr 1fr; gap: 14px; align-items: center; padding: 13px 14px; border-top: 1px solid #F4F1EB;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 13px; color: #1A1815;">{{row.role}}</span>
+              <span style="font-size: 11.5px; color: #A8A39B;">{{row.company}}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="width: 34px; height: 3px; border-radius: 2px; background: #EDEAE3; overflow: hidden;">
+                <div style="{{row.barStyle}}"></div>
+              </div>
+              <span style="font-size: 12px; color: #57544E;">{{row.match}}</span>
+            </div>
+            <span style="{{row.pillStyle}}">{{row.status}}</span>
+            <span style="font-size: 12px; color: #A8A39B;">{{row.updated}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── 01 numbers ───────── -->
+  <div style="padding: 76px 56px; background: #171A18;">
+    <div style="max-width: 1000px; margin: 0 auto;">
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; color: #6E8073;">01</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #6E8073;">Why bother</span>
+      </div>
+      <h2 style="margin: 22px 0 0; max-width: 680px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 44px; line-height: 1.1; color: #F5F3EF;">
+        Tailoring works. Doing it by hand <span style="font-style: italic; color: #93B3A5;">does not scale</span>.
+      </h2>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 60px; border-top: 1px solid #2C312E;">
+        <sc-for list="{{stats}}" as="s" hint-placeholder-count="3">
+          <div style="{{s.cellStyle}}">
+            <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 62px; line-height: 1; color: #F5F3EF;">{{s.figure}}</span>
+            <span style="font-size: 14.5px; line-height: 1.6; color: #9AA39D; max-width: 230px;">{{s.label}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── 02 transformation ───────── -->
+  <div style="padding: 96px 56px;">
+    <div style="max-width: 1000px; margin: 0 auto;">
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; color: #A8A39B;">02</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #A8A39B;">What it does</span>
+      </div>
+      <h2 style="margin: 22px 0 0; max-width: 620px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 44px; line-height: 1.1;">
+        The same summer, written for the job in front of you.
+      </h2>
+
+      <div style="display: grid; grid-template-columns: 1fr 44px 1fr; gap: 0; align-items: center; margin-top: 52px;">
+        <div style="border: 1px solid #E9E5DE; border-radius: 6px; background: #FFFFFF; padding: 28px; display: flex; flex-direction: column; gap: 16px; min-height: 168px; box-sizing: border-box;">
+          <span style="font-size: 11px; letter-spacing: 0.11em; text-transform: uppercase; color: #A8A39B;">What you told us</span>
+          <p style="margin: 0; font-size: 16.5px; line-height: 1.6; color: #57544E;">
+            Worked on the payments backend at a fintech startup over the summer.
+          </p>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B5B0A8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"></path>
+          </svg>
+        </div>
+
+        <div style="border: 1px solid #2F5D50; border-radius: 6px; background: #F4F7F5; padding: 28px; display: flex; flex-direction: column; gap: 16px; min-height: 168px; box-sizing: border-box;">
+          <span style="font-size: 11px; letter-spacing: 0.11em; text-transform: uppercase; color: #2F5D50;">Written for &mdash; Backend Engineer, Shopify</span>
+          <p style="margin: 0; font-size: 16.5px; line-height: 1.6; color: #1A1815;">
+            Rebuilt a payment retry pipeline in Python and Celery, recovering 12% of charges that previously failed outright and removing 90 minutes of daily manual reconciliation.
+          </p>
+        </div>
+      </div>
+
+      <p style="margin: 22px 0 0; text-align: center; font-size: 14px; color: #8A8680;">
+        Nothing invented &mdash; it just asked better questions.
+      </p>
+    </div>
+  </div>
+
+  <!-- ───────── 03 how it works ───────── -->
+  <div style="padding: 84px 56px; background: #F5F3EF; border-top: 1px solid #EBE7E0; border-bottom: 1px solid #EBE7E0;">
+    <div style="max-width: 1000px; margin: 0 auto;">
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; color: #A8A39B;">03</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #A8A39B;">How it works</span>
+      </div>
+      <h2 style="margin: 22px 0 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 44px; line-height: 1.1;">
+        Build it once. Use it forty times.
+      </h2>
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 52px;">
+        <sc-for list="{{steps}}" as="step" hint-placeholder-count="3">
+          <div style="border: 1px solid #E5E1DA; border-radius: 6px; background: #FFFFFF; padding: 26px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: #EDF2EF;">
+              <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 17px; color: #2F5D50;">{{step.n}}</span>
+            </div>
+            <span style="font-size: 17.5px; color: #1A1815;">{{step.title}}</span>
+            <span style="font-size: 15px; line-height: 1.65; color: #57544E;">{{step.body}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── 04 trust ───────── -->
+  <div style="padding: 96px 56px;">
+    <div style="max-width: 1000px; margin: 0 auto;">
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; color: #A8A39B;">04</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #A8A39B;">The part everyone worries about</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; margin-top: 22px;">
+        <div>
+          <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 44px; line-height: 1.1;">
+            It will not make things <span style="font-style: italic; color: #2F5D50;">up</span> about you.
+          </h2>
+          <p style="margin: 24px 0 0; font-size: 16.5px; line-height: 1.7; color: #57544E;">
+            Every line on your resume traces back to something you actually told it. Anything that cannot be traced is flagged for you rather than passed off as fact.
+          </p>
+          <p style="margin: 18px 0 0; font-size: 16.5px; line-height: 1.7; color: #57544E;">
+            It will push you for the specifics that make a resume land &mdash; the number, the team size, the thing that changed. It will not supply them for you.
+          </p>
+        </div>
+
+        <div style="border: 1px solid #E9E5DE; border-radius: 6px; background: #FFFFFF; padding: 28px; display: flex; flex-direction: column; gap: 20px; box-shadow: 0 1px 24px rgba(26, 24, 21, 0.05);">
+          <p style="margin: 0; font-size: 16.5px; line-height: 1.6; color: #1A1815;">
+            &ldquo;Recovered ~12% of charges that previously failed outright.&rdquo;
+          </p>
+          <div style="height: 1px; background: #F0EDE7;"></div>
+          <div style="display: flex; flex-direction: column; gap: 11px;">
+            <span style="font-size: 11px; letter-spacing: 0.11em; text-transform: uppercase; color: #A8A39B;">Traced to</span>
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 3px;">
+                <path d="M20 6L9 17l-5-5"></path>
+              </svg>
+              <span style="font-size: 14.5px; line-height: 1.55; color: #57544E;">
+                Your answer, question 7 &mdash; &ldquo;it recovered around 12% of payments that used to just fail&rdquo;
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── questions ───────── -->
+  <div style="padding: 0 56px 100px;">
+    <div style="max-width: 860px; margin: 0 auto;">
+      <h2 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 40px; line-height: 1.12;">
+        Questions people ask
+      </h2>
+      <div style="display: flex; flex-direction: column; margin-top: 38px;">
+        <sc-for list="{{faqs}}" as="faq" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 44px; padding: 26px 0; border-top: 1px solid #EBE7E0;">
+            <span style="font-size: 16px; line-height: 1.5; color: #1A1815;">{{faq.q}}</span>
+            <span style="font-size: 15.5px; line-height: 1.7; color: #57544E;">{{faq.a}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── close ───────── -->
+  <div style="padding: 96px 56px; background: #171A18;">
+    <div style="max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center;">
+      <h2 style="margin: 0; max-width: 640px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 52px; line-height: 1.1; color: #F5F3EF;">
+        Stop rewriting the same resume from scratch.
+      </h2>
+      <div style="display: flex; align-items: center; gap: 16px; margin-top: 38px;">
+        <button style="padding: 16px 34px; border: none; border-radius: 4px; background: #F5F3EF; color: #171A18; font-family: inherit; font-size: 15.5px; font-weight: 500; cursor: pointer;">
+          Build my profile
+        </button>
+        <span style="font-size: 14px; color: #8B958F;">Five minutes &middot; no resume required</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── footer ───────── -->
+  <div style="padding: 52px 56px 40px; background: #FBFAF8;">
+    <div style="max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1.6fr 1fr 1fr; gap: 48px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 9px;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+            <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+          </svg>
+          <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+        </div>
+        <span style="font-size: 14px; line-height: 1.65; color: #8A8680; max-width: 300px;">
+          A resume that changes for every job you apply to. Built in Canada.
+        </span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <span style="font-size: 11px; letter-spacing: 0.11em; text-transform: uppercase; color: #A8A39B;">Product</span>
+        <span style="font-size: 14px; color: #57544E;">How it works</span>
+        <span style="font-size: 14px; color: #57544E;">Pricing</span>
+        <span style="font-size: 14px; color: #57544E;">Sign in</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <span style="font-size: 11px; letter-spacing: 0.11em; text-transform: uppercase; color: #A8A39B;">Legal</span>
+        <span style="font-size: 14px; color: #57544E;">Privacy</span>
+        <span style="font-size: 14px; color: #57544E;">Terms</span>
+        <span style="font-size: 14px; color: #57544E;">Delete my data</span>
+      </div>
+    </div>
+
+    <div style="max-width: 1000px; margin: 44px auto 0; padding-top: 24px; border-top: 1px solid #EBE7E0; display: flex; align-items: center; justify-content: space-between;">
+      <span style="font-size: 13px; color: #A8A39B;">&copy; 2026 Resumi</span>
+      <span style="font-size: 13px; color: #A8A39B;">[YOUR CONTACT EMAIL]</span>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const pill =
+      'display: inline-flex; align-items: center; justify-self: start; padding: 3px 9px;' +
+      'border-radius: 3px; font-size: 11px; ';
+
+    const previewRows = [
+      { role: 'Backend Engineering Intern', company: 'Shopify', match: '86%', status: 'Interviewing', updated: '2d' },
+      { role: 'Software Developer Intern', company: 'Wealthsimple', match: '81%', status: 'Applied', updated: '4d' },
+      { role: 'Platform Engineering Intern', company: 'Faire', match: '78%', status: 'Applied', updated: '5d' },
+      { role: 'Data Engineering Intern', company: 'Ada', match: '74%', status: 'Draft', updated: '1w' },
+    ].map((r) => ({
+      ...r,
+      pillStyle:
+        pill +
+        (r.status === 'Interviewing' ? 'background: #FAF2E4; color: #8A6414;'
+         : r.status === 'Applied' ? 'background: #EDF2EF; color: #2F5D50;'
+         : 'background: #F5F3F0; color: #6B6862;'),
+      barStyle: 'height: 100%; border-radius: 2px; background: #2F5D50; width: ' + r.match + ';',
+    }));
+
+    const cell =
+      'display: flex; flex-direction: column; gap: 16px; padding: 40px 34px 0;';
+    const stats = [
+      { figure: '2×', label: 'the interview rate, tailored against generic' },
+      { figure: '30–50', label: 'applications in a typical job search' },
+      { figure: 'up to 1h', label: 'spent tailoring a single resume by hand' },
+    ].map((s, i) => ({
+      ...s,
+      cellStyle: cell + (i > 0 ? 'border-left: 1px solid #2C312E;' : ''),
+    }));
+
+    return {
+      previewRows,
+      stats,
+
+      steps: [
+        {
+          n: '1',
+          title: 'Build your profile',
+          body: 'Answer a few questions about your work, or upload a resume you already have. This happens once.',
+        },
+        {
+          n: '2',
+          title: 'Paste a job posting',
+          body: 'Drop in the text or a screenshot. Resumi reads it and works out what the role actually wants.',
+        },
+        {
+          n: '3',
+          title: 'Get a resume for that job',
+          body: 'A typeset PDF, rewritten around the posting, ready to send. Every one you make is kept.',
+        },
+      ],
+
+      faqs: [
+        {
+          q: 'I do not have a resume yet. Is that a problem?',
+          a: 'No — that is the case it was built for. Answer questions about what you have done and it writes the resume from your answers. Uploading an existing one is just a shortcut.',
+        },
+        {
+          q: 'Will it make things up about me?',
+          a: 'No. Every line traces back to something you told it, and anything that cannot be traced is flagged for you rather than passed off as fact. It will push you for specifics; it will not supply them.',
+        },
+        {
+          q: 'Will the PDF get through applicant tracking systems?',
+          a: 'Yes. It is typeset from a single-column LaTeX template with standard section headings and no tables, columns, or graphics — the things that break parsers.',
+        },
+        {
+          q: 'What happens to what I tell it?',
+          a: 'It is yours. It is used to write your resumes and nothing else, it is never sold, and you can delete all of it from your account whenever you want.',
+        },
+        {
+          q: 'What does it cost?',
+          a: 'Your first five applications are free, and the profile you build is free to keep. Beyond that it is [YOUR PRICE] — set that before launch.',
+        },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

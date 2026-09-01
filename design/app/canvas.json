@@ -1,0 +1,46 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1280, "h": 880, "title": "Applications — the missing centre" },
+    { "file": "EmptyHome.dc.html", "x": 1380, "y": 0, "w": 1280, "h": 880, "title": "Applications — empty" },
+    { "file": "NewApplication.dc.html", "x": 0, "y": 980, "w": 1280, "h": 880, "title": "New application" },
+    { "file": "Profile.dc.html", "x": 1380, "y": 980, "w": 1280, "h": 880, "title": "Profile" }
+  ],
+  "annotations": [
+    {
+      "id": "premise",
+      "x": 0,
+      "y": -230,
+      "w": 520,
+      "text": "THE THING WE MISSED\n\nJob seekers send 30–50 applications. Resumi is built for one: a single session, one output, and \"New Session\" wipes it.\n\nSo the centre of the app is not the tailoring screen — it is a list of applications. Everything else feeds it. The profile is the reusable part; each job produces another row."
+    },
+    {
+      "id": "gaps",
+      "x": 560,
+      "y": -230,
+      "w": 520,
+      "text": "WHAT THIS SURFACES THAT WE DO NOT HAVE\n\n• Saved resumes — every tailor is currently thrown away\n• Application status: draft / applied / interviewing / rejected\n• Match score as something you compare across roles, not a one-off number\n• Usage against a free tier, visible before you hit it\n• An empty state that says what to do next\n• Account, avatar, somewhere for settings to live"
+    },
+    {
+      "id": "empty-note",
+      "x": 1380,
+      "y": -150,
+      "w": 460,
+      "text": "Empty states are where the product explains itself. This one names the number — 30–50 roles — so the list reads as a place things accumulate, not a feature you might use once."
+    },
+    {
+      "id": "new-app-note",
+      "x": 0,
+      "y": 1900,
+      "w": 520,
+      "text": "One screen, not the current three-panel workspace. About Me and Rules are gone from the critical path: the profile already holds them, so tailoring only needs the job posting.\n\n\"Tailoring from your profile · 68 details\" is the reassurance that it knows who you are without making you re-supply it."
+    },
+    {
+      "id": "profile-note",
+      "x": 1380,
+      "y": 1900,
+      "w": 520,
+      "text": "Profile strength as a score, not a percentage buried in a sidebar — it is the one number that predicts how much editing every future tailor needs.\n\nEntries carry a quiet flag when they have no numbers, and the warning at the top offers the questions that would fix them. That is the interview earning its place inside the app rather than only at signup."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

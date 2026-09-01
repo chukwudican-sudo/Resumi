@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 880px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 64px; border-bottom: 1px solid #E9E5DE; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 40px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+        </svg>
+        <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <span style="font-size: 14.5px; color: #1A1815; border-bottom: 2px solid #2F5D50; padding: 21px 0 19px;">Applications</span>
+        <span style="font-size: 14.5px; color: #8A8680;">Profile</span>
+      </div>
+    </div>
+    <div style="width: 30px; height: 30px; border-radius: 50%; background: #E7EBE8; display: flex; align-items: center; justify-content: center; font-size: 12.5px; color: #2F5D50;">AN</div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px;">
+    <div style="width: 100%; max-width: 470px; display: flex; flex-direction: column; align-items: center; text-align: center;">
+
+      <div style="display: flex; flex-direction: column; gap: 7px; width: 190px; margin-bottom: 40px;">
+        <div style="height: 11px; border-radius: 2px; background: #EDEAE3;"></div>
+        <div style="height: 11px; border-radius: 2px; background: #F2EFE9; width: 78%;"></div>
+        <div style="height: 11px; border-radius: 2px; background: #F6F3EE; width: 55%;"></div>
+      </div>
+
+      <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 36px; line-height: 1.15;">
+        Nothing here yet
+      </h1>
+      <p style="margin: 16px 0 0; font-size: 15.5px; line-height: 1.65; color: #57544E;">
+        Your profile is ready. Add a job posting and Resumi will rewrite your resume around it &mdash; every application you make will be kept here.
+      </p>
+
+      <button style="margin-top: 34px; padding: 15px 30px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">
+        Add your first job posting
+      </button>
+
+      <span style="margin-top: 18px; font-size: 13.5px; color: #8A8680;">
+        Most people apply to 30&ndash;50 roles. This is where they all live.
+      </span>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

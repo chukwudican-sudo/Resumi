@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 880px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <!-- top bar -->
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 64px; border-bottom: 1px solid #E9E5DE; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 40px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+        </svg>
+        <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <span style="font-size: 14.5px; color: #1A1815; border-bottom: 2px solid #2F5D50; padding: 21px 0 19px;">Applications</span>
+        <span style="font-size: 14.5px; color: #8A8680;">Profile</span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="font-size: 13px; color: #8A8680;">3 of 5 free this month</span>
+      <div style="width: 30px; height: 30px; border-radius: 50%; background: #E7EBE8; display: flex; align-items: center; justify-content: center; font-size: 12.5px; color: #2F5D50;">AN</div>
+    </div>
+  </div>
+
+  <!-- body -->
+  <div style="flex-grow: 1; padding: 40px; display: flex; flex-direction: column; gap: 26px; overflow: hidden;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+      <div>
+        <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 38px; line-height: 1.1;">Applications</h1>
+        <p style="margin: 8px 0 0; font-size: 14.5px; color: #57544E;">12 resumes tailored &middot; 4 sent this week</p>
+      </div>
+      <button style="display: flex; align-items: center; gap: 9px; padding: 13px 22px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FBFAF8" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+        New application
+      </button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 22px; border-bottom: 1px solid #E9E5DE;">
+      <sc-for list="{{tabs}}" as="tab" hint-placeholder-count="4">
+        <span style="{{tab.style}}">{{tab.label}}</span>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column; border: 1px solid #E9E5DE; border-radius: 6px; background: #FFFFFF; overflow: hidden;">
+      <div style="display: grid; grid-template-columns: 2.4fr 1fr 1fr 1fr 40px; gap: 16px; padding: 13px 22px; border-bottom: 1px solid #EFEBE4; background: #FCFBF9;">
+        <span style="font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A8680;">Role</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A8680;">Match</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A8680;">Status</span>
+        <span style="font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A8680;">Updated</span>
+        <span></span>
+      </div>
+
+      <sc-for list="{{rows}}" as="row" hint-placeholder-count="6">
+        <div style="display: grid; grid-template-columns: 2.4fr 1fr 1fr 1fr 40px; gap: 16px; align-items: center; padding: 17px 22px; border-bottom: 1px solid #F4F1EB;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-size: 14.5px; color: #1A1815;">{{row.role}}</span>
+            <span style="font-size: 13px; color: #8A8680;">{{row.company}}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <div style="width: 42px; height: 4px; border-radius: 2px; background: #EDEAE3; overflow: hidden;">
+              <div style="{{row.barStyle}}"></div>
+            </div>
+            <span style="font-size: 13.5px; color: #57544E;">{{row.match}}</span>
+          </div>
+          <span style="{{row.pillStyle}}">{{row.status}}</span>
+          <span style="font-size: 13.5px; color: #8A8680;">{{row.updated}}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5B0A8" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle>
+          </svg>
+        </div>
+      </sc-for>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const pill =
+      'display: inline-flex; align-items: center; justify-self: start; padding: 4px 11px;' +
+      'border-radius: 3px; font-size: 12.5px; ';
+
+    const rows = [
+      { role: 'Backend Engineering Intern', company: 'Shopify', match: '86%', status: 'Interviewing', updated: '2 days ago' },
+      { role: 'Software Developer Intern', company: 'Wealthsimple', match: '81%', status: 'Applied', updated: '4 days ago' },
+      { role: 'Platform Engineering Intern', company: 'Faire', match: '78%', status: 'Applied', updated: '5 days ago' },
+      { role: 'Data Engineering Intern', company: 'Ada', match: '74%', status: 'Draft', updated: '1 week ago' },
+      { role: 'Backend Intern', company: 'Cohere', match: '69%', status: 'Rejected', updated: '2 weeks ago' },
+      { role: 'Full-Stack Intern', company: 'Jane Street', match: '64%', status: 'Draft', updated: '3 weeks ago' },
+    ].map((r) => {
+      const tone =
+        r.status === 'Interviewing' ? 'background: #FAF2E4; color: #8A6414;'
+        : r.status === 'Applied' ? 'background: #EDF2EF; color: #2F5D50;'
+        : r.status === 'Rejected' ? 'background: #F5F3F0; color: #9A9690;'
+        : 'background: #F5F3F0; color: #6B6862;';
+      return {
+        ...r,
+        pillStyle: pill + tone,
+        barStyle:
+          'height: 100%; border-radius: 2px; background: #2F5D50; width: ' + r.match + ';',
+      };
+    });
+
+    const tabBase = 'font-size: 14px; padding: 0 0 13px; ';
+    const tabs = ['All', 'Draft', 'Applied', 'Interviewing'].map((label, i) => ({
+      label,
+      style: tabBase + (i === 0
+        ? 'color: #1A1815; border-bottom: 2px solid #2F5D50;'
+        : 'color: #8A8680; border-bottom: 2px solid transparent;'),
+    }));
+
+    return { rows, tabs };
+  }
+}
+</script>
+</body>
+</html>
