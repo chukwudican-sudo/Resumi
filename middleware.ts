@@ -15,7 +15,14 @@ const isPublic = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
-  if (!isPublic(request)) await auth.protect();
+  if (isPublic(request)) return;
+
+  // Explicit redirect rather than auth.protect(): protect() answers an
+  // unauthenticated page request with a 404, which tells someone the page does
+  // not exist when the truth is that they need to sign in. Sending them to
+  // sign-in — and back afterwards — is the behaviour people expect.
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) return redirectToSignIn({ returnBackUrl: request.url });
 });
 
 export const config = {
