@@ -6,7 +6,7 @@
       "y": 0,
       "w": 1280,
       "h": 3900,
-      "title": "1 · Landing",
+      "title": "1 \u00b7 Landing",
       "expand": "fill"
     },
     {
@@ -15,7 +15,7 @@
       "y": 0,
       "w": 1280,
       "h": 880,
-      "title": "2 · Sign up"
+      "title": "2 \u00b7 Sign up"
     },
     {
       "file": "Goal.dc.html",
@@ -23,7 +23,7 @@
       "y": 0,
       "w": 1280,
       "h": 880,
-      "title": "3 · Your goal"
+      "title": "3 \u00b7 Your goal"
     },
     {
       "file": "BuildProfile.dc.html",
@@ -31,7 +31,7 @@
       "y": 0,
       "w": 1280,
       "h": 880,
-      "title": "4 · Build your profile"
+      "title": "4 \u00b7 Build your profile"
     },
     {
       "file": "Questions.dc.html",
@@ -39,7 +39,7 @@
       "y": 0,
       "w": 1280,
       "h": 880,
-      "title": "5 · Questions"
+      "title": "5 \u00b7 Questions"
     },
     {
       "file": "Thinking.dc.html",
@@ -47,7 +47,7 @@
       "y": 0,
       "w": 1280,
       "h": 880,
-      "title": "5b · Thinking"
+      "title": "5b \u00b7 Thinking"
     },
     {
       "file": "Applications.dc.html",
@@ -55,7 +55,7 @@
       "y": 1060,
       "w": 1440,
       "h": 960,
-      "title": "9 · Applications"
+      "title": "9 \u00b7 Applications"
     },
     {
       "file": "Review.dc.html",
@@ -63,7 +63,39 @@
       "y": 1060,
       "w": 1440,
       "h": 940,
-      "title": "10 · Review"
+      "title": "10 \u00b7 Review"
+    },
+    {
+      "file": "ApplicationsEmpty.dc.html",
+      "x": 3080,
+      "y": 1060,
+      "w": 1440,
+      "h": 900,
+      "title": "6 \u00b7 Applications (empty)"
+    },
+    {
+      "file": "NewApplication.dc.html",
+      "x": 4620,
+      "y": 1060,
+      "w": 1440,
+      "h": 900,
+      "title": "7 \u00b7 New application"
+    },
+    {
+      "file": "Tailoring.dc.html",
+      "x": 6160,
+      "y": 1060,
+      "w": 1440,
+      "h": 900,
+      "title": "8 \u00b7 Tailoring"
+    },
+    {
+      "file": "Profile.dc.html",
+      "x": 7700,
+      "y": 1060,
+      "w": 1440,
+      "h": 960,
+      "title": "11 \u00b7 Profile"
     }
   ],
   "annotations": [
@@ -72,21 +104,21 @@
       "x": 0,
       "y": -300,
       "w": 500,
-      "text": "THE JOURNEY, IN ORDER\n\n1 Landing            ✓\n2 Sign up            ✓\n3 Your goal          ✓\n4 Build profile      ✓\n5 Questions          ✓\n5b Thinking          ✓\n9 Applications       ✓\n10 Review            ✓\n\nStill to draw: empty applications, new application,\ntailoring, profile.\n\nThe old welcome screen is gone — it only existed because there was no landing page."
+      "text": "THE JOURNEY \u2014 ALL TWELVE SCREENS\n\n1  Landing\n2  Sign up\n3  Your goal\n4  Build profile\n5  Questions   \u00b7  5b Thinking\n6  Applications (empty)\n7  New application\n8  Tailoring\n9  Applications (full)\n10 Review\n11 Profile\n\nThe welcome screen was cut \u2014 it only existed because there was no\nlanding page, and showing someone who just signed up another\nexplanation of the product is a click that buys nothing."
     },
     {
       "id": "landing-note",
       "x": 540,
       "y": -300,
       "w": 520,
-      "text": "WHY THIS HEADLINE\n\n\"You'll apply to forty jobs. You'll tailor maybe five.\" names the behaviour rather than pitching the product — the reader recognises themselves before they have been sold anything. Italic serif carries the turn in the sentence.\n\nSTRUCTURE\n\nNumbered sections (01–04) give the page a spine, so it reads as an argument rather than a stack of blocks.\n\nThe product shot sits directly under the hero and bleeds off the bottom edge — the page shows the tool before it describes it.\n\nTwo dark bands (the numbers, the closing call) break up a long light page and give it rhythm. The close inverts the button so the last thing on screen is the loudest.\n\nThe stats are real and sourced. Cost carries a [YOUR PRICE] placeholder — fill it before launch rather than letting a made-up number ship."
+      "text": "WHY THIS HEADLINE\n\n\"You'll apply to forty jobs. You'll tailor maybe five.\" names the behaviour rather than pitching the product \u2014 the reader recognises themselves before they have been sold anything. Italic serif carries the turn in the sentence.\n\nSTRUCTURE\n\nNumbered sections (01\u201304) give the page a spine, so it reads as an argument rather than a stack of blocks.\n\nThe product shot sits directly under the hero and bleeds off the bottom edge \u2014 the page shows the tool before it describes it.\n\nTwo dark bands (the numbers, the closing call) break up a long light page and give it rhythm. The close inverts the button so the last thing on screen is the loudest.\n\nThe stats are real and sourced. Cost carries a [YOUR PRICE] placeholder \u2014 fill it before launch rather than letting a made-up number ship."
     },
     {
       "id": "signup-note",
       "x": 1380,
       "y": -200,
       "w": 460,
-      "text": "One field, or one button. Nothing is asked here that the flow asks better later — no name, no role, no password if they use Google.\n\nThe line about deleting your data sits above the fold on purpose: this is the screen where someone decides whether to hand over their work history."
+      "text": "One field, or one button. Nothing is asked here that the flow asks better later \u2014 no name, no role, no password if they use Google.\n\nThe line about deleting your data sits above the fold on purpose: this is the screen where someone decides whether to hand over their work history."
     },
     {
       "id": "goal-note",
@@ -100,42 +132,70 @@
       "x": 4140,
       "y": -230,
       "w": 480,
-      "text": "Both paths carry a time cost — 30 seconds against 5 minutes. Without it, \"answer some questions\" reads as open-ended, which is what stops people picking it.\n\nUpload leads because it is fastest. But the note underneath makes the honest argument for the slower path: a resume only contains what you already wrote down. That is the case for the questions, made without hiding the trade."
+      "text": "Both paths carry a time cost \u2014 30 seconds against 5 minutes. Without it, \"answer some questions\" reads as open-ended, which is what stops people picking it.\n\nUpload leads because it is fastest. But the note underneath makes the honest argument for the slower path: a resume only contains what you already wrote down. That is the case for the questions, made without hiding the trade."
     },
     {
       "id": "questions-note",
       "x": 5520,
       "y": -260,
       "w": 500,
-      "text": "THE QUESTION IS THE HERO\n\nThe old screen buried it under a scrolling transcript. Here it is the largest thing on the page and there is nothing to scroll past to reach it — you read it and answer.\n\nThe transcript is gone entirely. Its job was reassurance that the thing was listening; the profile panel does that better, because it shows what was actually understood rather than what was typed.\n\nThe italic line above the question is the model reacting to the last answer. It is the whole difference between a conversation and a form.\n\nFreshly captured facts are tinted; older ones settle to white. You watch your profile being built."
+      "text": "THE QUESTION IS THE HERO\n\nThe old screen buried it under a scrolling transcript. Here it is the largest thing on the page and there is nothing to scroll past to reach it \u2014 you read it and answer.\n\nThe transcript is gone entirely. Its job was reassurance that the thing was listening; the profile panel does that better, because it shows what was actually understood rather than what was typed.\n\nThe italic line above the question is the model reacting to the last answer. It is the whole difference between a conversation and a form.\n\nFreshly captured facts are tinted; older ones settle to white. You watch your profile being built."
     },
     {
       "id": "thinking-note",
       "x": 6900,
       "y": -260,
       "w": 500,
-      "text": "EIGHT SECONDS, HONESTLY SPENT\n\nEach turn takes 7-8s. A spinner for that long reads as broken, so the wait names its own work — read what you said, noted the scope, working out what is missing — and ticks the steps off as they complete.\n\nThe answer stays on screen so the wait feels like the conversation continuing rather than a gap in it.\n\nThe new fact animates into the panel the moment it is captured, before the next question arrives — so the wait pays out early. The closing line explains why it is slow, which is what stops slow feeling like stuck."
+      "text": "EIGHT SECONDS, HONESTLY SPENT\n\nEach turn takes 7-8s. A spinner for that long reads as broken, so the wait names its own work \u2014 read what you said, noted the scope, working out what is missing \u2014 and ticks the steps off as they complete.\n\nThe answer stays on screen so the wait feels like the conversation continuing rather than a gap in it.\n\nThe new fact animates into the panel the moment it is captured, before the next question arrives \u2014 so the wait pays out early. The closing line explains why it is slow, which is what stops slow feeling like stuck."
     },
     {
       "id": "apps-note",
       "x": 0,
       "y": 780,
       "w": 620,
-      "text": "THIS IS A JOB-SEARCH TOOL, NOT A RESUME GENERATOR\n\nTwo strips at the top do most of the work:\n\nSKILL GAPS ACROSS POSTINGS — \"Six of your saved jobs ask for Docker. Your profile never mentions it.\" This is the strongest idea in the product and nothing here is new: you already store every posting and every fact. Counting demand across saved jobs against the profile turns a pile of applications into advice. It also feeds the questions — one answer improves every future resume.\n\nFOLLOW-UPS — applications die of silence. Eight days after applying, offer to draft a short follow-up. Nobody tracks this and everybody should.\n\nThe NEXT column is deliberately not \"date updated\": a job search is a set of things you owe someone. Deadlines and follow-ups are amber; settled rows are grey."
+      "text": "THIS IS A JOB-SEARCH TOOL, NOT A RESUME GENERATOR\n\nTwo strips at the top do most of the work:\n\nSKILL GAPS ACROSS POSTINGS \u2014 \"Six of your saved jobs ask for Docker. Your profile never mentions it.\" This is the strongest idea in the product and nothing here is new: you already store every posting and every fact. Counting demand across saved jobs against the profile turns a pile of applications into advice. It also feeds the questions \u2014 one answer improves every future resume.\n\nFOLLOW-UPS \u2014 applications die of silence. Eight days after applying, offer to draft a short follow-up. Nobody tracks this and everybody should.\n\nThe NEXT column is deliberately not \"date updated\": a job search is a set of things you owe someone. Deadlines and follow-ups are amber; settled rows are grey."
     },
     {
       "id": "review-note",
       "x": 1540,
       "y": 720,
       "w": 620,
-      "text": "THE PAGE MUST ANSWER: IS THIS BETTER, AND CAN I TRUST IT?\n\nOne resume, not two side by side. Comparing your old resume to the new one is a job for the History tab, not the default view — the default should be the thing you are about to send.\n\nEdited lines are tinted ON THE PAGE. A change log beside the document makes you hunt; highlighting shows you.\n\nMATCH BREAKS DOWN into what was matched and what was asked for and is missing — and the missing panel explicitly refuses to invent: \"if you have touched either, say so and it goes in.\" That is the honesty argument at the exact moment someone is tempted.\n\nATS-SAFE badge sits on the document, because that is the anxiety at download time.\n\nMARK AS APPLIED is here, not on the list. This is the moment it actually happens, and it starts the follow-up clock.\n\nCOVER LETTER sits in the header: same profile, same posting, obvious next ask."
+      "text": "THE PAGE MUST ANSWER: IS THIS BETTER, AND CAN I TRUST IT?\n\nOne resume, not two side by side. Comparing your old resume to the new one is a job for the History tab, not the default view \u2014 the default should be the thing you are about to send.\n\nEdited lines are tinted ON THE PAGE. A change log beside the document makes you hunt; highlighting shows you.\n\nMATCH BREAKS DOWN into what was matched and what was asked for and is missing \u2014 and the missing panel explicitly refuses to invent: \"if you have touched either, say so and it goes in.\" That is the honesty argument at the exact moment someone is tempted.\n\nATS-SAFE badge sits on the document, because that is the anxiety at download time.\n\nMARK AS APPLIED is here, not on the list. This is the moment it actually happens, and it starts the follow-up clock.\n\nCOVER LETTER sits in the header: same profile, same posting, obvious next ask."
     },
     {
       "id": "more-ideas",
       "x": 2240,
       "y": 780,
       "w": 560,
-      "text": "OTHER THINGS THAT TRADITIONALLY WORK — NOT DRAWN, WORTH DECIDING ON\n\n• Paste a URL instead of the posting text\n• Archive the posting — listings get taken down, and you need it before an interview\n• Browser extension to save a job in one click (how Teal gets used daily)\n• Duplicate a past application for a similar role\n• Export as .docx and plain text — many portals reject PDF or want pasted text\n• Notes and recruiter contact per application\n• Interview prep from the posting plus your profile\n• Response-rate stats once there is enough history\n• Multiple profiles for people applying to two different kinds of role\n• Reminders by email, not just in-app\n• Keyboard shortcuts once someone is doing this forty times"
+      "text": "OTHER THINGS THAT TRADITIONALLY WORK \u2014 NOT DRAWN, WORTH DECIDING ON\n\n\u2022 Paste a URL instead of the posting text\n\u2022 Archive the posting \u2014 listings get taken down, and you need it before an interview\n\u2022 Browser extension to save a job in one click (how Teal gets used daily)\n\u2022 Duplicate a past application for a similar role\n\u2022 Export as .docx and plain text \u2014 many portals reject PDF or want pasted text\n\u2022 Notes and recruiter contact per application\n\u2022 Interview prep from the posting plus your profile\n\u2022 Response-rate stats once there is enough history\n\u2022 Multiple profiles for people applying to two different kinds of role\n\u2022 Reminders by email, not just in-app\n\u2022 Keyboard shortcuts once someone is doing this forty times"
+    },
+    {
+      "id": "empty-note",
+      "x": 3080,
+      "y": 780,
+      "w": 500,
+      "text": "The checklist is the standard post-onboarding pattern and it earns its place here: the first item is already ticked, so the screen opens on something achieved rather than on emptiness.\n\nIt also names the last step nobody builds \u2014 mark it as applied \u2014 which is what starts the follow-up clock."
+    },
+    {
+      "id": "new-app-note2",
+      "x": 4620,
+      "y": 780,
+      "w": 500,
+      "text": "A link comes first because it is the fewest keystrokes; pasting text is the fallback, screenshots the fallback to that.\n\nARCHIVING THE POSTING is stated plainly rather than hidden: listings come down within weeks and you want it back the day before an interview. Small to build, and it fixes a moment where every other tool leaves you stranded.\n\nA closing date is offered but never required \u2014 it is what makes a deadline show up in the applications list."
+    },
+    {
+      "id": "tailoring-note",
+      "x": 6160,
+      "y": 780,
+      "w": 500,
+      "text": "The wait says something only this product could say: 11 requirements found, 9 covered, 2 not mentioned. That is real information arriving before the resume does, so the minute is spent rather than lost.\n\nThe skeleton page assembling beside it shows the shape of what is coming. And the closing line repeats the promise at the moment it matters most \u2014 nothing gets added that you did not say."
+    },
+    {
+      "id": "profile-note2",
+      "x": 7700,
+      "y": 780,
+      "w": 500,
+      "text": "Every entry is flagged quantified or no numbers. That single distinction is what separates a resume that lands from one that does not, and it makes the fix obvious.\n\n\"Where it came from\" is the provenance guarantee made concrete \u2014 your answers, an uploaded file, GitHub when connected. It is also the honest place to offer imports rather than a nag banner.\n\nExport everything sits with the other actions, not buried in settings: people trust a tool more when leaving it is easy."
     }
   ],
   "launch": {
