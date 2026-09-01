@@ -1,0 +1,265 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 940px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <!-- top bar -->
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 62px; border-bottom: 1px solid #EDE9E2; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#57544E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+      </svg>
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-size: 14.5px; color: #1A1815;">Backend Engineering Intern</span>
+        <span style="font-size: 12.5px; color: #8A8680;">Shopify &middot; Toronto &middot; saved 2 days ago</span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid #DDD8D0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13.5px; color: #57544E; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#57544E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path>
+        </svg>
+        Cover letter
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid #DDD8D0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13.5px; color: #57544E; cursor: pointer;">
+        Version 3
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8A8680" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9l6 6 6-6"></path>
+        </svg>
+      </button>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBFAF8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path>
+        </svg>
+        Download
+      </button>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: grid; grid-template-columns: minmax(0, 1fr) 440px; overflow: hidden;">
+
+    <!-- the resume -->
+    <div style="background: #F2EFE9; padding: 28px 36px; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 600px; margin-bottom: 16px;">
+        <span style="font-size: 12px; color: #8A8680;">Alex_Ndubuisi_Backend_Engineering_Intern_Shopify.pdf</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 12px; color: #8A8680;">1 page</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 3px; background: #EDF2EF; font-size: 11.5px; color: #2F5D50;">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6L9 17l-5-5"></path>
+            </svg>
+            ATS-safe
+          </span>
+        </div>
+      </div>
+
+      <!-- paper -->
+      <div style="width: 100%; max-width: 600px; flex-grow: 1; background: #FFFFFF; border: 1px solid #E2DED6; box-shadow: 0 2px 20px rgba(26,24,21,0.06); padding: 44px 52px; box-sizing: border-box; overflow: hidden;">
+        <div style="text-align: center; padding-bottom: 14px; border-bottom: 1px solid #E5E1DA;">
+          <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; line-height: 1.1;">Alex Ndubuisi</div>
+          <div style="margin-top: 7px; font-size: 10.5px; color: #57544E;">Toronto, ON &middot; alex@example.com &middot; linkedin.com/in/alex &middot; github.com/alex</div>
+        </div>
+
+        <sc-for list="{{resume}}" as="sec" hint-placeholder-count="3">
+          <div style="margin-top: 18px;">
+            <div style="font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #1A1815; padding-bottom: 4px; border-bottom: 1px solid #E5E1DA;">{{sec.title}}</div>
+            <sc-for list="{{sec.entries}}" as="e" hint-placeholder-count="2">
+              <div style="margin-top: 10px;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+                  <span style="font-size: 11.5px; font-weight: 500; color: #1A1815;">{{e.title}}</span>
+                  <span style="font-size: 10.5px; color: #57544E; white-space: nowrap;">{{e.dates}}</span>
+                </div>
+                <div style="font-size: 10.5px; font-style: italic; color: #57544E; margin-top: 2px;">{{e.org}}</div>
+                <sc-for list="{{e.bullets}}" as="b" hint-placeholder-count="2">
+                  <div style="display: flex; gap: 7px; margin-top: 5px;">
+                    <span style="font-size: 10.5px; color: #A8A39B;">&bull;</span>
+                    <span style="{{b.style}}">{{b.text}}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- right rail -->
+    <div style="border-left: 1px solid #EDE9E2; background: #FFFFFF; display: flex; flex-direction: column; overflow: hidden;">
+
+      <div style="display: flex; gap: 0; border-bottom: 1px solid #EDE9E2; padding: 0 22px;">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+          <span style="{{t.style}}">{{t.label}}</span>
+        </sc-for>
+      </div>
+
+      <div style="flex-grow: 1; padding: 24px 22px; display: flex; flex-direction: column; gap: 22px; overflow: hidden;">
+
+        <!-- match -->
+        <div style="border: 1px solid #E9E5DE; border-radius: 6px; padding: 18px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #A8A39B;">Match</span>
+            <div style="display: flex; align-items: baseline; gap: 5px;">
+              <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1;">86</span>
+              <span style="font-size: 13px; color: #A8A39B;">/ 100</span>
+            </div>
+          </div>
+          <div style="height: 4px; border-radius: 2px; background: #EDEAE3; margin-top: 12px; overflow: hidden;">
+            <div style="height: 100%; width: 86%; border-radius: 2px; background: #2F5D50;"></div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px;">
+            <sc-for list="{{matched}}" as="m" hint-placeholder-count="5">
+              <span style="{{m.style}}">{{m.label}}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- missing -->
+        <div style="border: 1px solid #EADFC4; border-radius: 6px; background: #FDF9F0; padding: 18px;">
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8A6414" stroke-width="1.8" stroke-linecap="round">
+              <path d="M12 9v4M12 17h.01"></path>
+              <path d="M10.3 3.9L2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path>
+            </svg>
+            <span style="font-size: 13.5px; color: #6B4E10;">They ask for two things you have not mentioned</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;">
+            <span style="padding: 4px 10px; border-radius: 3px; background: #FFFFFF; border: 1px solid #E8DCBE; font-size: 12px; color: #6B4E10;">Kubernetes</span>
+            <span style="padding: 4px 10px; border-radius: 3px; background: #FFFFFF; border: 1px solid #E8DCBE; font-size: 12px; color: #6B4E10;">GraphQL</span>
+          </div>
+          <span style="display: block; margin-top: 11px; font-size: 12.5px; line-height: 1.55; color: #8A6414;">
+            If you have touched either, say so and it goes in. If not, leave it &mdash; nothing gets invented.
+          </span>
+        </div>
+
+        <!-- changes -->
+        <div style="display: flex; flex-direction: column; gap: 11px; overflow: hidden;">
+          <span style="font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #A8A39B;">What changed &middot; 6 edits</span>
+          <sc-for list="{{changes}}" as="c" hint-placeholder-count="4">
+            <div style="display: flex; align-items: flex-start; gap: 9px;">
+              <div style="width: 5px; height: 5px; border-radius: 50%; background: #C9C3B9; flex-shrink: 0; margin-top: 7px;"></div>
+              <span style="font-size: 13.5px; line-height: 1.55; color: #57544E;">{{c}}</span>
+            </div>
+          </sc-for>
+        </div>
+
+      </div>
+
+      <!-- refine -->
+      <div style="border-top: 1px solid #EDE9E2; padding: 16px 22px; background: #FCFBF9;">
+        <div style="display: flex; align-items: center; gap: 9px; border: 1px solid #E0DCD4; border-radius: 4px; background: #FFFFFF; padding: 10px 12px;">
+          <input type="text" placeholder="Ask for a change — “cut it to one page”" style="flex-grow: 1; border: none; font-family: inherit; font-size: 13.5px; color: #1A1815; outline: none;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14M13 6l6 6-6 6"></path>
+          </svg>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+          <span style="font-size: 12.5px; color: #A8A39B;">Edits are free on this resume</span>
+          <button style="display: flex; align-items: center; gap: 7px; padding: 8px 14px; border: 1px solid #DDD8D0; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13px; color: #1A1815; cursor: pointer;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 6L9 17l-5-5"></path>
+            </svg>
+            Mark as applied
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const tabBase = 'font-size: 13.5px; padding: 15px 0; margin-right: 22px; ';
+    const tabs = ['Review', 'Job posting', 'History'].map((label, i) => ({
+      label,
+      style: tabBase + (i === 0
+        ? 'color: #1A1815; border-bottom: 2px solid #2F5D50;'
+        : 'color: #8A8680; border-bottom: 2px solid transparent;'),
+    }));
+
+    const chip = 'padding: 4px 10px; border-radius: 3px; font-size: 12px; ';
+    const matched = ['Python', 'Celery', 'Postgres', 'AWS', 'Payments', 'On-call']
+      .map((label) => ({ label, style: chip + 'background: #EDF2EF; color: #2F5D50;' }));
+
+    // Bullets the tailoring touched are marked, so the change is visible on the
+    // page rather than only described in a list beside it.
+    const bullet = (text, edited) => ({
+      text,
+      style:
+        'font-size: 10.5px; line-height: 1.5; color: #1A1815; ' +
+        (edited ? 'background: #EDF2EF; box-shadow: 0 0 0 3px #EDF2EF;' : ''),
+    });
+
+    return {
+      tabs,
+      matched,
+      changes: [
+        'Led the Northbound entry with the 12% recovery figure — it is the number closest to what this posting asks for.',
+        'Rewrote the retry bullet around reliability and on-call, which the posting names twice.',
+        'Moved Python and Celery to the front of your skills; they head the requirements list.',
+        'Dropped the course-project bullet to keep it to one page.',
+      ],
+      resume: [
+        {
+          title: 'Experience',
+          entries: [
+            {
+              title: 'Backend Engineering Intern',
+              org: 'Northbound · Toronto, ON',
+              dates: 'May – Aug 2025',
+              bullets: [
+                bullet('Rebuilt the payment retry pipeline in Python and Celery, recovering ~12% of charges that previously failed outright', true),
+                bullet('Removed 90 minutes of daily manual reconciliation by automating retry scheduling on Postgres and AWS', true),
+                bullet('Sole engineer on the system; partnered with a senior engineer through design review and rollout', false),
+              ],
+            },
+          ],
+        },
+        {
+          title: 'Projects',
+          entries: [
+            {
+              title: 'Resumi',
+              org: 'Personal project',
+              dates: '2026',
+              bullets: [
+                bullet('Built a resume tailoring tool in Next.js and TypeScript that rewrites a resume against any job posting', false),
+                bullet('Typesets output through LaTeX for ATS-safe PDF generation', true),
+              ],
+            },
+          ],
+        },
+        {
+          title: 'Education',
+          entries: [
+            {
+              title: 'BSc Software Engineering',
+              org: 'Ontario Tech University',
+              dates: 'Expected 2028',
+              bullets: [],
+            },
+          ],
+        },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

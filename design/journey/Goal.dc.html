@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 880px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 56px; height: 74px; border-bottom: 1px solid #EDE9E2;">
+    <div style="display: flex; align-items: center; gap: 9px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+        <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+      </svg>
+      <span style="font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px;">
+      <span style="font-size: 13px; color: #A8A39B;">Step 1 of 2</span>
+      <div style="display: flex; gap: 5px;">
+        <div style="width: 22px; height: 3px; border-radius: 2px; background: #2F5D50;"></div>
+        <div style="width: 22px; height: 3px; border-radius: 2px; background: #E2DED6;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 40px 56px;">
+    <div style="width: 100%; max-width: 540px; display: flex; flex-direction: column;">
+
+      <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 46px; line-height: 1.08; letter-spacing: -0.012em;">
+        What are you hunting <span style="font-style: italic; color: #2F5D50;">for</span>?
+      </h1>
+      <p style="margin: 14px 0 0; font-size: 15.5px; line-height: 1.6; color: #57544E;">
+        It changes what we ask you about, and what gets pulled forward on every resume you make.
+      </p>
+
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 36px;">
+        <sc-for list="{{options}}" as="opt" hint-placeholder-count="3">
+          <button onClick="{{opt.pick}}" style="{{opt.style}}">
+            <span style="display: flex; flex-direction: column; gap: 4px; text-align: left;">
+              <span style="font-size: 15.5px; color: #1A1815;">{{opt.label}}</span>
+              <span style="font-size: 13.5px; line-height: 1.5; color: #8A8680;">{{opt.detail}}</span>
+            </span>
+            <sc-if value="{{opt.selected}}" hint-placeholder-val="{{true}}">
+              <span style="display: flex; align-items: center; justify-content: center; width: 21px; height: 21px; border-radius: 50%; background: #2F5D50; flex-shrink: 0;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6L9 17l-5-5"></path>
+                </svg>
+              </span>
+            </sc-if>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 30px;">
+        <label style="font-size: 13.5px; color: #57544E;">
+          Doing what? <span style="color: #A8A39B;">optional</span>
+        </label>
+        <input type="text" placeholder="backend engineering, data science, product design…" style="width: 100%; box-sizing: border-box; padding: 14px 16px; border: 1px solid #E0DCD4; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 15px; color: #1A1815; outline: none;">
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 40px; padding-top: 26px; border-top: 1px solid #EDE9E2;">
+        <span style="font-size: 13.5px; color: #A8A39B;">You can change this later</span>
+        <button style="padding: 14px 32px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 15px; font-weight: 500; cursor: pointer;">
+          Continue
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { picked: 'new_grad' };
+  }
+
+  renderVals() {
+    const base =
+      'display: flex; align-items: center; justify-content: space-between; gap: 14px;' +
+      'width: 100%; box-sizing: border-box; padding: 18px 20px; border-radius: 5px;' +
+      'font-family: inherit; cursor: pointer;';
+
+    const options = [
+      { id: 'internship', label: 'An internship or co-op', detail: 'Still studying, looking for a placement' },
+      { id: 'new_grad', label: 'My first proper role', detail: 'Graduated recently, or a couple of years in' },
+      { id: 'experienced', label: 'A move up or across', detail: 'Several years in, changing roles or levels' },
+    ].map((o) => {
+      const selected = this.state.picked === o.id;
+      return {
+        ...o,
+        selected,
+        pick: () => this.setState({ picked: o.id }),
+        style:
+          base +
+          (selected
+            ? 'border: 1px solid #2F5D50; background: #F4F7F5;'
+            : 'border: 1px solid #E5E1DA; background: #FFFFFF;'),
+      };
+    });
+
+    return { options };
+  }
+}
+</script>
+</body>
+</html>

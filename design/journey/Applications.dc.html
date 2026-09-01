@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 960px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 36px; height: 62px; border-bottom: 1px solid #EDE9E2; background: #FFFFFF;">
+    <div style="display: flex; align-items: center; gap: 38px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+        </svg>
+        <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 26px;">
+        <span style="font-size: 14px; color: #1A1815; border-bottom: 2px solid #2F5D50; padding: 20px 0 18px;">Applications</span>
+        <span style="font-size: 14px; color: #8A8680;">Insights</span>
+        <span style="font-size: 14px; color: #8A8680;">Profile</span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="font-size: 13px; color: #8A8680;">2 of 5 free left</span>
+      <div style="width: 28px; height: 28px; border-radius: 50%; background: #E7EBE8; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #2F5D50;">AN</div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 30px 36px; display: flex; flex-direction: column; gap: 20px; overflow: hidden;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+      <div style="display: flex; align-items: baseline; gap: 26px;">
+        <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 34px; line-height: 1;">Applications</h1>
+        <sc-for list="{{counters}}" as="c" hint-placeholder-count="3">
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span style="font-size: 15px; color: #1A1815;">{{c.n}}</span>
+            <span style="font-size: 13px; color: #8A8680;">{{c.label}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <button style="display: flex; align-items: center; gap: 8px; padding: 11px 20px; border: none; border-radius: 4px; background: #2F5D50; color: #FBFAF8; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FBFAF8" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        New application
+      </button>
+    </div>
+
+    <!-- the two nudges that make this a job-search tool, not a resume generator -->
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+
+      <div style="display: flex; align-items: flex-start; gap: 12px; padding: 15px 17px; border: 1px solid #DCE5E0; border-radius: 6px; background: #F4F7F5;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;">
+          <path d="M3 3v18h18"></path><path d="M18 9l-5 5-3-3-4 4"></path>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <span style="font-size: 13.5px; color: #1F4238;">Six of your saved jobs ask for Docker. Your profile never mentions it.</span>
+          <span style="font-size: 12.5px; color: #4A7264;">If you have used it, one answer puts it on every future resume.</span>
+        </div>
+        <span style="font-size: 13px; color: #2F5D50; white-space: nowrap; margin-top: 1px;">Fix</span>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 12px; padding: 15px 17px; border: 1px solid #EADFC4; border-radius: 6px; background: #FDF9F0;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8A6414" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;">
+          <circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>
+        </svg>
+        <div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+          <span style="font-size: 13.5px; color: #6B4E10;">You applied to Wealthsimple eight days ago.</span>
+          <span style="font-size: 12.5px; color: #8A6414;">A short follow-up now is normal and often works.</span>
+        </div>
+        <span style="font-size: 13px; color: #8A6414; white-space: nowrap; margin-top: 1px;">Draft one</span>
+      </div>
+
+    </div>
+
+    <!-- controls -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <sc-for list="{{filters}}" as="f" hint-placeholder-count="5">
+          <span style="{{f.style}}">{{f.label}} <span style="{{f.countStyle}}">{{f.count}}</span></span>
+        </sc-for>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #E0DCD4; border-radius: 4px; background: #FFFFFF; width: 210px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A8A39B" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          <input type="text" placeholder="Search company or role" style="flex-grow: 1; border: none; font-family: inherit; font-size: 13px; color: #1A1815; outline: none; background: none;">
+        </div>
+        <button style="display: flex; align-items: center; gap: 7px; padding: 9px 13px; border: 1px solid #E0DCD4; border-radius: 4px; background: #FFFFFF; font-family: inherit; font-size: 13px; color: #57544E; cursor: pointer;">
+          Recent
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8A8680" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- table -->
+    <div style="border: 1px solid #E9E5DE; border-radius: 6px; background: #FFFFFF; overflow: hidden;">
+      <div style="display: grid; grid-template-columns: 2.6fr 1fr 1.1fr 1.3fr 36px; gap: 16px; padding: 12px 22px; border-bottom: 1px solid #EFEBE4; background: #FCFBF9;">
+        <sc-for list="{{cols}}" as="c" hint-placeholder-count="4">
+          <span style="font-size: 10.5px; letter-spacing: 0.11em; text-transform: uppercase; color: #A8A39B;">{{c}}</span>
+        </sc-for>
+        <span></span>
+      </div>
+
+      <sc-for list="{{rows}}" as="row" hint-placeholder-count="7">
+        <div style="display: grid; grid-template-columns: 2.6fr 1fr 1.1fr 1.3fr 36px; gap: 16px; align-items: center; padding: 15px 22px; border-bottom: 1px solid #F4F1EB;">
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-size: 14px; color: #1A1815;">{{row.role}}</span>
+            <span style="font-size: 12.5px; color: #8A8680;">{{row.company}} &middot; {{row.location}}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 9px;">
+            <div style="width: 38px; height: 3px; border-radius: 2px; background: #EDEAE3; overflow: hidden;">
+              <div style="{{row.barStyle}}"></div>
+            </div>
+            <span style="font-size: 13px; color: #57544E;">{{row.match}}</span>
+          </div>
+          <span style="{{row.pillStyle}}">{{row.status}}</span>
+          <span style="{{row.nextStyle}}">{{row.next}}</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C0BAB1" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle>
+          </svg>
+        </div>
+      </sc-for>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const pill = 'display: inline-flex; align-items: center; justify-self: start; padding: 4px 10px; border-radius: 3px; font-size: 12px; ';
+
+    const rows = [
+      { role: 'Backend Engineering Intern', company: 'Shopify', location: 'Toronto', match: '86%', status: 'Interviewing', next: 'Interview Thu 10am', urgent: true },
+      { role: 'Software Developer Intern', company: 'Wealthsimple', location: 'Toronto', match: '81%', status: 'Applied', next: 'Follow up — 8 days', urgent: true },
+      { role: 'Platform Engineering Intern', company: 'Faire', location: 'Remote', match: '78%', status: 'Applied', next: 'Applied 5 days ago', urgent: false },
+      { role: 'Data Engineering Intern', company: 'Ada', location: 'Toronto', match: '74%', status: 'Draft', next: 'Closes in 3 days', urgent: true },
+      { role: 'Backend Intern', company: 'Cohere', location: 'Toronto', match: '69%', status: 'Rejected', next: '—', urgent: false },
+      { role: 'Full-Stack Intern', company: 'Jane Street', location: 'New York', match: '64%', status: 'Draft', next: 'Not sent', urgent: false },
+      { role: 'Infrastructure Intern', company: 'Vercel', location: 'Remote', match: '61%', status: 'Draft', next: 'Not sent', urgent: false },
+    ].map((r) => ({
+      ...r,
+      pillStyle: pill + (
+        r.status === 'Interviewing' ? 'background: #FAF2E4; color: #8A6414;'
+        : r.status === 'Applied' ? 'background: #EDF2EF; color: #2F5D50;'
+        : r.status === 'Rejected' ? 'background: #F5F3F0; color: #A8A39B;'
+        : 'background: #F5F3F0; color: #6B6862;'),
+      barStyle: 'height: 100%; border-radius: 2px; background: #2F5D50; width: ' + r.match + ';',
+      nextStyle: 'font-size: 13px; ' + (r.urgent ? 'color: #8A6414;' : 'color: #A8A39B;'),
+    }));
+
+    const fBase = 'padding: 7px 13px; border-radius: 100px; font-size: 13px; cursor: pointer; ';
+    const filters = [
+      { label: 'All', count: 12, on: true },
+      { label: 'Draft', count: 4, on: false },
+      { label: 'Applied', count: 5, on: false },
+      { label: 'Interviewing', count: 2, on: false },
+      { label: 'Closed', count: 1, on: false },
+    ].map((f) => ({
+      ...f,
+      style: fBase + (f.on
+        ? 'background: #1A1815; color: #FBFAF8;'
+        : 'background: #FFFFFF; border: 1px solid #E5E1DA; color: #57544E;'),
+      countStyle: 'font-size: 12px; ' + (f.on ? 'color: #9A9E9B;' : 'color: #B5B0A8;'),
+    }));
+
+    return {
+      rows,
+      filters,
+      cols: ['Role', 'Match', 'Status', 'Next'],
+      counters: [
+        { n: '12', label: 'tracked' },
+        { n: '5', label: 'sent' },
+        { n: '2', label: 'interviewing' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

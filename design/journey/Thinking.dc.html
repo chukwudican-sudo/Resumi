@@ -1,0 +1,163 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;450;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #2F5D50; } a:hover { color: #23463C; }
+    @keyframes settle {
+      0%   { opacity: 0; transform: translateY(4px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .settling { animation: settle 420ms ease-out both; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 880px; box-sizing: border-box; background: #FBFAF8; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; color: #1A1815; display: flex; flex-direction: column;">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 40px; height: 68px; border-bottom: 1px solid #EDE9E2;">
+    <div style="display: flex; align-items: center; gap: 32px;">
+      <div style="display: flex; align-items: center; gap: 9px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path>
+        </svg>
+        <span style="font-size: 12.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #57544E;">Resumi</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 18px;">
+        <sc-for list="{{phases}}" as="p" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 7px;">
+            <div style="{{p.dotStyle}}"></div>
+            <span style="{{p.labelStyle}}">{{p.label}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 76px; height: 4px; border-radius: 2px; background: #E7E3DB; overflow: hidden;">
+        <div style="height: 100%; width: 68%; border-radius: 2px; background: #2F5D50;"></div>
+      </div>
+      <span style="font-size: 13px; color: #57544E;">68%</span>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: grid; grid-template-columns: minmax(0, 1fr) 400px; overflow: hidden;">
+
+    <div style="padding: 64px 56px; display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+      <div style="max-width: 620px;">
+
+        <div style="padding: 20px 22px; border-radius: 6px; background: #F2EFE9; border: 1px solid #E7E3DB;">
+          <span style="font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #A8A39B;">You said</span>
+          <p style="margin: 9px 0 0; font-size: 15.5px; line-height: 1.6; color: #57544E;">
+            I was the only engineer on it, but I paired with the senior backend engineer for design review before it shipped.
+          </p>
+        </div>
+
+        <div style="margin-top: 40px; display: flex; flex-direction: column; gap: 18px;">
+          <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 13px;">
+              <span style="{{s.iconWrap}}">
+                <sc-if value="{{s.done}}" hint-placeholder-val="{{true}}">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 6L9 17l-5-5"></path>
+                  </svg>
+                </sc-if>
+              </span>
+              <span style="{{s.textStyle}}">{{s.label}}</span>
+            </div>
+          </sc-for>
+        </div>
+
+        <p style="margin: 44px 0 0; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 19px; line-height: 1.5; color: #B5B0A8;">
+          Takes a few seconds &mdash; it is reading everything you have said so far, not just that answer.
+        </p>
+
+      </div>
+    </div>
+
+    <div style="border-left: 1px solid #EDE9E2; background: #F7F5F1; padding: 32px 28px; display: flex; flex-direction: column; gap: 22px; overflow: hidden;">
+
+      <div style="display: flex; align-items: baseline; justify-content: space-between;">
+        <span style="font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: #A8A39B;">Building your profile</span>
+        <span style="font-size: 12.5px; color: #2F5D50;">+1 just now</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;">
+          <span style="font-size: 14px; color: #1A1815;">Backend Intern &middot; Northbound</span>
+          <span style="font-size: 12px; color: #B5B0A8; white-space: nowrap;">Summer 2025</span>
+        </div>
+
+        <div class="settling" style="display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: 4px; background: #EDF2EF; border: 1px solid #D6E2DC;">
+          <span style="font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; padding-top: 3px; flex-shrink: 0; width: 46px; color: #2F5D50;">scope</span>
+          <span style="font-size: 13.5px; line-height: 1.5; color: #3D3A35;">Sole engineer on the system; paired with a senior engineer for design review</span>
+        </div>
+
+        <sc-for list="{{settled}}" as="f" hint-placeholder-count="3">
+          <div style="display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border-radius: 4px; background: #FFFFFF; border: 1px solid #EDE9E2;">
+            <span style="font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; padding-top: 3px; flex-shrink: 0; width: 46px; color: #B5B0A8;">{{f.tag}}</span>
+            <span style="font-size: 13.5px; line-height: 1.5; color: #3D3A35;">{{f.text}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top: auto; padding-top: 18px; border-top: 1px solid #E7E3DB;">
+        <span style="font-size: 12.5px; line-height: 1.6; color: #A8A39B;">
+          Nothing here is written by us &mdash; it is what you said, kept in your words until the resume is built.
+        </span>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const phaseNames = ['About you', 'Your work', 'The details', 'Skills'];
+    const activeIndex = 2;
+    const phases = phaseNames.map((label, i) => ({
+      label,
+      dotStyle:
+        'width: 6px; height: 6px; border-radius: 50%; ' +
+        (i <= activeIndex ? 'background: #2F5D50;' : 'background: #DAD5CC;'),
+      labelStyle:
+        'font-size: 13px; ' +
+        (i === activeIndex ? 'color: #1A1815;' : i < activeIndex ? 'color: #8A8680;' : 'color: #B5B0A8;'),
+    }));
+
+    // Naming the work makes the wait read as deliberate rather than stalled.
+    const steps = [
+      { label: 'Read what you said', done: true },
+      { label: 'Noted the scope of your role', done: true },
+      { label: 'Working out what is still missing', done: false },
+    ].map((s) => ({
+      ...s,
+      iconWrap:
+        'display: flex; align-items: center; justify-content: center; width: 20px; height: 20px;' +
+        'border-radius: 50%; flex-shrink: 0; ' +
+        (s.done ? 'background: #2F5D50;' : 'background: #FFFFFF; border: 2px solid #DCD8D0;'),
+      textStyle: 'font-size: 15.5px; ' + (s.done ? 'color: #57544E;' : 'color: #1A1815;'),
+    }));
+
+    return {
+      phases,
+      steps,
+      settled: [
+        { tag: 'metric', text: 'Recovered ~12% of payments that previously failed outright' },
+        { tag: 'metric', text: 'Cut manual reconciliation from 90 minutes a day to nothing' },
+        { tag: 'tooling', text: 'Python, Celery, Postgres, on AWS' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
