@@ -197,6 +197,55 @@ export async function getDueFollowUps(userId: string) {
     );
 }
 
+/**
+ * The applications list with everything the page needs, in one query.
+ *
+ * The match score comes from the newest resume for each application, pulled in
+ * a lateral join rather than a second round trip per row — a job search is
+ * thirty to fifty of these and N+1 would show.
+ */
+export async function listApplicationsForDisplay(userId: string) {
+  return db.execute<{
+    id: string;
+    status: string;
+    applied_at: Date | null;
+    follow_up_due_at: Date | null;
+    closes_at: Date | null;
+    company: string | null;
+    role: string | null;
+    location: string | null;
+    match_score: number | null;
+    has_resume: boolean;
+  }>(sql`
+    select
+      a.id, a.status, a.applied_at, a.follow_up_due_at,
+      p.closes_at, p.company, p.role, p.location,
+      r.match_score,
+      (r.id is not null) as has_resume
+    from ${applications} a
+    left join ${jobPostings} p on p.id = a.posting_id
+    left join lateral (
+      select id, match_score
+      from ${resumes}
+      where application_id = a.id
+      order by version desc
+      limit 1
+    ) r on true
+    where a.user_id = ${userId}
+    order by a.updated_at desc
+  `);
+}
+
+/** Counts per status, for the filter chips. */
+export async function countApplicationsByStatus(userId: string) {
+  const rows = await db
+    .select({ status: applications.status, count: sql<number>`count(*)::int` })
+    .from(applications)
+    .where(eq(applications.userId, userId))
+    .groupBy(applications.status);
+  return Object.fromEntries(rows.map((r) => [r.status, r.count])) as Record<string, number>;
+}
+
 // ── Resumes ────────────────────────────────────────────────────────────────
 
 /** The newest version for an application. */
