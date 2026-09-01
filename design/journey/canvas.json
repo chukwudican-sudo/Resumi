@@ -6,7 +6,7 @@
       "y": 0,
       "w": 1280,
       "h": 3900,
-      "title": "1 \u00b7 Landing",
+      "title": "1 · Landing",
       "expand": "fill"
     },
     {
@@ -15,7 +15,55 @@
       "y": 0,
       "w": 1280,
       "h": 880,
-      "title": "2 \u00b7 Sign up"
+      "title": "2 · Sign up"
+    },
+    {
+      "file": "Goal.dc.html",
+      "x": 2760,
+      "y": 0,
+      "w": 1280,
+      "h": 880,
+      "title": "3 · Your goal"
+    },
+    {
+      "file": "BuildProfile.dc.html",
+      "x": 4140,
+      "y": 0,
+      "w": 1280,
+      "h": 880,
+      "title": "4 · Build your profile"
+    },
+    {
+      "file": "Questions.dc.html",
+      "x": 5520,
+      "y": 0,
+      "w": 1280,
+      "h": 880,
+      "title": "5 · Questions"
+    },
+    {
+      "file": "Thinking.dc.html",
+      "x": 6900,
+      "y": 0,
+      "w": 1280,
+      "h": 880,
+      "title": "5b · Thinking"
+    },
+    {
+      "file": "Applications.dc.html",
+      "x": 0,
+      "y": 1060,
+      "w": 1440,
+      "h": 960,
+      "title": "9 · Applications"
+    },
+    {
+      "file": "Review.dc.html",
+      "x": 1540,
+      "y": 1060,
+      "w": 1440,
+      "h": 940,
+      "title": "10 · Review"
     }
   ],
   "annotations": [
@@ -24,24 +72,74 @@
       "x": 0,
       "y": -300,
       "w": 500,
-      "text": "THE JOURNEY, IN ORDER\n\n1 Landing        \u2190 here\n2 Sign up        \u2190 here\n3 Welcome\n4 Your goal\n5 Build profile\n6 Questions\n7 Applications (empty)\n8 New application\n9 Tailoring\n10 Review\n11 Applications (full)\n12 Profile\n\nScreens land on this canvas as we work through them."
+      "text": "THE JOURNEY, IN ORDER\n\n1 Landing            ✓\n2 Sign up            ✓\n3 Your goal          ✓\n4 Build profile      ✓\n5 Questions          ✓\n5b Thinking          ✓\n9 Applications       ✓\n10 Review            ✓\n\nStill to draw: empty applications, new application,\ntailoring, profile.\n\nThe old welcome screen is gone — it only existed because there was no landing page."
     },
     {
       "id": "landing-note",
       "x": 540,
       "y": -300,
       "w": 520,
-      "text": "WHY THIS HEADLINE\n\n\"You'll apply to forty jobs. You'll tailor maybe five.\" names the behaviour rather than pitching the product \u2014 the reader recognises themselves before they have been sold anything. Italic serif carries the turn in the sentence.\n\nSTRUCTURE\n\nNumbered sections (01\u201304) give the page a spine, so it reads as an argument rather than a stack of blocks.\n\nThe product shot sits directly under the hero and bleeds off the bottom edge \u2014 the page shows the tool before it describes it.\n\nTwo dark bands (the numbers, the closing call) break up a long light page and give it rhythm. The close inverts the button so the last thing on screen is the loudest.\n\nThe stats are real and sourced. Cost carries a [YOUR PRICE] placeholder \u2014 fill it before launch rather than letting a made-up number ship."
+      "text": "WHY THIS HEADLINE\n\n\"You'll apply to forty jobs. You'll tailor maybe five.\" names the behaviour rather than pitching the product — the reader recognises themselves before they have been sold anything. Italic serif carries the turn in the sentence.\n\nSTRUCTURE\n\nNumbered sections (01–04) give the page a spine, so it reads as an argument rather than a stack of blocks.\n\nThe product shot sits directly under the hero and bleeds off the bottom edge — the page shows the tool before it describes it.\n\nTwo dark bands (the numbers, the closing call) break up a long light page and give it rhythm. The close inverts the button so the last thing on screen is the loudest.\n\nThe stats are real and sourced. Cost carries a [YOUR PRICE] placeholder — fill it before launch rather than letting a made-up number ship."
     },
     {
       "id": "signup-note",
       "x": 1380,
       "y": -200,
       "w": 460,
-      "text": "One field, or one button. Nothing is asked here that the flow asks better later \u2014 no name, no role, no password if they use Google.\n\nThe line about deleting your data sits above the fold on purpose: this is the screen where someone decides whether to hand over their work history."
+      "text": "One field, or one button. Nothing is asked here that the flow asks better later — no name, no role, no password if they use Google.\n\nThe line about deleting your data sits above the fold on purpose: this is the screen where someone decides whether to hand over their work history."
+    },
+    {
+      "id": "goal-note",
+      "x": 2760,
+      "y": -230,
+      "w": 460,
+      "text": "Each option carries a line of detail, because \"new grad\" means different things to different people and a wrong pick quietly degrades every question that follows.\n\n\"You can change this later\" sits next to the button: the cost of choosing wrong is the thing that makes people hesitate on a screen like this."
+    },
+    {
+      "id": "build-note",
+      "x": 4140,
+      "y": -230,
+      "w": 480,
+      "text": "Both paths carry a time cost — 30 seconds against 5 minutes. Without it, \"answer some questions\" reads as open-ended, which is what stops people picking it.\n\nUpload leads because it is fastest. But the note underneath makes the honest argument for the slower path: a resume only contains what you already wrote down. That is the case for the questions, made without hiding the trade."
+    },
+    {
+      "id": "questions-note",
+      "x": 5520,
+      "y": -260,
+      "w": 500,
+      "text": "THE QUESTION IS THE HERO\n\nThe old screen buried it under a scrolling transcript. Here it is the largest thing on the page and there is nothing to scroll past to reach it — you read it and answer.\n\nThe transcript is gone entirely. Its job was reassurance that the thing was listening; the profile panel does that better, because it shows what was actually understood rather than what was typed.\n\nThe italic line above the question is the model reacting to the last answer. It is the whole difference between a conversation and a form.\n\nFreshly captured facts are tinted; older ones settle to white. You watch your profile being built."
+    },
+    {
+      "id": "thinking-note",
+      "x": 6900,
+      "y": -260,
+      "w": 500,
+      "text": "EIGHT SECONDS, HONESTLY SPENT\n\nEach turn takes 7-8s. A spinner for that long reads as broken, so the wait names its own work — read what you said, noted the scope, working out what is missing — and ticks the steps off as they complete.\n\nThe answer stays on screen so the wait feels like the conversation continuing rather than a gap in it.\n\nThe new fact animates into the panel the moment it is captured, before the next question arrives — so the wait pays out early. The closing line explains why it is slow, which is what stops slow feeling like stuck."
+    },
+    {
+      "id": "apps-note",
+      "x": 0,
+      "y": 780,
+      "w": 620,
+      "text": "THIS IS A JOB-SEARCH TOOL, NOT A RESUME GENERATOR\n\nTwo strips at the top do most of the work:\n\nSKILL GAPS ACROSS POSTINGS — \"Six of your saved jobs ask for Docker. Your profile never mentions it.\" This is the strongest idea in the product and nothing here is new: you already store every posting and every fact. Counting demand across saved jobs against the profile turns a pile of applications into advice. It also feeds the questions — one answer improves every future resume.\n\nFOLLOW-UPS — applications die of silence. Eight days after applying, offer to draft a short follow-up. Nobody tracks this and everybody should.\n\nThe NEXT column is deliberately not \"date updated\": a job search is a set of things you owe someone. Deadlines and follow-ups are amber; settled rows are grey."
+    },
+    {
+      "id": "review-note",
+      "x": 1540,
+      "y": 720,
+      "w": 620,
+      "text": "THE PAGE MUST ANSWER: IS THIS BETTER, AND CAN I TRUST IT?\n\nOne resume, not two side by side. Comparing your old resume to the new one is a job for the History tab, not the default view — the default should be the thing you are about to send.\n\nEdited lines are tinted ON THE PAGE. A change log beside the document makes you hunt; highlighting shows you.\n\nMATCH BREAKS DOWN into what was matched and what was asked for and is missing — and the missing panel explicitly refuses to invent: \"if you have touched either, say so and it goes in.\" That is the honesty argument at the exact moment someone is tempted.\n\nATS-SAFE badge sits on the document, because that is the anxiety at download time.\n\nMARK AS APPLIED is here, not on the list. This is the moment it actually happens, and it starts the follow-up clock.\n\nCOVER LETTER sits in the header: same profile, same posting, obvious next ask."
+    },
+    {
+      "id": "more-ideas",
+      "x": 2240,
+      "y": 780,
+      "w": 560,
+      "text": "OTHER THINGS THAT TRADITIONALLY WORK — NOT DRAWN, WORTH DECIDING ON\n\n• Paste a URL instead of the posting text\n• Archive the posting — listings get taken down, and you need it before an interview\n• Browser extension to save a job in one click (how Teal gets used daily)\n• Duplicate a past application for a similar role\n• Export as .docx and plain text — many portals reject PDF or want pasted text\n• Notes and recruiter contact per application\n• Interview prep from the posting plus your profile\n• Response-rate stats once there is enough history\n• Multiple profiles for people applying to two different kinds of role\n• Reminders by email, not just in-app\n• Keyboard shortcuts once someone is doing this forty times"
     }
   ],
   "launch": {
-    "view": "canvas"
+    "view": "focused",
+    "file": "Review.dc.html"
   }
 }
