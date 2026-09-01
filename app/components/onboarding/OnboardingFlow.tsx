@@ -177,7 +177,7 @@ export default function OnboardingFlow({
         setError(data?.error?.message ?? "We couldn't read this as a resume. Try a different file.");
         return;
       }
-      router.push('/profile');
+      router.push('/setup');
     } catch {
       setError("We couldn't read that file. Make sure it isn't password protected.");
     } finally {
@@ -318,7 +318,7 @@ export default function OnboardingFlow({
               <button
                 type="button"
                 disabled={parsing}
-                onClick={() => router.push('/interview')}
+                onClick={() => router.push('/setup')}
                 className="flex items-start gap-[18px] rounded-md border border-rule bg-ground-surface p-[26px] text-left transition hover:border-rule-field disabled:opacity-60"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-rule bg-ground-band">
@@ -328,11 +328,11 @@ export default function OnboardingFlow({
                 </span>
                 <span className="flex flex-grow flex-col gap-1.5">
                   <span className="flex flex-wrap items-center gap-2.5">
-                    <span className="text-[17px] text-ink">Answer some questions</span>
+                    <span className="text-[17px] text-ink">Fill it in myself</span>
                     <span className="rounded-[3px] bg-ground-band px-2 py-0.5 text-[11px] text-ink-prose">about 5 minutes</span>
                   </span>
                   <span className="text-[14.5px] leading-relaxed text-ink-prose">
-                    No file needed. We ask about your work and write the resume from your answers &mdash; usually a better one.
+                    No file needed. Type in your jobs and projects and the resume builds as you go.
                   </span>
                 </span>
               </button>
@@ -345,8 +345,9 @@ export default function OnboardingFlow({
                 <circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" />
               </svg>
               <span className="text-[13.5px] leading-relaxed text-ink-prose">
-                Uploading is quicker, but a resume only contains what you already wrote down. The
-                questions dig for the numbers and detail most resumes are missing &mdash; you can do both.
+                Either way you can edit everything afterwards. When you paste in a job posting, Resumi asks
+                you a few questions about that specific role &mdash; that is where the detail that makes a
+                resume land gets added.
               </span>
             </div>
 
