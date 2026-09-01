@@ -2,7 +2,6 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans, Instrument_Serif } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
-import RecoveryBanner from './components/RecoveryBanner';
 import { syncCurrentUser } from './server/auth';
 
 /**
@@ -39,7 +38,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <ClerkProvider>
       <html lang="en" className={`${sans.variable} ${serif.variable}`}>
         <body>
-          <RecoveryBanner />
           {children}
         </body>
       </html>

@@ -1,10 +1,17 @@
-import OnboardingShell from '../components/onboarding/OnboardingShell';
+import { redirect } from 'next/navigation';
+import OnboardingFlow from '../components/onboarding/OnboardingFlow';
+import { requireUserId } from '../server/auth';
+import { getProfile, getUser } from '../server/db/repository';
 
 /**
- * Not wrapped in AppFrame. The desktop-only gate is defensible for the
- * side-by-side PDF review; it is not defensible on the first screen a new
- * person ever sees.
+ * First run. Someone who already has a profile has no business here — sending
+ * them back to their applications is kinder than showing setup they finished.
  */
-export default function OnboardingPage() {
-  return <OnboardingShell />;
+export default async function OnboardingPage() {
+  const userId = await requireUserId();
+  const [user, profile] = await Promise.all([getUser(userId), getProfile(userId)]);
+
+  if (profile && !profile.stale) redirect('/applications');
+
+  return <OnboardingFlow initialStage={user?.stage ?? ''} initialField={user?.targetField ?? ''} />;
 }

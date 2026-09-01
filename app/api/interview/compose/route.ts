@@ -1,42 +1,61 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { NoToolUseError } from '../../../lib/anthropic';
 import { cleanWarning, composeProfile, findUncitedBullets } from '../../../lib/interview/compose';
+import { profileStrength } from '../../../lib/profileStrength';
 import type { Fact, ProfileEntry } from '../../../lib/types';
+import { requireUserId } from '../../../server/auth';
+import {
+  getActiveFacts,
+  getProfileEntries,
+  saveComposedProfile,
+} from '../../../server/db/repository';
 import { errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
 
 export const maxDuration = 60;
 
-/** Turns the interview's collected facts into a ResumeStructure. */
-export async function POST(request: NextRequest) {
+/** Turns everything collected into a resume, and saves it as the profile. */
+export async function POST() {
+  const userId = await requireUserId();
+
   if (!process.env.ANTHROPIC_API_KEY) {
-    return errorResponse(
-      { type: 'auth', message: 'Your API key may be invalid or out of credits. Check console.anthropic.com.' },
-      500,
-    );
+    return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 500);
   }
 
-  let body: { entries?: ProfileEntry[]; facts?: Fact[] };
-  try {
-    body = await request.json();
-  } catch {
-    return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 400);
-  }
+  const [entryRows, factRows] = await Promise.all([getProfileEntries(userId), getActiveFacts(userId)]);
 
-  const entries = body.entries;
-  const facts = body.facts;
-  if (!Array.isArray(entries) || !Array.isArray(facts)) {
-    return errorResponse({ type: 'generic', message: 'Interview data is missing or malformed.' }, 400);
-  }
-  if (facts.length === 0) {
+  if (factRows.length === 0) {
     return errorResponse({ type: 'generic', message: 'There is nothing to build a profile from yet.' }, 400);
   }
+
+  const entries: ProfileEntry[] = entryRows.map((e) => ({
+    id: e.id,
+    kind: e.kind as ProfileEntry['kind'],
+    title: e.title ?? undefined,
+    org: e.org ?? undefined,
+    location: e.location ?? undefined,
+    datesDisplay: e.datesDisplay ?? undefined,
+    orderIndex: e.orderIndex,
+    source: e.source as ProfileEntry['source'],
+  }));
+
+  const facts: Fact[] = factRows.map((f) => ({
+    id: f.id,
+    entryId: f.entryId,
+    category: f.category as Fact['category'],
+    text: f.text,
+    hasNumber: f.hasNumber,
+    confidence: f.confidence,
+    source: f.source as Fact['source'],
+    sourceTurnId: f.sourceTurnId,
+    status: 'active',
+  }));
 
   try {
     const result = await composeProfile(entries, facts);
 
-    // A bullet the model could not trace to a fact is one it invented. Surface
-    // it as a warning rather than letting it pass silently into the resume.
+    // A bullet the model could not trace back to anything is one it invented.
+    // Surfaced rather than silently shipped into someone's resume.
     const uncited = findUncitedBullets(result, facts);
     const warnings = result.warnings.map(cleanWarning).filter(Boolean);
     if (uncited.length) {
@@ -45,22 +64,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      structure: result.structure,
-      bulletSources: result.bulletSources,
-      warnings,
-      usage: result.usage,
-    });
+    await saveComposedProfile(
+      userId,
+      result.structure,
+      result.bulletSources,
+      profileStrength(result.structure),
+    );
+
+    return NextResponse.json({ structure: result.structure, warnings });
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-      return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits. Check console.anthropic.com.' }, 401);
+      return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
     }
     if (error instanceof Anthropic.APIConnectionError) {
-      return errorResponse({ type: 'network', message: 'Your internet connection dropped. Please check your connection.' }, 503);
+      return errorResponse({ type: 'network', message: 'Your internet connection dropped.' }, 503);
     }
     if (error instanceof NoToolUseError) {
       return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
     }
+    console.error('[Resumi] Compose failed:', error);
     return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
   }
 }

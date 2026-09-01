@@ -1,10 +1,6 @@
-import ReviewShell from '../components/ReviewShell';
-import AppFrame from '../components/AppFrame';
+import { redirect } from 'next/navigation';
 
+/** Reviewing now happens per application, at /applications/[id]. */
 export default function ReviewPage() {
-  return (
-    <AppFrame>
-      <ReviewShell />
-    </AppFrame>
-  );
+  redirect('/applications');
 }
