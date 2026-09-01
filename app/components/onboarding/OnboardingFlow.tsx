@@ -2,11 +2,100 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveOnboardingGoal } from '../../server/actions';
+import { saveContactDetails, saveOnboardingGoal } from '../../server/actions';
 import { fileToBase64 } from '../../lib/fileToBase64';
 import type { ResumeStructure } from '../../lib/types';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+export interface Contact {
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  linkedin: string;
+  website: string;
+}
+
+/**
+ * The one thing a resume cannot be finished without.
+ *
+ * A form rather than a conversation on purpose: contact details are structured,
+ * and asking for a phone number in prose is worse for everyone. Name and email
+ * arrive already filled from the account, so most people confirm rather than
+ * type — which is what keeps a third step from feeling like a third step.
+ */
+function ContactStep({
+  contact,
+  onChange,
+  onBack,
+  onContinue,
+  pending,
+}: {
+  contact: Contact;
+  onChange: (key: keyof Contact) => (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBack: () => void;
+  onContinue: () => void;
+  pending: boolean;
+}) {
+  const fields: { key: keyof Contact; label: string; placeholder: string; optional?: boolean }[] = [
+    { key: 'name', label: 'Name', placeholder: 'Alex Ndubuisi' },
+    { key: 'email', label: 'Email', placeholder: 'you@example.com' },
+    { key: 'phone', label: 'Phone', placeholder: '(416) 555-0134', optional: true },
+    { key: 'location', label: 'Location', placeholder: 'Toronto, ON', optional: true },
+    { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/you', optional: true },
+    { key: 'website', label: 'GitHub or portfolio', placeholder: 'github.com/you', optional: true },
+  ];
+
+  return (
+    <div className="flex w-full max-w-[540px] flex-col">
+      <h1 className="font-serif text-[38px] leading-[1.08] tracking-[-0.012em] sm:text-[46px]">
+        How should employers <em className="text-accent">reach</em> you?
+      </h1>
+      <p className="mt-3.5 text-[15.5px] leading-relaxed text-ink-prose">
+        This goes at the top of every resume you make. We filled in what your account already told
+        us.
+      </p>
+
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {fields.map((f) => (
+          <label key={f.key} className={`flex flex-col gap-2 ${f.key === 'name' || f.key === 'email' ? 'sm:col-span-1' : ''}`}>
+            <span className="text-[13.5px] text-ink-prose">
+              {f.label}{' '}
+              {f.optional ? <span className="text-ink-faint">optional</span> : null}
+            </span>
+            <input
+              type="text"
+              value={contact[f.key]}
+              onChange={onChange(f.key)}
+              placeholder={f.placeholder}
+              className="w-full rounded border border-rule-field bg-ground-surface px-4 py-3 text-[15px] text-ink outline-none transition placeholder:text-ink-ghost focus:border-accent"
+            />
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-9 flex items-center justify-between border-t border-rule pt-[26px]">
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={pending}
+          className="py-3 text-[14.5px] text-ink-muted transition hover:text-ink disabled:opacity-50"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={pending}
+          className="rounded bg-accent px-8 py-3.5 text-[15px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-60"
+        >
+          {pending ? 'Saving…' : 'Continue'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const STAGES = [
   { id: 'internship', label: 'An internship or co-op', detail: 'Still studying, looking for a placement' },
@@ -15,28 +104,50 @@ const STAGES = [
 ];
 
 /**
- * Two steps: what you are hunting for, then how to build your profile.
+ * Three steps: what you are hunting for, how to reach you, and how to build the
+ * profile.
  *
- * Deliberately short. The goal question is the only thing asked before any
- * payoff, and it earns that by sharpening both the questions and every later
- * tailoring — everything else is collected by the parts already good at it.
+ * Everything else waits for the conversation, which is better at asking. These
+ * three earn their place because each changes what comes after: the goal
+ * sharpens every question and every later tailoring, the contact block is the
+ * one thing a resume cannot be finished without, and the last is the fork in
+ * the road itself.
  */
-export default function OnboardingFlow({ initialStage, initialField }: { initialStage: string; initialField: string }) {
+export default function OnboardingFlow({
+  initialStage,
+  initialField,
+  initialContact,
+}: {
+  initialStage: string;
+  initialField: string;
+  initialContact: Contact;
+}) {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [stage, setStage] = useState(initialStage || 'new_grad');
   const [field, setField] = useState(initialField);
+  const [contact, setContact] = useState<Contact>(initialContact);
   const [pending, startTransition] = useTransition();
   const [parsing, setParsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
-  function continueToStep2() {
+  function continueToContact() {
     startTransition(async () => {
       await saveOnboardingGoal(stage, field);
       setStep(2);
     });
   }
+
+  function continueToBuild() {
+    startTransition(async () => {
+      await saveContactDetails(contact);
+      setStep(3);
+    });
+  }
+
+  const setField_ = (key: keyof Contact) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setContact((c) => ({ ...c, [key]: e.target.value }));
 
   async function handleFile(file: File) {
     const name = file.name.toLowerCase();
@@ -84,10 +195,14 @@ export default function OnboardingFlow({ initialStage, initialField }: { initial
           <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
         </div>
         <div className="flex items-center gap-3.5">
-          <span className="text-[13px] text-ink-faint">Step {step} of 2</span>
+          <span className="text-[13px] text-ink-faint">Step {step} of 3</span>
           <div className="flex gap-[5px]">
-            <div className="h-[3px] w-[22px] rounded-sm bg-accent" />
-            <div className={`h-[3px] w-[22px] rounded-sm ${step === 2 ? 'bg-accent' : 'bg-rule-field'}`} />
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className={`h-[3px] w-[22px] rounded-sm ${step >= n ? 'bg-accent' : 'bg-rule-field'}`}
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -147,7 +262,7 @@ export default function OnboardingFlow({ initialStage, initialField }: { initial
               <span className="text-[13.5px] text-ink-faint">You can change this later</span>
               <button
                 type="button"
-                onClick={continueToStep2}
+                onClick={continueToContact}
                 disabled={pending}
                 className="rounded bg-accent px-8 py-3.5 text-[15px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-60"
               >
@@ -238,7 +353,7 @@ export default function OnboardingFlow({ initialStage, initialField }: { initial
             <div className="mt-8">
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(2)}
                 disabled={parsing}
                 className="py-3 text-[14.5px] text-ink-muted transition hover:text-ink disabled:opacity-50"
               >
