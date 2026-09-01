@@ -21,10 +21,18 @@ export const FACT_CATEGORY_DESCRIPTIONS: Record<FactCategory, string> = {
 };
 
 /**
- * The categories an experience or project entry needs before it is considered
- * well covered. Education is excluded — a degree does not need a metric.
+ * What an entry needs, depending on how much attention it will get.
+ *
+ * Not every entry deserves the same depth. A reader spends most of their
+ * attention on the two or three most recent things; everything else is there to
+ * show range, and a portfolio site does not need scope, outcome and context —
+ * it needs one line saying what it is.
+ *
+ * Requiring all six of everything is what made the interview grow with the
+ * length of someone's history: ten entries meant sixty gaps, so being thorough
+ * about your past was punished with a forty-question interview.
  */
-export const ENTRY_REQUIRED_CATEGORIES: FactCategory[] = [
+export const DEEP_REQUIRED_CATEGORIES: FactCategory[] = [
   'action',
   'metric',
   'scope',
@@ -32,6 +40,24 @@ export const ENTRY_REQUIRED_CATEGORIES: FactCategory[] = [
   'outcome',
   'context',
 ];
+
+/** Enough to write an honest line about something. */
+export const SHALLOW_REQUIRED_CATEGORIES: FactCategory[] = ['action', 'tooling'];
+
+/**
+ * How many entries of each kind get the full treatment, most recent first.
+ *
+ * Two jobs and one project is roughly what a one-page resume can carry in
+ * detail anyway, so going deeper on more of them would produce material that
+ * gets cut at tailoring time.
+ */
+export const DEEP_ENTRY_LIMIT: Record<string, number> = {
+  experience: 2,
+  project: 1,
+};
+
+/** Kept for callers that only need the full list. */
+export const ENTRY_REQUIRED_CATEGORIES = DEEP_REQUIRED_CATEGORIES;
 
 /** Entry kinds that are scored against ENTRY_REQUIRED_CATEGORIES. */
 export const SCORED_ENTRY_KINDS: EntryKind[] = ['experience', 'project'];
