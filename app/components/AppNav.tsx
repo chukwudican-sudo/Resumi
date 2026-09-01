@@ -6,7 +6,7 @@ export type NavKey = 'applications' | 'insights' | 'profile';
 const ITEMS: { key: NavKey; href: string; label: string }[] = [
   { key: 'applications', href: '/applications', label: 'Applications' },
   { key: 'insights', href: '/insights', label: 'Insights' },
-  { key: 'profile', href: '/profile', label: 'Profile' },
+  { key: 'profile', href: '/setup', label: 'Resume' },
 ];
 
 /**

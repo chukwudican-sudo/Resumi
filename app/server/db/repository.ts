@@ -298,6 +298,131 @@ export async function getActiveRules(userId: string) {
     .orderBy(rules.orderIndex);
 }
 
+// ── The setup form ─────────────────────────────────────────────────────────
+
+/**
+ * Everything the form edits: entries with their own bullets, plus the identity
+ * and skill facts that make up the contact block and skills section.
+ */
+export async function getResumeInputs(userId: string) {
+  const [entryRows, factRows] = await Promise.all([
+    db
+      .select()
+      .from(profileEntries)
+      .where(eq(profileEntries.userId, userId))
+      .orderBy(profileEntries.kind, profileEntries.orderIndex),
+    db
+      .select({ category: facts.category, text: facts.text })
+      .from(facts)
+      .where(and(eq(facts.userId, userId), eq(facts.status, 'active'))),
+  ]);
+  return { entryRows, factRows };
+}
+
+/**
+ * Adds or updates one entry.
+ *
+ * The id comes from the client, which means it is a request to edit something
+ * rather than proof of owning it — the where clause carries the userId, so a
+ * borrowed id updates nothing rather than someone else's history.
+ */
+export async function upsertEntry(
+  userId: string,
+  entry: {
+    id: string | null;
+    kind: string;
+    title: string;
+    org: string;
+    location: string;
+    datesDisplay: string;
+    tech: string;
+    bullets: string[];
+  },
+): Promise<string> {
+  const bullets = entry.bullets.map((b) => b.trim()).filter(Boolean);
+
+  if (entry.id) {
+    const [row] = await db
+      .update(profileEntries)
+      .set({
+        title: entry.title, org: entry.org, location: entry.location,
+        datesDisplay: entry.datesDisplay, tech: entry.tech,
+        bullets, updatedAt: new Date(),
+      })
+      .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, entry.id)))
+      .returning({ id: profileEntries.id });
+    if (row) {
+      await markProfileStale(userId);
+      return row.id;
+    }
+    // Fell through: the id was not theirs. Treated as a new entry rather than
+    // an error, so a stale tab cannot silently discard what someone just typed.
+  }
+
+  const [{ next }] = await db
+    .select({ next: sql<number>`coalesce(max(${profileEntries.orderIndex}) + 1, 0)::int` })
+    .from(profileEntries)
+    .where(and(eq(profileEntries.userId, userId), eq(profileEntries.kind, entry.kind)));
+
+  const id = newId('entry');
+  await db.insert(profileEntries).values({
+    id, userId, kind: entry.kind,
+    title: entry.title, org: entry.org, location: entry.location,
+    datesDisplay: entry.datesDisplay, tech: entry.tech,
+    bullets, orderIndex: next, source: 'manual',
+  });
+  await markProfileStale(userId);
+  return id;
+}
+
+export async function deleteEntry(userId: string, entryId: string) {
+  await db
+    .delete(profileEntries)
+    .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, entryId)));
+  await markProfileStale(userId);
+}
+
+/** Replaces the skills block. Grouped as `Category: items`. */
+export async function saveSkillGroups(
+  userId: string,
+  groups: { category: string; items: string }[],
+) {
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(facts)
+      .where(and(eq(facts.userId, userId), eq(facts.category, 'skill'), eq(facts.source, 'manual')));
+
+    const rows = groups
+      .filter((g) => g.items.trim())
+      .map((g) => ({
+        id: newId('fact'), userId, entryId: null,
+        category: 'skill', text: `${g.category.trim() || 'Skills'}: ${g.items.trim()}`,
+        hasNumber: false, confidence: 1, source: 'manual' as const, sourceTurnId: null,
+      }));
+
+    if (rows.length) await tx.insert(facts).values(rows);
+    await tx.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
+  });
+}
+
+/** Stores the deterministic render so other pages can read one shape. */
+export async function saveMasterResume(userId: string, structure: unknown, strength: number) {
+  await db
+    .insert(profiles)
+    .values({
+      id: newId('prof'), userId,
+      resumeStructure: structure as object, bulletSources: [],
+      strength, composedAt: new Date(), stale: false,
+    })
+    .onConflictDoUpdate({
+      target: profiles.userId,
+      set: {
+        resumeStructure: structure as object,
+        strength, composedAt: new Date(), stale: false, updatedAt: new Date(),
+      },
+    });
+}
+
 // ── Interview ──────────────────────────────────────────────────────────────
 
 /** The live session, if there is one. At most one exists per person. */
