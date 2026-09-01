@@ -144,8 +144,8 @@ export default function InterviewFlow({
   const globals = facts.filter((f) => !f.entryId);
 
   return (
-    <main className="flex min-h-screen flex-col bg-ground font-sans text-ink">
-      <div className="flex h-[68px] items-center justify-between border-b border-rule px-6 sm:px-10">
+    <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
+      <div className="flex h-[68px] shrink-0 items-center justify-between border-b border-rule px-6 sm:px-10">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2.5">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
@@ -185,8 +185,8 @@ export default function InterviewFlow({
         </div>
       </div>
 
-      <div className="grid flex-grow grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="flex flex-col justify-center px-6 py-12 sm:px-14">
+      <div className="grid min-h-0 flex-grow grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="flex min-h-0 flex-col justify-center overflow-y-auto px-6 py-12 sm:px-14">
           <div className="max-w-[620px]">
             {finished ? (
               <>
@@ -294,13 +294,13 @@ export default function InterviewFlow({
           </div>
         </div>
 
-        <aside className="flex flex-col gap-5 border-t border-rule bg-ground-panel px-7 py-8 lg:border-l lg:border-t-0">
+        <aside className="flex min-h-0 flex-col gap-5 overflow-hidden border-t border-rule bg-ground-panel px-7 py-8 lg:border-l lg:border-t-0">
           <div className="flex items-baseline justify-between">
             <span className="text-[11px] uppercase tracking-[0.13em] text-ink-faint">Building your profile</span>
             <span className="text-[12.5px] text-ink-muted">{facts.length} details</span>
           </div>
 
-          <div className="flex flex-col gap-5 overflow-y-auto">
+          <div className="-mr-2 flex min-h-0 flex-grow flex-col gap-5 overflow-y-auto pr-2">
             {grouped.map(({ entry, own }) => (
               <div key={entry.id} className="flex flex-col gap-2.5">
                 <div className="flex items-baseline justify-between gap-2.5">
@@ -329,7 +329,7 @@ export default function InterviewFlow({
             ) : null}
           </div>
 
-          <div className="mt-auto border-t border-rule pt-4">
+          <div className="shrink-0 border-t border-rule pt-4">
             <span className="text-[12.5px] leading-relaxed text-ink-faint">
               Nothing here is written by us &mdash; it is what you said, kept in your words until
               the resume is built.
@@ -349,10 +349,12 @@ function FactChip({ fact, fresh }: { fact: Fact; fresh: boolean }) {
         fresh ? 'border-accent-line bg-accent-wash' : weak ? 'border-flag-line bg-flag-bg' : 'border-rule bg-ground-surface'
       }`}
     >
-      <span className={`w-[46px] shrink-0 pt-[3px] text-[9.5px] uppercase tracking-[0.1em] ${fresh ? 'text-accent' : 'text-ink-ghost'}`}>
+      <span className={`shrink-0 pt-[3px] text-[9.5px] uppercase tracking-[0.1em] ${fresh ? 'text-accent' : 'text-ink-ghost'}`}>
         {fact.category}
       </span>
-      <span className="text-[13.5px] leading-snug text-ink-prose">{fact.text}</span>
+      <span className="min-w-0 flex-1 break-words text-[13.5px] leading-snug text-ink-prose">
+        {fact.text}
+      </span>
     </div>
   );
 }
