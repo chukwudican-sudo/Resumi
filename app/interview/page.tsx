@@ -53,7 +53,6 @@ export default async function InterviewPage() {
         turnCount: session?.turnCount ?? 0,
         coverage: coverage.overall,
         phase: (session?.phase as InterviewPhase) ?? 'identity',
-        started: Boolean(session),
       }}
     />
   );
