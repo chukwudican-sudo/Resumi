@@ -423,6 +423,21 @@ export async function saveMasterResume(userId: string, structure: unknown, stren
     });
 }
 
+/** Records what someone said in answer to the job-specific questions. */
+export async function addFactsFromAnswers(
+  userId: string,
+  rows: { entryId: string | null; category: string; text: string; hasNumber: boolean }[],
+) {
+  if (rows.length === 0) return;
+  await db.insert(facts).values(
+    rows.map((r) => ({
+      id: newId('fact'), userId, entryId: r.entryId,
+      category: r.category, text: r.text, hasNumber: r.hasNumber,
+      confidence: 1, source: 'interview' as const, sourceTurnId: null,
+    })),
+  );
+}
+
 // ── Interview ──────────────────────────────────────────────────────────────
 
 /** The live session, if there is one. At most one exists per person. */
