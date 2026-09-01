@@ -1,5 +1,11 @@
 import type { Fact, FactCategory, ProfileEntry } from '../types';
-import { CATEGORY_WEIGHTS, ENTRY_REQUIRED_CATEGORIES, SCORED_ENTRY_KINDS } from './taxonomy';
+import {
+  CATEGORY_WEIGHTS,
+  DEEP_ENTRY_LIMIT,
+  DEEP_REQUIRED_CATEGORIES,
+  SHALLOW_REQUIRED_CATEGORIES,
+  SCORED_ENTRY_KINDS,
+} from './taxonomy';
 
 /**
  * Works out what the interview still needs to ask about.
@@ -27,6 +33,8 @@ export interface EntryCoverage {
   /** 0..1 — fraction of required categories present. */
   score: number;
   missing: FactCategory[];
+  /** Whether this entry is one of the few that gets the full treatment. */
+  deep: boolean;
 }
 
 export interface CoverageReport {
@@ -82,23 +90,37 @@ export function computeCoverage(entries: ProfileEntry[], facts: Fact[]): Coverag
     .filter((e) => SCORED_ENTRY_KINDS.includes(e.kind))
     .sort((a, b) => a.orderIndex - b.orderIndex);
 
+  // The most recent few of each kind get the full six; the rest need only
+  // enough to write an honest line. Without this the interview grows with the
+  // length of someone's history rather than with what a resume can carry.
+  const seenByKind = new Map<string, number>();
+  const deepIds = new Set<string>();
+  for (const entry of scored) {
+    const seen = seenByKind.get(entry.kind) ?? 0;
+    if (seen < (DEEP_ENTRY_LIMIT[entry.kind] ?? 0)) deepIds.add(entry.id);
+    seenByKind.set(entry.kind, seen + 1);
+  }
+
   const perEntry: EntryCoverage[] = [];
   const gaps: Gap[] = [];
 
   for (const entry of scored) {
     const entryFacts = byEntry.get(entry.id) ?? [];
+    const deep = deepIds.has(entry.id);
+    const required = deep ? DEEP_REQUIRED_CATEGORIES : SHALLOW_REQUIRED_CATEGORIES;
     const missing: FactCategory[] = [];
 
-    for (const category of ENTRY_REQUIRED_CATEGORIES) {
+    for (const category of required) {
       if (!entryFacts.some((f) => satisfies(f, category))) missing.push(category);
     }
 
-    const present = ENTRY_REQUIRED_CATEGORIES.length - missing.length;
+    const present = required.length - missing.length;
     perEntry.push({
       entryId: entry.id,
       label: entryLabel(entry),
-      score: present / ENTRY_REQUIRED_CATEGORIES.length,
+      score: present / required.length,
       missing,
+      deep,
     });
 
     // An entry we know nothing about is worth more than one more detail on an
@@ -151,7 +173,11 @@ export function computeCoverage(entries: ProfileEntry[], facts: Fact[]): Coverag
 
   gaps.sort((a, b) => b.priority - a.priority);
 
-  const entriesWithNoMetric = perEntry.filter((e) => e.missing.includes('metric')).map((e) => e.entryId);
+  // Only the deep entries are held to the metric bar. A shallow entry never
+  // needed one, so counting it here would make completion unreachable.
+  const entriesWithNoMetric = perEntry
+    .filter((e) => e.deep && e.missing.includes('metric'))
+    .map((e) => e.entryId);
 
   // Overall folds the global checks in as one pseudo-entry so a profile with
   // well-covered jobs but no email cannot read as complete.

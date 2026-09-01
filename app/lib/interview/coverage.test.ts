@@ -229,3 +229,96 @@ test('an empty profile scores zero and is not sufficient', () => {
   assert.equal(report.overall, 0);
   assert.equal(isCoverageSufficient(report), false);
 });
+
+// ── Tiering ────────────────────────────────────────────────────────────────
+// Requiring all six categories of every entry made the interview grow with the
+// length of someone's history: ten entries meant sixty gaps, and being thorough
+// about your past was punished with a forty-question interview.
+
+test('only the most recent entries of each kind are held to full depth', () => {
+  const jobs = [entry({ orderIndex: 0 }), entry({ orderIndex: 1 }), entry({ orderIndex: 2 })];
+  const projects = [
+    entry({ kind: 'project', orderIndex: 0 }),
+    entry({ kind: 'project', orderIndex: 1 }),
+  ];
+
+  const report = computeCoverage([...jobs, ...projects], []);
+  const deep = new Set(report.perEntry.filter((e) => e.deep).map((e) => e.entryId));
+
+  assert.equal(deep.size, 3, 'two jobs and one project');
+  assert.ok(deep.has(jobs[0].id) && deep.has(jobs[1].id), 'the two most recent jobs');
+  assert.ok(deep.has(projects[0].id), 'the most recent project');
+  assert.ok(!deep.has(jobs[2].id) && !deep.has(projects[1].id), 'and nothing older');
+});
+
+test('a shallow entry needs only what it did and what it used', () => {
+  // Two jobs fill the deep quota, so the third is shallow.
+  const first = entry({ orderIndex: 0 });
+  const second = entry({ orderIndex: 1 });
+  const older = entry({ orderIndex: 2 });
+  const facts = [fact(older.id, 'action'), fact(older.id, 'tooling')];
+
+  const report = computeCoverage([first, second, older], facts);
+  const shallow = report.perEntry.find((e) => e.entryId === older.id)!;
+
+  assert.equal(shallow.deep, false);
+  assert.equal(shallow.score, 1, 'action and tooling is a complete shallow entry');
+  assert.deepEqual(shallow.missing, []);
+});
+
+test('a shallow entry without a number does not block completion', () => {
+  // Two deep jobs fully covered, plus a long tail that will never have metrics.
+  const a = entry({ orderIndex: 0 });
+  const b = entry({ orderIndex: 1 });
+  const tail = [2, 3, 4, 5].map((i) => entry({ orderIndex: i }));
+  const school = entry({ kind: 'education' });
+
+  const facts = [
+    ...fullyCovered(a.id),
+    ...fullyCovered(b.id),
+    ...tail.flatMap((t) => [fact(t.id, 'action'), fact(t.id, 'tooling')]),
+    fact(null, 'identity', { text: 'alex@example.com' }),
+    fact(null, 'skill'),
+    fact(null, 'skill'),
+    fact(null, 'skill'),
+  ];
+
+  const report = computeCoverage([a, b, ...tail, school], facts);
+
+  assert.equal(report.gaps.length, 0, 'nothing left to ask');
+  assert.equal(
+    isCoverageSufficient(report),
+    true,
+    'six entries and no outstanding questions should be finishable',
+  );
+});
+
+test('a deep entry without a number still blocks completion', () => {
+  const recent = entry({ orderIndex: 0 });
+  const school = entry({ kind: 'education' });
+  const facts = [
+    fact(recent.id, 'action'),
+    fact(recent.id, 'metric', { text: 'made it faster', hasNumber: false }),
+    fact(recent.id, 'scope'),
+    fact(recent.id, 'tooling'),
+    fact(recent.id, 'outcome'),
+    fact(recent.id, 'context'),
+    fact(null, 'identity', { text: 'alex@example.com' }),
+    fact(null, 'skill'),
+    fact(null, 'skill'),
+    fact(null, 'skill'),
+  ];
+
+  const report = computeCoverage([recent, school], facts);
+  assert.equal(isCoverageSufficient(report), false, 'the entries that matter still need numbers');
+});
+
+test('ten entries produce far fewer gaps than ten times six', () => {
+  const entries = Array.from({ length: 10 }, (_, i) => entry({ orderIndex: i }));
+  const report = computeCoverage(entries, []);
+
+  const entryGaps = report.gaps.filter((g) => g.entryId !== null).length;
+  // Two deep at six, eight shallow at two.
+  assert.equal(entryGaps, 2 * 6 + 8 * 2);
+  assert.ok(entryGaps < 60, `a long history must not mean sixty questions, got ${entryGaps}`);
+});
