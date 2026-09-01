@@ -178,6 +178,11 @@ export interface TurnContext {
   maxTurns: number;
   /** What they told onboarding they're looking for, if anything. */
   goal?: { stage: string; targetField: string };
+  /**
+   * Unresolved points raised when their resume was drafted. When present the
+   * interview is being resumed specifically to settle these.
+   */
+  openQuestions?: string[];
 }
 
 /** Builds the single user message for one interview turn. */
@@ -215,7 +220,23 @@ export function buildTurnMessage(ctx: TurnContext): string {
     '',
   );
 
-  if (ctx.latestAnswer === null) {
+  if (ctx.openQuestions?.length) {
+    sections.push(
+      '[UNRESOLVED]',
+      'Their resume was drafted and these points could not be settled from what they had told you:',
+      ...ctx.openQuestions.map((q) => `  - ${q}`),
+      '',
+      'Work through these before anything else, one question at a time, most consequential first. A wrong date or an invented-sounding number matters more than a missing phone number. When they are all settled, or the person cannot resolve the rest, set done.',
+      '',
+    );
+  }
+
+  if (ctx.latestAnswer === null && ctx.turns.length > 0) {
+    sections.push(
+      '[YOUR TASK]',
+      'You are picking the conversation back up after a break, so there is no new answer to react to. Return an empty acknowledgement and an empty facts array. Ask the single most useful question you can given everything above.',
+    );
+  } else if (ctx.latestAnswer === null) {
     sections.push(
       '[YOUR TASK]',
       'This is the first turn. There is no answer to react to, so return an empty acknowledgement and an empty facts array. Ask an opening question that gets them talking about their most recent work.',

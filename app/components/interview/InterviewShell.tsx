@@ -42,7 +42,7 @@ export default function InterviewShell() {
   const [composing, setComposing] = useState(false);
   const [acknowledgement, setAcknowledgement] = useState('');
   const [apiError, setApiError] = useState<ApiErrorPayload | null>(null);
-  const [composeWarnings, setComposeWarnings] = useState<string[]>([]);
+  const [composeWarnings, setComposeWarnings] = useLocalStorageState<string[]>('resumi-interview-open', []);
   const [confirmRestart, setConfirmRestart] = useState(false);
 
   const started = state.turns.length > 0 || state.pendingQuestion !== null;
@@ -73,6 +73,7 @@ export default function InterviewShell() {
           answer,
           skipped,
           goal: { stage: onboarding.stage, targetField: onboarding.targetField },
+          openQuestions: composeWarnings,
         }),
       });
       const data = await response.json();
@@ -124,6 +125,18 @@ export default function InterviewShell() {
     } finally {
       setComposing(false);
     }
+  }
+
+  /**
+   * Reopens the conversation to settle the points the draft raised.
+   *
+   * Without this the draft is a dead end: it tells you a date looks wrong or a
+   * number sounds like a target, and offers no way to say which. The questions
+   * carry over so the next turn works through them first.
+   */
+  function resolveOpenQuestions() {
+    setState({ ...state, finished: false, finishReason: '', pendingQuestion: null });
+    takeTurn(null);
   }
 
   function restart() {
@@ -182,13 +195,23 @@ export default function InterviewShell() {
                     <li key={w} className="text-sm text-warning">{w}</li>
                   ))}
                 </ul>
-                <button
-                  type="button"
-                  onClick={() => router.push('/profile')}
-                  className="mt-4 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-blue-500"
-                >
-                  See my profile
-                </button>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={resolveOpenQuestions}
+                    disabled={thinking}
+                    className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-slate-950 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+                  >
+                    {thinking ? 'Starting…' : `Answer ${composeWarnings.length === 1 ? 'this' : 'these'}`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/profile')}
+                    className="rounded-full border border-slate-700 bg-slate-900 px-5 py-2 text-sm text-slate-200 transition hover:border-slate-500"
+                  >
+                    Skip for now
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="mt-8 flex flex-wrap gap-3">
