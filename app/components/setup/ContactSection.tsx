@@ -9,6 +9,7 @@ export interface Contact {
   phone: string;
   location: string;
   linkedin: string;
+  github: string;
   website: string;
 }
 
@@ -18,7 +19,8 @@ const FIELDS: { key: keyof Contact; label: string; placeholder: string; optional
   { key: 'phone', label: 'Phone', placeholder: '(416) 555-0134', optional: true },
   { key: 'location', label: 'Location', placeholder: 'Toronto, ON', optional: true },
   { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/you', optional: true, wide: true },
-  { key: 'website', label: 'GitHub or portfolio', placeholder: 'github.com/you', optional: true, wide: true },
+  { key: 'github', label: 'GitHub', placeholder: 'github.com/you', optional: true, wide: true },
+  { key: 'website', label: 'Portfolio or personal site', placeholder: 'yoursite.com', optional: true, wide: true },
 ];
 
 export default function ContactSection({
@@ -48,8 +50,9 @@ export default function ContactSection({
     <div>
       <h1 className="font-serif text-[34px] leading-tight">Contact</h1>
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink-prose">
-        This goes at the top of every resume you make. Only a name and an email are needed &mdash;
-        the rest go in if you have them.
+        This goes at the top of every resume you make. A name and an email are the only ones
+        required &mdash; but for a software role, a recruiter expects somewhere to see your work,
+        so a GitHub or a portfolio is worth more here than it looks.
       </p>
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">

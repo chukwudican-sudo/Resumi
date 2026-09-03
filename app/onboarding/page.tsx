@@ -28,6 +28,7 @@ export default async function OnboardingPage() {
     phone: pick('Phone'),
     location: pick('Location'),
     linkedin: pick('LinkedIn'),
+    github: pick('GitHub'),
     website: pick('Website'),
   };
 

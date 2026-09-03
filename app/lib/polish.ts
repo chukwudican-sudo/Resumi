@@ -37,13 +37,23 @@ WHAT YOU DECIDE
    - Write terms the way the industry writes them: "PostgreSQL" not "postgres", "REST API design" not "rest apis".
 
 2. SECTION ORDER AND NAMES. Decide the order of education, experience, projects and skills, and what each section is called.
-   - The strongest evidence for the kind of work they want goes first. A student whose projects are substantial software and whose jobs are not should have projects above experience. Someone with real industry experience should not.
-   - Education goes near the top for a current student, lower for someone years into a career.
-   - Names: "Projects" or "Technical Projects", "Experience" or "Work Experience". Pick what fits what is actually in the section.
+
+   Work it out in this order, and follow it:
+   a. Is there a degree in progress, or one finished within roughly the last year? If so, EDUCATION GOES FIRST. A student is read as a student, and burying the degree makes a reader hunt for the thing that explains the rest of the page. Only someone several years past graduating puts education below their work.
+   b. Then compare their jobs against their projects, for the kind of work the resume is for. Whichever is the stronger evidence goes next. Someone whose jobs are in another field entirely — retail, admin, finance — and whose projects are substantial software should have PROJECTS ABOVE EXPERIENCE. Someone with real industry experience in the field should not.
+   c. Skills last, unless the resume is very thin on everything else.
+
+   Do not put skills or projects above education for someone still studying, and do not reorder simply to look different from the conventional layout.
+
+   Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section.
 
 3. CORRECTIONS. Propose fixes for clear errors in short factual fields — a misspelled city or company name ("San Fransisco"), an inconsistent capitalisation. Only propose a correction you are confident is an error, and only a small one. Never "correct" a job title, a degree, a date, or anything you merely find stylistically unappealing. If you are not sure it is a typo, leave it.
 
-4. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no field of study, dates that overlap in a way that looks like a mistake. Say what they would need to add. Never mention internal ids or field names.
+4. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
+
+   One sentence each, at most two. Say the problem and what to do about it, then stop. Do not restate the dates back to them, do not reason out loud, and do not raise the same issue twice in different words. At most five warnings; if there are more, keep the five that would cost them the most.
+
+   Never write a warning that ends in "no action needed" — if there is no action, it is not a warning. Never mention internal ids or field names.
 
 Do not comment on the quality of their writing — you are not being asked to judge their bullets, and they have not asked.`;
 

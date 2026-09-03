@@ -161,9 +161,12 @@ function renderContact(c: ResumeStructure['contact']): string {
   const parts: string[] = [];
   if (c.phone) parts.push(escapeLatex(c.phone));
   if (c.email) parts.push(`\\href{mailto:${escapeLatex(c.email)}}{\\underline{${escapeLatex(c.email)}}}`);
-  if (c.linkedin) parts.push(`\\href{${escapeLatex(c.linkedin)}}{\\underline{${escapeLatex(c.linkedin)}}}`);
-  if (c.github) parts.push(`\\href{${escapeLatex(c.github)}}{\\underline{${escapeLatex(c.github)}}}`);
-  if (c.website) parts.push(`\\href{${escapeLatex(c.website)}}{\\underline{${escapeLatex(c.website)}}}`);
+  // Labelled, not spelled out. A resume header says "LinkedIn", not
+  // "https://linkedin.com/in/chukwudi-ndubuisi-1a2b3c" — the long form eats the
+  // line and is useless on paper, where nobody retypes it.
+  for (const link of [c.linkedin, c.github, c.website]) {
+    if (link) parts.push(`\\href{${escapeLatex(withScheme(link))}}{\\underline{${escapeLatex(linkLabel(link))}}}`);
+  }
   return parts.join(' $|$ ');
 }
 

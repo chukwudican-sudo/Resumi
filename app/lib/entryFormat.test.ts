@@ -18,7 +18,22 @@ test('a current job says Present', () => {
 
 test('an unfinished degree says Expected, not Present', () => {
   const out = formatDates(dates({ startYear: 2022, endYear: 2028, isCurrent: true }), 'education');
-  assert.equal(out, 'Expected 2028', 'a degree is a date you are working towards, not one you are in');
+  assert.equal(out, '2022 – 2028 (Expected)', 'a degree is worked towards, not something you are "in"');
+  assert.doesNotMatch(out, /Present/);
+});
+
+test('a degree in progress keeps both ends, because the span is the point', () => {
+  // How long they have been at it is what a reader weighs when they see an
+  // unfinished degree, so dropping the start throws away the useful half.
+  assert.equal(
+    formatDates(dates({ startMonth: 9, startYear: 2023, endMonth: 5, endYear: 2028, isCurrent: true }), 'education'),
+    'Sep 2023 – May 2028 (Expected)',
+  );
+  // With no start there is no range to state.
+  assert.equal(
+    formatDates(dates({ endMonth: 5, endYear: 2028, isCurrent: true }), 'education'),
+    'Expected May 2028',
+  );
 });
 
 test('years alone are fine when the month is not known', () => {

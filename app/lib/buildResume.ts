@@ -116,6 +116,7 @@ function readContact(facts: ContactFact[]) {
     phone: pick('Phone'),
     location: pick('Location'),
     linkedin: pick('LinkedIn'),
+    github: pick('GitHub'),
     website: pick('Website'),
   };
 }
@@ -161,12 +162,21 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
       email: contact.email || undefined,
       phone: contact.phone ? formatPhone(contact.phone) : undefined,
       linkedin: contact.linkedin ? formatWebsite(contact.linkedin) : undefined,
+      github: contact.github ? formatWebsite(contact.github) : undefined,
       website: contact.website ? formatWebsite(contact.website) : undefined,
     },
     education: byKind('education').map((e) => ({
       school: clean(e.org),
       location: formatPlace(placeOf(e), e.location, home),
-      degree: [clean(e.title), clean(e.extra?.honours)].filter(Boolean).join(' · '),
+      // "Bachelor of Engineering in Software Engineering" — the credential and
+      // the field read as one phrase, and a field of study on its own leaves a
+      // reader guessing at the level.
+      degree: [
+        [clean(e.extra?.credential), clean(e.title)].filter(Boolean).join(' in '),
+        clean(e.extra?.honours),
+      ]
+        .filter(Boolean)
+        .join(' · '),
       dates: formatDates(datesOf(e), 'education', e.datesDisplay),
       // Coursework, honours, a thesis. For a student this is often the most
       // relevant thing on the page, and it had nowhere to go.

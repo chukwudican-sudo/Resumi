@@ -14,6 +14,7 @@ export interface Contact {
   phone: string;
   location: string;
   linkedin: string;
+  github: string;
   website: string;
 }
 
@@ -44,7 +45,8 @@ function ContactStep({
     { key: 'phone', label: 'Phone', placeholder: '(416) 555-0134', optional: true },
     { key: 'location', label: 'Location', placeholder: 'Toronto, ON', optional: true },
     { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/you', optional: true },
-    { key: 'website', label: 'GitHub or portfolio', placeholder: 'github.com/you', optional: true },
+    { key: 'github', label: 'GitHub', placeholder: 'github.com/you', optional: true },
+    { key: 'website', label: 'Portfolio or personal site', placeholder: 'yoursite.com', optional: true },
   ];
 
   return (

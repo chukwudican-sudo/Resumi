@@ -39,9 +39,14 @@ export function formatDates(parts: DateParts, kind: string, fallback?: string | 
 
   if (parts.isCurrent) {
     const word = kind === 'education' ? 'Expected' : 'Present';
-    // "Expected 2028" reads better than "2024 – Expected" for a degree with no
-    // meaningful start date on the page.
-    if (kind === 'education' && parts.endYear) return `Expected ${point(parts.endMonth, parts.endYear)}`;
+    if (kind === 'education' && parts.endYear) {
+      // A degree in progress states both ends. The range says how long they
+      // have been at it, which is the part a reader is actually judging when
+      // they see an unfinished degree, and it is what a written resume shows:
+      // "Sep 2023 – May 2028 (Expected)".
+      const finish = point(parts.endMonth, parts.endYear);
+      return start ? `${start} – ${finish} (Expected)` : `Expected ${finish}`;
+    }
     return start ? `${start} – ${word}` : word;
   }
 

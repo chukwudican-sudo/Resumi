@@ -13,10 +13,12 @@ import { useState } from 'react';
 export default function DownloadPdf({ applicationId }: { applicationId?: string }) {
   const [state, setState] = useState<'idle' | 'working' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [blocking, setBlocking] = useState<{ message: string }[]>([]);
 
   async function download() {
     setState('working');
     setMessage(null);
+    setBlocking([]);
     try {
       const response = await fetch('/api/compile', {
         method: 'POST',
@@ -27,6 +29,9 @@ export default function DownloadPdf({ applicationId }: { applicationId?: string 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         setMessage(body?.error ?? `Something went wrong (${response.status}).`);
+        // The server says what is missing; repeating "not finished" without the
+        // list would leave someone clicking the same button again.
+        setBlocking(Array.isArray(body?.blocking) ? body.blocking : []);
         setState('error');
         return;
       }
@@ -54,8 +59,9 @@ export default function DownloadPdf({ applicationId }: { applicationId?: string 
   }
 
   return (
-    <div className="flex items-center gap-3">
-      {message ? <span className="text-[12.5px] text-flag">{message}</span> : null}
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex items-center gap-3">
+      {message && !blocking.length ? <span className="text-[12.5px] text-flag">{message}</span> : null}
       <button
         type="button"
         onClick={download}
@@ -67,6 +73,20 @@ export default function DownloadPdf({ applicationId }: { applicationId?: string 
         </svg>
         {state === 'working' ? 'Building…' : 'Download PDF'}
       </button>
+      </div>
+
+      {blocking.length ? (
+        <div className="max-w-[320px] rounded-md border border-flag/40 bg-ground-surface p-3.5 text-left">
+          <span className="text-[11px] uppercase tracking-[0.12em] text-flag">Not ready to send</span>
+          <ul className="mt-1.5 flex flex-col gap-1.5">
+            {blocking.map((b) => (
+              <li key={b.message} className="text-[12.5px] leading-snug text-ink-prose">
+                {b.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

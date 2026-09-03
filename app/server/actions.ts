@@ -64,6 +64,7 @@ export async function saveContactDetails(details: {
   phone: string;
   location: string;
   linkedin: string;
+  github: string;
   website: string;
 }) {
   const userId = await requireUserId();
@@ -74,6 +75,7 @@ export async function saveContactDetails(details: {
     { label: 'Phone', value: details.phone },
     { label: 'Location', value: details.location },
     { label: 'LinkedIn', value: details.linkedin },
+    { label: 'GitHub', value: details.github },
     { label: 'Website', value: details.website },
   ]);
 

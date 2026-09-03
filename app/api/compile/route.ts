@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { renderResumeLatex } from '../../lib/latexEngine';
+import { checkReadiness } from '../../lib/readiness';
 import { buildDefaultFilenameBase } from '../../lib/filename';
 import type { ResumeStructure } from '../../lib/types';
 import { requireUserId } from '../../server/auth';
@@ -68,6 +69,19 @@ export async function POST(req: NextRequest) {
       );
     }
     filename = `${buildDefaultFilenameBase(structure.name ?? '', '', '')}.pdf`;
+  }
+
+  // Checked here rather than only in the page, because a disabled button is a
+  // suggestion — this is where the PDF is actually produced.
+  const readiness = checkReadiness(structure);
+  if (!readiness.ready) {
+    return NextResponse.json(
+      {
+        error: 'This resume is not finished yet.',
+        blocking: readiness.blocking,
+      },
+      { status: 422 },
+    );
   }
 
   try {

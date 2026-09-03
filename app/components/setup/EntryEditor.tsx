@@ -26,14 +26,25 @@ export function blankEntry(kind: Kind): EditableEntry {
   };
 }
 
+/** The ones that cover almost everybody; anything else stays free text. */
+const CREDENTIALS = [
+  'Bachelor of Engineering',
+  'Bachelor of Science',
+  'Bachelor of Arts',
+  'Master of Science',
+  'Master of Engineering',
+  'Diploma',
+  'Certificate',
+];
+
 const COPY: Record<Kind, { titleLabel: string; orgLabel: string; titlePlaceholder: string; orgPlaceholder: string }> = {
   experience: {
     titleLabel: 'Job title', orgLabel: 'Company',
     titlePlaceholder: 'Backend Engineering Intern', orgPlaceholder: 'Northbound',
   },
   education: {
-    titleLabel: 'Degree or programme', orgLabel: 'School',
-    titlePlaceholder: 'BSc Software Engineering', orgPlaceholder: 'Ontario Tech University',
+    titleLabel: 'Field of study', orgLabel: 'School',
+    titlePlaceholder: 'Software Engineering', orgPlaceholder: 'Ontario Tech University',
   },
   project: {
     titleLabel: 'Project name', orgLabel: 'Context',
@@ -125,6 +136,32 @@ export default function EntryEditor({
             onChange={(v) => setDraft({ ...draft, url: v })}
             placeholder="github.com/you/project"
           />
+        </div>
+      ) : null}
+
+      {kind === 'education' ? (
+        <div className="mt-6">
+          <span className="text-[13.5px] text-ink-prose">Credential</span>
+          <p className="mt-1 text-[13px] leading-snug text-ink-faint">
+            Written out in full on a resume &mdash; &ldquo;Bachelor of Engineering in Software
+            Engineering&rdquo;, not &ldquo;Software Engineering&rdquo; on its own.
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            {CREDENTIALS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setExtra('credential', draft.extra.credential === c ? '' : c)}
+                className={`rounded-full border px-3.5 py-1.5 text-[13px] transition ${
+                  draft.extra.credential === c
+                    ? 'border-accent bg-accent-tint text-accent'
+                    : 'border-rule-field text-ink-muted hover:border-ink-faint'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 

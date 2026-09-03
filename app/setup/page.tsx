@@ -27,6 +27,7 @@ export default async function SetupPage() {
     phone: pick('Phone'),
     location: pick('Location'),
     linkedin: pick('LinkedIn'),
+    github: pick('GitHub'),
     website: pick('Website'),
   };
 
