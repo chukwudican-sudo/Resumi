@@ -131,6 +131,30 @@ export function escapeLatex(s: string): string {
   return s.replace(/[\\&%$#_{}~^]/g, (ch) => LATEX_ESCAPES[ch]);
 }
 
+/**
+ * What a link is called on the page.
+ *
+ * A resume shows "GitHub", not "https://github.com/someone/some-repo". The long
+ * form eats a line of horizontal space and is unusable on paper, where nobody
+ * is going to type it out.
+ */
+export function linkLabel(url: string): string {
+  const host = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].toLowerCase();
+  const known: Record<string, string> = {
+    'github.com': 'GitHub',
+    'gitlab.com': 'GitLab',
+    'linkedin.com': 'LinkedIn',
+    'medium.com': 'Medium',
+    'devpost.com': 'Devpost',
+  };
+  return known[host] ?? host ?? url;
+}
+
+/** \\href needs a scheme or the link is relative and silently dead. */
+export function withScheme(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 // Heading contact line: joins present fields with ` $|$ `. Emails/links are
 // wrapped in \href{...}{\underline{...}} like the Jake Gutierrez template.
 function renderContact(c: ResumeStructure['contact']): string {
@@ -182,61 +206,80 @@ export function renderResumeLatex(r: ResumeStructure): string {
     lines.push('      \\resumeItemListEnd');
   };
 
-  // Education
-  if (r.education.length) {
-    lines.push('');
-    lines.push('\\section{Education}');
-    lines.push('  \\resumeSubHeadingListStart');
-    for (const e of r.education) {
-      lines.push(
-        `    \\resumeSubheading{${escapeLatex(e.school)}}{${escapeLatex(e.location)}}{${escapeLatex(e.degree)}}{${escapeLatex(e.dates)}}`,
-      );
-    }
-    lines.push('  \\resumeSubHeadingListEnd');
-  }
+  const emit: Record<string, (label: string) => void> = {
+    education: (label) => {
+      if (!r.education.length) return;
+      lines.push('');
+      lines.push(`\\section{${escapeLatex(label)}}`);
+      lines.push('  \\resumeSubHeadingListStart');
+      for (const e of r.education) {
+        lines.push(
+          `    \\resumeSubheading{${escapeLatex(e.school)}}{${escapeLatex(e.location)}}{${escapeLatex(e.degree)}}{${escapeLatex(e.dates)}}`,
+        );
+        pushBullets((e as { bullets?: string[] }).bullets);
+      }
+      lines.push('  \\resumeSubHeadingListEnd');
+    },
 
-  // Experience
-  if (r.experience.length) {
-    lines.push('');
-    lines.push('\\section{Experience}');
-    lines.push('  \\resumeSubHeadingListStart');
-    for (const x of r.experience) {
-      lines.push(
-        `    \\resumeSubheading{${escapeLatex(x.title)}}{${escapeLatex(x.dates)}}{${escapeLatex(x.org)}}{${escapeLatex(x.location)}}`,
-      );
-      pushBullets(x.bullets);
-    }
-    lines.push('  \\resumeSubHeadingListEnd');
-  }
+    experience: (label) => {
+      if (!r.experience.length) return;
+      lines.push('');
+      lines.push(`\\section{${escapeLatex(label)}}`);
+      lines.push('  \\resumeSubHeadingListStart');
+      for (const x of r.experience) {
+        lines.push(
+          `    \\resumeSubheading{${escapeLatex(x.title)}}{${escapeLatex(x.dates)}}{${escapeLatex(x.org)}}{${escapeLatex(x.location)}}`,
+        );
+        pushBullets(x.bullets);
+      }
+      lines.push('  \\resumeSubHeadingListEnd');
+    },
 
-  // Projects
-  if (r.projects.length) {
-    lines.push('');
-    lines.push('\\section{Projects}');
-    lines.push('  \\resumeSubHeadingListStart');
-    for (const p of r.projects) {
-      // Without tech the separator would dangle after the project name.
-      const heading = p.tech
-        ? `\\textbf{${escapeLatex(p.name)}} $|$ \\emph{${escapeLatex(p.tech)}}`
-        : `\\textbf{${escapeLatex(p.name)}}`;
-      lines.push(`    \\resumeProjectHeading{${heading}}{${escapeLatex(p.dates)}}`);
-      pushBullets(p.bullets);
-    }
-    lines.push('  \\resumeSubHeadingListEnd');
-  }
+    projects: (label) => {
+      if (!r.projects.length) return;
+      lines.push('');
+      lines.push(`\\section{${escapeLatex(label)}}`);
+      lines.push('  \\resumeSubHeadingListStart');
+      for (const p of r.projects) {
+        // Without tech the separator would dangle after the project name.
+        const parts = [`\\textbf{${escapeLatex(p.name)}}`];
+        if (p.tech) parts.push(`\\emph{${escapeLatex(p.tech)}}`);
+        // A short label, never the URL. The heading cell does not wrap, so a
+        // full link pushed the dates past the right margin and clipped them
+        // off the page entirely.
+        if (p.url) parts.push(`\\href{${escapeLatex(withScheme(p.url))}}{\\underline{${escapeLatex(linkLabel(p.url))}}}`);
+        lines.push(`    \\resumeProjectHeading{${parts.join(' $|$ ')}}{${escapeLatex(p.dates)}}`);
+        pushBullets(p.bullets);
+      }
+      lines.push('  \\resumeSubHeadingListEnd');
+    },
 
-  // Technical Skills
-  const skills = r.skills.filter((s) => s.items.trim());
-  if (skills.length) {
-    lines.push('');
-    lines.push('\\section{Technical Skills}');
-    lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
-    const skillLines = skills
-      .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
-      .join('\n');
-    lines.push(`    \\small{\\item{\n${skillLines}\n    }}`);
-    lines.push(' \\end{itemize}');
-  }
+    skills: (label) => {
+      const skills = r.skills.filter((s) => s.items.trim());
+      if (!skills.length) return;
+      lines.push('');
+      lines.push(`\\section{${escapeLatex(label)}}`);
+      lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
+      const skillLines = skills
+        .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
+        .join('\n');
+      lines.push(`    \\small{\\item{\n${skillLines}\n    }}`);
+      lines.push(' \\end{itemize}');
+    },
+  };
+
+  // The order and the names are the polish pass's decision when it has run.
+  // Falling back to the conventional order means nothing depends on it having.
+  const plan = r.sections?.length
+    ? r.sections
+    : ([
+        { key: 'education', label: 'Education' },
+        { key: 'experience', label: 'Experience' },
+        { key: 'projects', label: 'Projects' },
+        { key: 'skills', label: 'Technical Skills' },
+      ] as NonNullable<ResumeStructure['sections']>);
+
+  for (const section of plan) emit[section.key]?.(section.label);
 
   // Optional Certifications
   if (r.certifications && r.certifications.length > 0) {

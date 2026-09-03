@@ -18,7 +18,10 @@ import {
   upsertEntry as upsertEntryRow,
 } from './db/repository';
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
+import type { ResumeStructure } from '../lib/types';
 import { profileStrength } from '../lib/profileStrength';
+import { polishResume } from '../lib/polish';
+import { getProfile, getUser } from './db/repository';
 import { RULE_MAX_LENGTH } from '../lib/rules';
 
 /**
@@ -209,4 +212,40 @@ export async function reorderRules(orderedIds: string[]) {
   const userId = await requireUserId();
   await reorderRulesRow(userId, orderedIds);
   revalidatePath('/rules');
+}
+
+
+// ── Polish ─────────────────────────────────────────────────────────────────
+
+/**
+ * Runs the editorial pass over the master resume.
+ *
+ * Typing your history into a form gets the facts down. It does not decide that
+ * "California" reads as "CA", that your skills belong in four named groups, or
+ * that your projects should sit above your jobs — those are judgments, and
+ * making the person perform them in a form is making them do the work they came
+ * here to hand over.
+ *
+ * Kept separate from saving so that typing stays instant and free. A save marks
+ * the profile stale; this is what clears it.
+ */
+export async function polishMasterResume(): Promise<{
+  warnings: string[];
+  corrections: { from: string; to: string; reason: string }[];
+  sections: { key: string; label: string }[];
+}> {
+  const userId = await requireUserId();
+  const [profile, user] = await Promise.all([getProfile(userId), getUser(userId)]);
+
+  const structure = profile?.resumeStructure as ResumeStructure | null;
+  if (!structure?.name) {
+    return { warnings: ['Add your name and at least one entry first.'], corrections: [], sections: [] };
+  }
+
+  const { polish, applied } = await polishResume(userId, structure, user?.locale ?? null);
+  await saveMasterResume(userId, applied, profileStrength(applied));
+
+  revalidatePath('/setup');
+  revalidatePath('/profile');
+  return { warnings: polish.warnings, corrections: polish.corrections, sections: polish.sections };
 }

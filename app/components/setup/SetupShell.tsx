@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
 import ResumePaper from '../applications/ResumePaper';
 import DownloadPdf from '../applications/DownloadPdf';
+import PolishButton from './PolishButton';
+import type { ResumeStructure } from '../../lib/types';
 import ContactSection, { type Contact } from './ContactSection';
 import EntrySection from './EntrySection';
 import SkillsSection, { type SkillGroup } from './SkillsSection';
@@ -24,10 +26,14 @@ export default function SetupShell({
   initialEntries,
   initialFacts,
   initialContact,
+  polished,
+  stale,
 }: {
   initialEntries: EntryWithBullets[];
   initialFacts: ContactFact[];
   initialContact: Contact;
+  polished: ResumeStructure | null;
+  stale: boolean;
 }) {
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('contact');
@@ -43,7 +49,11 @@ export default function SetupShell({
   const facts = initialFacts;
 
   const status = useMemo(() => sectionStatus(entries, facts), [entries, facts]);
-  const resume = useMemo(() => buildResume(entries, facts), [entries, facts]);
+  // Once the editorial pass has run, that is the resume — showing the raw
+  // build beside a Download button that produces the polished one would be a
+  // preview of something the person never receives.
+  const built = useMemo(() => buildResume(entries, facts), [entries, facts]);
+  const resume = polished ?? built;
   const doneCount = status.filter((s) => s.done).length;
   // Offering a download of a resume with no name and no history on it would
   // produce a page nobody wants to have sent.
@@ -77,6 +87,7 @@ export default function SetupShell({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of 5 sections</span>
+          {usable ? <PolishButton stale={stale} /> : null}
           {usable ? <DownloadPdf /> : null}
           <Link
             href="/applications"

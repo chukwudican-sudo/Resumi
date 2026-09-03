@@ -69,14 +69,24 @@ export interface PlaceParts {
  * the obvious. Passing no home country keeps it.
  */
 export function formatPlace(place: PlaceParts, fallback?: string | null, homeCountry?: string | null): string {
-  const parts = [place.city, place.region].map((p) => p?.trim()).filter(Boolean);
+  const parts = [place.city, place.region ? abbreviateRegion(place.region) : null]
+    .map((p) => p?.trim())
+    .filter(Boolean);
   const country = place.country?.trim();
 
   if (parts.length === 0 && !country) return fallback?.trim() ?? '';
 
   const sameCountry =
     country && homeCountry && country.toLowerCase() === homeCountry.trim().toLowerCase();
-  if (country && !sameCountry) parts.push(country);
+
+  // A recognised region code already implies its country, so printing both is
+  // redundant: resumes say "San Francisco, CA" and "Oshawa, ON" even on the
+  // same page, but "Port Harcourt, Nigeria" — the country earns its place when
+  // no region carries it. The check is deliberately narrow: "Bavaria" does not
+  // imply Germany to most readers, so that country stays.
+  const regionCarriesIt = Boolean(place.region && isKnownRegion(place.region));
+
+  if (country && !sameCountry && !regionCarriesIt) parts.push(country);
 
   return parts.join(', ');
 }
@@ -97,4 +107,68 @@ export function recencyKey(parts: DateParts): number {
   const year = parts.endYear ?? parts.startYear ?? 0;
   const month = parts.endMonth ?? parts.startMonth ?? 0;
   return year * 12 + month;
+}
+
+/**
+ * Provinces and states as a resume writes them.
+ *
+ * People type "California" into a box labelled region, which is correct and
+ * also not how a resume reads — "San Francisco, CA" is the convention, and the
+ * long form looks like a form field that leaked onto the page. Deterministic on
+ * purpose: this is a lookup, not a judgment, so it should not cost a model call.
+ */
+const REGIONS: Record<string, string> = {
+  // Canada
+  alberta: 'AB', 'british columbia': 'BC', manitoba: 'MB', 'new brunswick': 'NB',
+  'newfoundland and labrador': 'NL', 'nova scotia': 'NS', ontario: 'ON',
+  'prince edward island': 'PE', quebec: 'QC', 'québec': 'QC', saskatchewan: 'SK',
+  'northwest territories': 'NT', nunavut: 'NU', yukon: 'YT',
+  // United States
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA', kansas: 'KS',
+  kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD', massachusetts: 'MA',
+  michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO', montana: 'MT',
+  nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND',
+  ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI',
+  'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX',
+  utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV',
+  wisconsin: 'WI', wyoming: 'WY', 'district of columbia': 'DC',
+};
+
+export function abbreviateRegion(region: string): string {
+  const trimmed = region.trim();
+  return REGIONS[trimmed.toLowerCase()] ?? trimmed;
+}
+
+/** True when the region is a code a reader will recognise without its country. */
+export function isKnownRegion(region: string): boolean {
+  const trimmed = region.trim();
+  if (!trimmed) return false;
+  const codes = new Set(Object.values(REGIONS));
+  return codes.has(trimmed.toUpperCase()) || trimmed.toLowerCase() in REGIONS;
+}
+
+/**
+ * A phone number as a person reads it.
+ *
+ * "9059225891" is what a form collects and not what belongs on a resume. Only
+ * North American 10-digit numbers are reformatted — anything else is left
+ * exactly as typed, because guessing at an unfamiliar national format produces
+ * something worse than the original.
+ */
+export function formatPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (local.length !== 10) return phone.trim();
+  // Only reformat when there was nothing to preserve — someone who typed
+  // "+44 20 7946 0958" or "(905) 922-5891" meant it.
+  if (/[^\d\s]/.test(phone.trim())) return phone.trim();
+  return `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`;
+}
+
+/** A website as a resume shows it: the domain, not the protocol. */
+export function formatWebsite(url: string): string {
+  return url.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
 }

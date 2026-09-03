@@ -155,7 +155,7 @@ test('entryFromRow carries every stored column through to the resume', () => {
 
   const built = buildResume([entryFromRow(row)], contactFacts);
   assert.equal(built.experience[0].dates, 'May 2025 – Aug 2025');
-  assert.equal(built.experience[0].location, 'Toronto, ON, Canada');
+  assert.equal(built.experience[0].location, 'Toronto, ON');
 
   // Anything the row holds and the entry does not is a column being dropped.
   const entryKeys = new Set(Object.keys(entryFromRow(row)));

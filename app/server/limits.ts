@@ -38,6 +38,9 @@ const USER_DAILY_USD = Number(process.env.RESUMI_USER_DAILY_USD ?? 2);
  */
 const BURST_PER_MINUTE: Record<string, number> = {
   interview_turn: 20,
+  // Polish runs on edit rather than on demand, so a person editing quickly is
+  // normal traffic, not abuse.
+  polish: 20,
   default: 8,
 };
 

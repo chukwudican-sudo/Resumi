@@ -29,7 +29,8 @@ export type UsageKind =
   | 'tailor'
   | 'instruct'
   | 'interview_turn'
-  | 'compose';
+  | 'compose'
+  | 'polish';
 
 /** Per-kind model + budget. Keeps model choice out of the handlers. */
 const CALL_CONFIG: Record<UsageKind, { model: string; maxTokens: number; effort: Effort }> = {
@@ -39,6 +40,9 @@ const CALL_CONFIG: Record<UsageKind, { model: string; maxTokens: number; effort:
   instruct: { model: 'claude-sonnet-4-6', maxTokens: 8000, effort: 'medium' },
   interview_turn: { model: 'claude-sonnet-4-6', maxTokens: 2000, effort: 'low' },
   compose: { model: 'claude-sonnet-4-6', maxTokens: 8000, effort: 'medium' },
+  // Short input, short output, and it runs whenever a resume changes — so it is
+  // budgeted as the cheap frequent call it is, not as a generation.
+  polish: { model: 'claude-sonnet-4-6', maxTokens: 2000, effort: 'low' },
 };
 
 /** The model used for the GET health check. */

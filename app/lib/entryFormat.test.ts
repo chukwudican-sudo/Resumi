@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { formatDates, formatPlace, parsePlace, recencyKey, type DateParts } from './entryFormat';
+import { abbreviateRegion, formatDates, formatPhone, formatPlace, formatWebsite, parsePlace, recencyKey, type DateParts } from './entryFormat';
 
 function dates(over: Partial<DateParts> = {}): DateParts {
   return { startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false, ...over };
@@ -55,8 +55,22 @@ test('the country is dropped when it matches where they are', () => {
     'Toronto, ON',
     'telling a Canadian employer the job was in Canada states the obvious',
   );
-  assert.equal(formatPlace(place, null, 'United States'), 'Toronto, ON, Canada');
-  assert.equal(formatPlace(place), 'Toronto, ON, Canada', 'no home country means keep it');
+  assert.equal(
+    formatPlace(place, null, 'United States'),
+    'Toronto, ON',
+    'ON is recognisable on its own — real resumes put "Oshawa, ON" and "San Francisco, CA" on the same page',
+  );
+  assert.equal(formatPlace(place), 'Toronto, ON', 'a known region code carries its own country');
+  assert.equal(
+    formatPlace({ city: 'Munich', region: 'Bavaria', country: 'Germany' }),
+    'Munich, Bavaria, Germany',
+    'an unfamiliar region does not imply its country, so the country stays',
+  );
+  assert.equal(
+    formatPlace({ city: 'Port Harcourt', region: null, country: 'Nigeria' }),
+    'Port Harcourt, Nigeria',
+    'with no region the country is the only thing placing it',
+  );
 });
 
 test('country matching ignores case and spacing', () => {
@@ -84,4 +98,36 @@ test('a later end date sorts higher', () => {
   const older = recencyKey(dates({ endMonth: 8, endYear: 2024 }));
   const newer = recencyKey(dates({ endMonth: 1, endYear: 2025 }));
   assert.ok(newer > older);
+});
+
+test('a region typed out in full is abbreviated the way a resume writes it', () => {
+  // People type "California" into a box labelled region, which is correct and
+  // also not what belongs on the page.
+  assert.equal(abbreviateRegion('California'), 'CA');
+  assert.equal(abbreviateRegion('ontario'), 'ON');
+  assert.equal(abbreviateRegion('ON'), 'ON', 'an existing code is left alone');
+  assert.equal(abbreviateRegion('Bavaria'), 'Bavaria', 'unknown regions pass through unchanged');
+  assert.equal(
+    formatPlace({ city: 'San Francisco', region: 'California', country: 'USA' }),
+    'San Francisco, CA',
+  );
+});
+
+test('a bare run of digits becomes a phone number', () => {
+  assert.equal(formatPhone('9059225891'), '905-922-5891');
+  assert.equal(formatPhone('19059225891'), '905-922-5891', 'a leading country code is dropped');
+});
+
+test('a phone someone already formatted is left exactly alone', () => {
+  // Someone who typed punctuation meant it, and an international number
+  // reformatted to a North American pattern is worse than what they wrote.
+  assert.equal(formatPhone('(905) 922-5891'), '(905) 922-5891');
+  assert.equal(formatPhone('+44 20 7946 0958'), '+44 20 7946 0958');
+  assert.equal(formatPhone('905.922.5891'), '905.922.5891');
+});
+
+test('a website shows as its domain', () => {
+  assert.equal(formatWebsite('https://meetalexius.com'), 'meetalexius.com');
+  assert.equal(formatWebsite('https://www.meetalexius.com/'), 'meetalexius.com');
+  assert.equal(formatWebsite('github.com/chukwudican-sudo'), 'github.com/chukwudican-sudo');
 });

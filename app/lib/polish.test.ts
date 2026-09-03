@@ -1,0 +1,155 @@
+import assert from 'node:assert';
+import test from 'node:test';
+import { applyPolish, validatePolish, type PolishResult } from './polish';
+import type { ResumeStructure } from './types';
+
+const SOURCE_SKILLS = [
+  'Skills: Uses TypeScript/JavaScript most, across full-stack web and mobile projects',
+  'Skills: Uses Python for backend algorithm work',
+  'Skills: Has C++ experience from coursework',
+  'Core languages: Python, TypeScript/JavaScript, Java, SQL',
+].join('\n');
+
+function polish(over: Partial<PolishResult> = {}): PolishResult {
+  return {
+    skillGroups: [{ category: 'Languages', items: ['Python', 'TypeScript'] }],
+    sections: [
+      { key: 'education', label: 'Education' },
+      { key: 'projects', label: 'Technical Projects' },
+      { key: 'experience', label: 'Experience' },
+      { key: 'skills', label: 'Technical Skills' },
+    ],
+    corrections: [],
+    warnings: [],
+    ...over,
+  };
+}
+
+test('prose becomes terms, grouped and named', () => {
+  const result = validatePolish(polish(), SOURCE_SKILLS);
+  assert.deepEqual(result.skillGroups, [{ category: 'Languages', items: ['Python', 'TypeScript'] }]);
+});
+
+test('a skill nobody claimed is dropped', () => {
+  // The whole reason grouping is safe: it can only rearrange what was given.
+  const result = validatePolish(
+    polish({ skillGroups: [{ category: 'Languages', items: ['Python', 'Rust', 'Kubernetes'] }] }),
+    SOURCE_SKILLS,
+  );
+  assert.deepEqual(result.skillGroups[0].items, ['Python'], 'Rust and Kubernetes appear nowhere in the source');
+});
+
+test('the same skill cannot appear in two groups', () => {
+  const result = validatePolish(
+    polish({
+      skillGroups: [
+        { category: 'Languages', items: ['Python'] },
+        { category: 'Backend', items: ['Python'] },
+      ],
+    }),
+    SOURCE_SKILLS,
+  );
+  assert.deepEqual(result.skillGroups, [{ category: 'Languages', items: ['Python'] }]);
+});
+
+test('matching ignores punctuation and case, so C++ survives', () => {
+  const result = validatePolish(
+    polish({ skillGroups: [{ category: 'Languages', items: ['C++', 'sql'] }] }),
+    SOURCE_SKILLS,
+  );
+  assert.deepEqual(result.skillGroups[0].items, ['C++', 'sql']);
+});
+
+test('a group left empty by filtering disappears rather than printing a bare heading', () => {
+  const result = validatePolish(
+    polish({ skillGroups: [{ category: 'Cloud', items: ['AWS', 'GCP'] }] }),
+    SOURCE_SKILLS,
+  );
+  assert.deepEqual(result.skillGroups, []);
+});
+
+test('a dropped section is restored rather than silently deleting someone education', () => {
+  const result = validatePolish(polish({ sections: [{ key: 'skills', label: 'Skills' }] }), SOURCE_SKILLS);
+  assert.equal(result.sections.length, 4);
+  assert.ok(result.sections.some((s) => s.key === 'education'));
+  assert.equal(result.sections[0].key, 'skills', 'what it did say is still honoured, first');
+});
+
+test('a section named twice is taken once', () => {
+  const result = validatePolish(
+    polish({
+      sections: [
+        { key: 'projects', label: 'Technical Projects' },
+        { key: 'projects', label: 'Projects' },
+      ],
+    }),
+    SOURCE_SKILLS,
+  );
+  assert.equal(result.sections.filter((s) => s.key === 'projects').length, 1);
+  assert.equal(result.sections[0].label, 'Technical Projects');
+});
+
+test('a typo is corrected', () => {
+  const result = validatePolish(
+    polish({ corrections: [{ from: 'San Fransisco', to: 'San Francisco', reason: 'spelling' }] }),
+    SOURCE_SKILLS,
+  );
+  assert.equal(result.corrections.length, 1);
+});
+
+test('a rewrite dressed as a correction is refused', () => {
+  // This is the line between fixing a misspelling and editing someone's history.
+  const result = validatePolish(
+    polish({
+      corrections: [
+        { from: 'Operations Specialist', to: 'Senior Operations Manager', reason: 'stronger' },
+        { from: 'Aegon', to: 'Aegon Financial Services International', reason: 'fuller name' },
+      ],
+    }),
+    SOURCE_SKILLS,
+  );
+  assert.deepEqual(result.corrections, []);
+});
+
+test('applying polish never touches a bullet', () => {
+  const structure: ResumeStructure = {
+    name: 'Chukwudi Ndubuisi',
+    contact: { email: 'a@b.c' },
+    education: [{ school: 'Ontario Tech', location: 'Oshawa, ON', degree: 'BEng', dates: '2028' }],
+    experience: [
+      {
+        title: 'Software Engineer',
+        org: 'Droady',
+        location: 'San Fransisco, CA',
+        dates: '2025',
+        bullets: ['Contributed to the AI physique rating feature'],
+      },
+    ],
+    projects: [{ name: 'MealApp', tech: 'React Native', dates: '2026', bullets: ['Designed an offline-first sync'] }],
+    skills: [{ category: 'Skills', items: 'Python, TypeScript' }],
+  };
+
+  const applied = applyPolish(
+    structure,
+    validatePolish(
+      polish({ corrections: [{ from: 'San Fransisco, CA', to: 'San Francisco, CA', reason: 'spelling' }] }),
+      SOURCE_SKILLS,
+    ),
+  );
+
+  assert.deepEqual(applied.experience[0].bullets, structure.experience[0].bullets);
+  assert.deepEqual(applied.projects[0].bullets, structure.projects[0].bullets);
+  assert.equal(applied.experience[0].location, 'San Francisco, CA', 'the correction did apply');
+  assert.equal(applied.name, 'Chukwudi Ndubuisi', 'the name is never touched');
+  assert.equal(applied.education[0].dates, '2028', 'dates are never touched');
+  assert.deepEqual(applied.sections?.map((s) => s.key), ['education', 'projects', 'experience', 'skills']);
+});
+
+test('an empty grouping leaves the existing skills alone rather than erasing them', () => {
+  const structure = {
+    name: 'X', contact: {}, education: [], experience: [], projects: [],
+    skills: [{ category: 'Skills', items: 'Python' }],
+  } as ResumeStructure;
+  const applied = applyPolish(structure, validatePolish(polish({ skillGroups: [] }), SOURCE_SKILLS));
+  assert.deepEqual(applied.skills, [{ category: 'Skills', items: 'Python' }]);
+});

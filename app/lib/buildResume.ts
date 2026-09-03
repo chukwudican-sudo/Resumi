@@ -1,4 +1,4 @@
-import { formatDates, formatPlace, recencyKey } from './entryFormat';
+import { formatDates, formatPhone, formatPlace, formatWebsite, recencyKey } from './entryFormat';
 import type { ProfileEntry, ResumeStructure } from './types';
 
 /**
@@ -151,30 +151,41 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
 
   const home = readContact(facts).location.split(',').pop()?.trim() || null;
 
+  // Trailing whitespace survives a form field and then shows up as a gap before
+  // a separator on the page.
+  const clean = (value: string | null | undefined) => (value ?? '').trim();
+
   return {
     name: contact.name,
     contact: {
       email: contact.email || undefined,
-      phone: contact.phone || undefined,
-      linkedin: contact.linkedin || undefined,
-      website: contact.website || undefined,
+      phone: contact.phone ? formatPhone(contact.phone) : undefined,
+      linkedin: contact.linkedin ? formatWebsite(contact.linkedin) : undefined,
+      website: contact.website ? formatWebsite(contact.website) : undefined,
     },
     education: byKind('education').map((e) => ({
-      school: e.org ?? '',
+      school: clean(e.org),
       location: formatPlace(placeOf(e), e.location, home),
-      degree: [e.title, e.extra?.honours].filter(Boolean).join(' · '),
+      degree: [clean(e.title), clean(e.extra?.honours)].filter(Boolean).join(' · '),
       dates: formatDates(datesOf(e), 'education', e.datesDisplay),
+      // Coursework, honours, a thesis. For a student this is often the most
+      // relevant thing on the page, and it had nowhere to go.
+      bullets: e.bullets ?? [],
     })),
     experience: byKind('experience').map((e) => ({
-      title: e.title ?? '',
-      org: e.org ?? '',
+      title: clean(e.title),
+      org: clean(e.org),
       location: formatPlace(placeOf(e), e.location, home),
       dates: formatDates(datesOf(e), 'experience', e.datesDisplay),
       bullets: e.bullets ?? [],
     })),
     projects: byKind('project').map((e) => ({
-      name: e.title ?? '',
-      tech: [e.tech, e.url].filter(Boolean).join(' · '),
+      name: clean(e.title),
+      tech: clean(e.tech),
+      // Kept separate from tech. Concatenating them put a 50-character URL in
+      // a heading cell that does not wrap, which pushed the dates past the
+      // right margin and clipped them off the page.
+      url: clean(e.url) || undefined,
       dates: formatDates(datesOf(e), 'project', e.datesDisplay),
       bullets: e.bullets ?? [],
     })),

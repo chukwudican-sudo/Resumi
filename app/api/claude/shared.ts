@@ -79,6 +79,7 @@ export const RESUME_STRUCTURE_SCHEMA = {
           location: { type: 'string' },
           degree: { type: 'string' },
           dates: { type: 'string' },
+          bullets: { type: 'array', items: { type: 'string' }, description: 'Relevant coursework, honours, thesis. Often empty.' },
         },
         required: ['school', 'location', 'degree', 'dates'],
         additionalProperties: false,

@@ -1,15 +1,17 @@
 import SetupShell from '../components/setup/SetupShell';
 import type { Contact } from '../components/setup/ContactSection';
 import { entryFromRow, type EntryWithBullets } from '../lib/buildResume';
+import type { ResumeStructure } from '../lib/types';
 import { requireUserId } from '../server/auth';
-import { getResumeInputs, getUser } from '../server/db/repository';
+import { getProfile, getResumeInputs, getUser } from '../server/db/repository';
 
 /** Where a resume gets built and edited. Everything here is typed by hand. */
 export default async function SetupPage() {
   const userId = await requireUserId();
-  const [{ entryRows, factRows }, user] = await Promise.all([
+  const [{ entryRows, factRows }, user, profile] = await Promise.all([
     getResumeInputs(userId),
     getUser(userId),
+    getProfile(userId),
   ]);
 
   const entries: EntryWithBullets[] = entryRows.map(entryFromRow);
@@ -28,5 +30,17 @@ export default async function SetupPage() {
     website: pick('Website'),
   };
 
-  return <SetupShell initialEntries={entries} initialFacts={factRows} initialContact={contact} />;
+  // The polished structure is what the person should see once the editorial
+  // pass has run; until then the deterministic build is the honest preview.
+  const polished = profile && !profile.stale ? (profile.resumeStructure as ResumeStructure) : null;
+
+  return (
+    <SetupShell
+      initialEntries={entries}
+      initialFacts={factRows}
+      initialContact={contact}
+      polished={polished}
+      stale={profile?.stale ?? true}
+    />
+  );
 }

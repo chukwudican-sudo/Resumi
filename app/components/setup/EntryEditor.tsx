@@ -170,12 +170,14 @@ export default function EntryEditor({
         </div>
       ) : null}
 
-      {kind !== 'education' ? (
-        <div className="mt-7">
-          <span className="text-[13.5px] text-ink-prose">What you did</span>
+      <div className="mt-7">
+          <span className="text-[13.5px] text-ink-prose">
+            {kind === 'education' ? 'Coursework, honours, anything worth naming' : 'What you did'}
+          </span>
           <p className="mt-1 text-[13px] leading-snug text-ink-faint">
-            One line each, in your own words. Write them plainly &mdash; tailoring rewrites them for
-            each job, and the questions push for numbers once you have a posting.
+            {kind === 'education'
+              ? 'Relevant coursework is worth listing while you are still studying \u2014 it is often the most relevant thing you have.'
+              : 'One line each, in your own words. Write them plainly \u2014 tailoring rewrites them for each job, and the questions push for numbers once you have a posting.'}
           </p>
           <div className="mt-3 flex flex-col gap-2.5">
             {draft.bullets.map((b, i) => (
@@ -189,7 +191,11 @@ export default function EntryEditor({
                     next[i] = e.target.value;
                     setDraft({ ...draft, bullets: next });
                   }}
-                  placeholder="Rebuilt the payment retry pipeline so failed charges were retried automatically"
+                  placeholder={
+                    kind === 'education'
+                      ? 'Relevant Coursework: Data Structures, Algorithms, Operating Systems'
+                      : 'Rebuilt the payment retry pipeline so failed charges were retried automatically'
+                  }
                   className="w-full resize-none rounded border border-rule-field bg-ground-surface px-3.5 py-2.5 text-[14.5px] leading-relaxed outline-none transition placeholder:text-ink-ghost focus:border-accent"
                 />
                 {draft.bullets.length > 1 ? (
@@ -214,8 +220,7 @@ export default function EntryEditor({
           >
             + Add another line
           </button>
-        </div>
-      ) : null}
+      </div>
 
       <div className="mt-8 flex items-center justify-between border-t border-rule pt-6">
         <button

@@ -116,10 +116,15 @@ export interface ResumeStructure {
   name: string;
   contact: { phone?: string; email?: string; linkedin?: string; github?: string; website?: string };
   summary?: string;
-  education: { school: string; location: string; degree: string; dates: string }[];
+  education: { school: string; location: string; degree: string; dates: string; bullets?: string[] }[];
   experience: { title: string; dates: string; org: string; location: string; bullets: string[] }[];
-  projects: { name: string; tech: string; dates: string; bullets: string[] }[];
+  projects: { name: string; tech: string; dates: string; bullets: string[]; url?: string }[];
   skills: { category: string; items: string }[];
   certifications?: string[];
   awards?: string[];
+  /**
+   * Section order and names, decided by the polish pass. Absent means the
+   * conventional order — nothing depends on polish having run.
+   */
+  sections?: { key: 'education' | 'experience' | 'projects' | 'skills'; label: string }[];
 }

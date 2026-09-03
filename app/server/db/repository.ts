@@ -133,9 +133,11 @@ export async function saveContactDetails(
   details: { label: string; value: string }[],
 ) {
   await db.transaction(async (tx) => {
+    // Same reasoning as skills below: the form holds the whole set, so a
+    // source-scoped delete would leave older copies to be rendered alongside.
     await tx
       .delete(facts)
-      .where(and(eq(facts.userId, userId), eq(facts.category, 'identity'), eq(facts.source, 'manual')));
+      .where(and(eq(facts.userId, userId), eq(facts.category, 'identity')));
 
     const rows = details
       .filter((d) => d.value.trim())
@@ -474,12 +476,25 @@ export async function saveSkillGroups(
   groups: { category: string; items: string }[],
 ) {
   await db.transaction(async (tx) => {
+    // Every skill fact goes, not only the ones this form wrote.
+    //
+    // Scoping the delete to source='manual' left the interview's copies behind,
+    // so saving the form added a second copy of skills that were already there
+    // and the resume printed each one twice. The form is shown every skill fact
+    // regardless of origin, so what it saves is the complete set — anything
+    // still in the table afterwards is a duplicate by definition.
     await tx
       .delete(facts)
-      .where(and(eq(facts.userId, userId), eq(facts.category, 'skill'), eq(facts.source, 'manual')));
+      .where(and(eq(facts.userId, userId), eq(facts.category, 'skill')));
 
+    const seen = new Set<string>();
     const rows = groups
-      .filter((g) => g.items.trim())
+      .filter((g) => {
+        const key = `${g.category.trim()}|${g.items.trim()}`;
+        if (!g.items.trim() || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .map((g) => ({
         id: newId('fact'), userId, entryId: null,
         category: 'skill', text: `${g.category.trim() || 'Skills'}: ${g.items.trim()}`,
