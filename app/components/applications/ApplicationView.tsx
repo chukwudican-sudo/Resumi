@@ -56,8 +56,8 @@ export default function ApplicationView({ applicationId, status, posting, resume
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-ground font-sans text-ink">
-      <div className="flex h-[62px] items-center justify-between border-b border-rule bg-ground-surface px-8">
+    <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
+      <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
         <div className="flex items-center gap-4">
           <Link href="/applications" className="text-ink-prose transition hover:text-ink">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -145,8 +145,8 @@ export default function ApplicationView({ applicationId, status, posting, resume
           </div>
         </div>
       ) : (
-        <div className="grid flex-grow grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px]">
-          <div className="flex flex-col items-center overflow-y-auto bg-ground-band px-9 py-7">
+        <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
+          <div className="flex min-h-0 flex-col items-center bg-ground-band px-9 py-7 lg:overflow-y-auto">
             <div className="mb-4 flex w-full max-w-[600px] items-center justify-between">
               <span className="text-xs text-ink-muted">Version {resume.version}</span>
               <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-accent-wash px-2.5 py-1 text-[11.5px] text-accent">
@@ -159,8 +159,8 @@ export default function ApplicationView({ applicationId, status, posting, resume
             <ResumePaper structure={resume.structure} />
           </div>
 
-          <aside className="flex flex-col border-t border-rule bg-ground-surface lg:border-l lg:border-t-0">
-            <div className="flex gap-6 border-b border-rule px-6">
+          <aside className="flex min-h-0 flex-col border-t border-rule bg-ground-surface lg:border-l lg:border-t-0">
+            <div className="flex shrink-0 gap-6 border-b border-rule px-6">
               {(['review', 'posting'] as const).map((t) => (
                 <button
                   key={t}
@@ -173,7 +173,7 @@ export default function ApplicationView({ applicationId, status, posting, resume
               ))}
             </div>
 
-            <div className="flex flex-col gap-5 overflow-y-auto px-6 py-6">
+            <div className="flex min-h-0 flex-grow flex-col gap-5 overflow-y-auto px-6 py-6">
               {tab === 'review' ? (
                 <>
                   {resume.matchScore !== null ? (

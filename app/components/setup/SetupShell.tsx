@@ -77,7 +77,7 @@ export default function SetupShell({
   );
 
   return (
-    <main className="flex min-h-screen flex-col bg-ground font-sans text-ink">
+    <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
         <div className="flex items-center gap-2.5">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
@@ -98,9 +98,9 @@ export default function SetupShell({
         </div>
       </div>
 
-      <div className="grid flex-grow grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_380px]">
+      <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[220px_minmax(0,1fr)_380px] lg:overflow-hidden">
         {/* rail */}
-        <nav className="border-b border-rule px-5 py-6 lg:border-b-0 lg:border-r">
+        <nav className="min-h-0 border-b border-rule px-5 py-6 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
             {status.map((s) => (
               <button
@@ -134,7 +134,7 @@ export default function SetupShell({
         </nav>
 
         {/* the section being edited */}
-        <div className="overflow-y-auto px-6 py-8 sm:px-10">
+        <div className="min-h-0 px-6 py-8 sm:px-10 lg:overflow-y-auto">
           <div className="mx-auto max-w-[560px]">
             {section === 'contact' ? (
               <ContactSection
@@ -162,7 +162,7 @@ export default function SetupShell({
         </div>
 
         {/* the actual resume, not a thumbnail */}
-        <aside className="hidden flex-col items-center border-l border-rule bg-ground-band px-6 py-8 lg:flex">
+        <aside className="hidden min-h-0 flex-col items-center border-l border-rule bg-ground-band px-6 py-8 lg:flex lg:overflow-y-auto">
           <span className="mb-4 self-start text-[11px] uppercase tracking-[0.12em] text-ink-faint">
             Your resume
           </span>
