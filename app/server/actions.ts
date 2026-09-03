@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { requireUserId } from './auth';
 import {
+  createRule as createRuleRow,
   deleteEntry as deleteEntryRow,
+  deleteRule as deleteRuleRow,
+  reorderRules as reorderRulesRow,
+  setRuleActive as setRuleActiveRow,
+  updateRule as updateRuleRow,
   getResumeInputs,
   markApplied as markAppliedRow,
   saveContactDetails as saveContactRow,
@@ -14,6 +19,7 @@ import {
 } from './db/repository';
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
 import { profileStrength } from '../lib/profileStrength';
+import { RULE_MAX_LENGTH } from '../lib/rules';
 
 /**
  * Mutations the UI can call directly.
@@ -156,4 +162,51 @@ export async function saveContactAndRefresh(details: {
   await refreshMasterResume(userId);
   revalidatePath('/setup');
   revalidatePath('/profile');
+}
+
+
+// ── Rules ──────────────────────────────────────────────────────────────────
+
+/**
+ * The instructions someone wants applied to every resume they make.
+ *
+ * Kept as rows the person can read, edit and switch off rather than as a blob
+ * of remembered preferences: a rule that silently shapes every resume without
+ * being visible is indistinguishable from the tool having an opinion of its
+ * own, and the first time it produces something unexpected there is nothing to
+ * look at.
+ */
+
+export async function addRule(text: string) {
+  const userId = await requireUserId();
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  await createRuleRow(userId, trimmed.slice(0, RULE_MAX_LENGTH));
+  revalidatePath('/rules');
+}
+
+export async function editRule(ruleId: string, text: string) {
+  const userId = await requireUserId();
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  await updateRuleRow(userId, ruleId, trimmed.slice(0, RULE_MAX_LENGTH));
+  revalidatePath('/rules');
+}
+
+export async function toggleRule(ruleId: string, active: boolean) {
+  const userId = await requireUserId();
+  await setRuleActiveRow(userId, ruleId, active);
+  revalidatePath('/rules');
+}
+
+export async function removeRule(ruleId: string) {
+  const userId = await requireUserId();
+  await deleteRuleRow(userId, ruleId);
+  revalidatePath('/rules');
+}
+
+export async function reorderRules(orderedIds: string[]) {
+  const userId = await requireUserId();
+  await reorderRulesRow(userId, orderedIds);
+  revalidatePath('/rules');
 }

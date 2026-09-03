@@ -60,6 +60,15 @@ export interface CallClaudeOptions {
   effort?: Effort;
   /** Ties the spend to an interview, for per-session cost reporting. */
   sessionId?: string | null;
+  /**
+   * Per-user prompt text, sent after the cached block.
+   *
+   * Anything that differs between people belongs here rather than in `system`.
+   * The cache key is a prefix match, so a name or a personal rule inside the
+   * shared block would give every user their own copy of the whole prompt and
+   * the hit rate would collapse to what one person can reuse alone.
+   */
+  systemSuffix?: string;
 }
 
 export interface CallClaudeResult<T> {
@@ -98,6 +107,9 @@ export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaude
   // something volatile has leaked into the system prompt.
   const system = [
     { type: 'text' as const, text: opts.system, cache_control: { type: 'ephemeral' as const } },
+    ...(opts.systemSuffix
+      ? [{ type: 'text' as const, text: opts.systemSuffix }]
+      : []),
   ];
 
   // `output_config` is not in the SDK's published request type yet, hence the

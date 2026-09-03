@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { NoToolUseError, callClaude } from '../../../../lib/anthropic';
-import { UNIVERSAL_RULES } from '../../../../lib/systemPrompt';
+import { TAILOR_INVARIANT, buildUserContext } from '../../../../lib/systemPrompt';
 import type { ResumeStructure } from '../../../../lib/types';
 import { requireUserId } from '../../../../server/auth';
 import {
   getActiveRules,
+  getUser,
   getApplication,
   getProfile,
   saveResume,
@@ -35,10 +36,11 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 500);
   }
 
-  const [record, profile, rules] = await Promise.all([
+  const [record, profile, rules, user] = await Promise.all([
     getApplication(userId, params.id),
     getProfile(userId),
     getActiveRules(userId),
+    getUser(userId),
   ]);
 
   if (!record) return errorResponse({ type: 'generic', message: 'Application not found.' }, 404);
@@ -59,9 +61,6 @@ export async function POST(_request: Request, { params }: { params: { id: string
   }
 
   const posting = record.posting;
-  const ruleText = rules.length
-    ? `\n\nThe person's own rules, which apply to every resume they make:\n${rules.map((r) => `- ${r.text}`).join('\n')}`
-    : '';
 
   const content = [
     {
@@ -72,7 +71,6 @@ export async function POST(_request: Request, { params }: { params: { id: string
         JSON.stringify(structure, null, 2),
         '```',
         `Job posting — Company: ${posting?.company ?? '(not provided)'}, Role: ${posting?.role ?? '(not provided)'}\n${posting?.description ?? '(no description)'}`,
-        ruleText,
         'Produce the tailored resume now via submit_tailored_resume. No About Me document was provided — the structure above is your only source for what this person has done, so tailor within it and invent nothing to fill gaps.',
       ]
         .filter(Boolean)
@@ -84,7 +82,12 @@ export async function POST(_request: Request, { params }: { params: { id: string
     const { toolInput } = await callClaude<TailorResult>({
       userId,
       kind: 'tailor',
-      system: UNIVERSAL_RULES,
+      system: TAILOR_INVARIANT,
+      systemSuffix: buildUserContext({
+        displayName: structure.name || user?.displayName,
+        locale: user?.locale,
+        rules,
+      }),
       content,
       tool: TAILOR_TOOL,
     });

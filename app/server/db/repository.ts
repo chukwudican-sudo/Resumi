@@ -291,6 +291,74 @@ export async function markProfileStale(userId: string) {
 
 // ── Rules ──────────────────────────────────────────────────────────────────
 
+/**
+ * Every rule, including the switched-off ones.
+ *
+ * The page needs those: turning a rule off is how someone parks it without
+ * losing the wording they worked out, and a rule that vanished when disabled
+ * would make the toggle indistinguishable from delete.
+ */
+export async function listRules(userId: string) {
+  return db.select().from(rules).where(eq(rules.userId, userId)).orderBy(rules.orderIndex);
+}
+
+export async function createRule(userId: string, text: string): Promise<string> {
+  // New rules go last: order carries meaning once the prompt reads them in
+  // sequence, and inserting at the top would silently reprioritise the others.
+  const [last] = await db
+    .select({ orderIndex: rules.orderIndex })
+    .from(rules)
+    .where(eq(rules.userId, userId))
+    .orderBy(desc(rules.orderIndex))
+    .limit(1);
+
+  const [row] = await db
+    .insert(rules)
+    .values({
+      id: newId('rule'),
+      userId,
+      text: text.trim(),
+      orderIndex: (last?.orderIndex ?? -1) + 1,
+    })
+    .returning({ id: rules.id });
+  return row.id;
+}
+
+export async function updateRule(userId: string, ruleId: string, text: string) {
+  await db
+    .update(rules)
+    .set({ text: text.trim(), updatedAt: new Date() })
+    .where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
+}
+
+export async function setRuleActive(userId: string, ruleId: string, active: boolean) {
+  await db
+    .update(rules)
+    .set({ active, updatedAt: new Date() })
+    .where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
+}
+
+export async function deleteRule(userId: string, ruleId: string) {
+  await db.delete(rules).where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
+}
+
+/**
+ * Writes a new order for the ids given.
+ *
+ * Every statement carries the userId, so an id belonging to someone else
+ * updates nothing rather than reordering their rules.
+ */
+export async function reorderRules(userId: string, orderedIds: string[]) {
+  await Promise.all(
+    orderedIds.map((ruleId, index) =>
+      db
+        .update(rules)
+        .set({ orderIndex: index, updatedAt: new Date() })
+        .where(and(eq(rules.userId, userId), eq(rules.id, ruleId))),
+    ),
+  );
+}
+
 export async function getActiveRules(userId: string) {
   return db
     .select()

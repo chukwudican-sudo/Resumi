@@ -1,18 +1,19 @@
 import Link from 'next/link';
 import { UserButton } from '@clerk/nextjs';
 
-export type NavKey = 'applications' | 'insights' | 'profile';
+export type NavKey = 'applications' | 'insights' | 'profile' | 'rules';
 
 const ITEMS: { key: NavKey; href: string; label: string }[] = [
   { key: 'applications', href: '/applications', label: 'Applications' },
   { key: 'insights', href: '/insights', label: 'Insights' },
   { key: 'profile', href: '/setup', label: 'Resume' },
+  { key: 'rules', href: '/rules', label: 'Rules' },
 ];
 
 /**
  * The bar across every signed-in page.
  *
- * Three destinations, all of which are places you return to. Onboarding and the
+ * Four destinations, all of which are places you return to. Onboarding and the
  * questions are not here on purpose — they are things you pass through, and
  * putting a one-time flow in permanent navigation is how an app ends up feeling
  * like a settings menu.
