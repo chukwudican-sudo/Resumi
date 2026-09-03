@@ -111,6 +111,11 @@ export const RESUME_STRUCTURE_SCHEMA = {
           tech: { type: 'string' },
           dates: { type: 'string' },
           bullets: { type: 'array', items: { type: 'string' } },
+          url: {
+            type: 'string',
+            description:
+              'Link to the project, if there is one. Return it exactly as given — it is the reader\'s way of seeing the work, and it is not yours to edit or drop.',
+          },
         },
         required: ['name', 'tech', 'dates', 'bullets'],
         additionalProperties: false,

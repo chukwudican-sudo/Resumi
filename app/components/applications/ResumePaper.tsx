@@ -31,7 +31,7 @@ export default function ResumePaper({ structure }: { structure: ResumeStructure 
   ].filter(Boolean);
 
   return (
-    <div className="w-full max-w-[600px] flex-grow overflow-y-auto border border-rule-field bg-white px-[52px] py-11 shadow-[0_2px_20px_rgba(26,24,21,0.06)]">
+    <div className="w-full max-w-[600px] shrink-0 border border-rule-field bg-white px-[52px] py-11 shadow-[0_2px_20px_rgba(26,24,21,0.06)]">
       <div className="border-b border-rule pb-3.5 text-center">
         <div className="font-serif text-[28px] leading-tight">{structure.name}</div>
         {contact.length > 0 ? (

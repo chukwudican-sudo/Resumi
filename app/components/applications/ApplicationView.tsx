@@ -146,7 +146,7 @@ export default function ApplicationView({ applicationId, status, posting, resume
         </div>
       ) : (
         <div className="grid flex-grow grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px]">
-          <div className="flex flex-col items-center bg-ground-band px-9 py-7">
+          <div className="flex flex-col items-center overflow-y-auto bg-ground-band px-9 py-7">
             <div className="mb-4 flex w-full max-w-[600px] items-center justify-between">
               <span className="text-xs text-ink-muted">Version {resume.version}</span>
               <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-accent-wash px-2.5 py-1 text-[11.5px] text-accent">
@@ -223,20 +223,6 @@ export default function ApplicationView({ applicationId, status, posting, resume
                     </div>
                   ) : null}
 
-                  {resume.log.length > 0 ? (
-                    <div className="flex flex-col gap-3">
-                      <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
-                        What changed &middot; {resume.log.length} {resume.log.length === 1 ? 'edit' : 'edits'}
-                      </span>
-                      {resume.log.map((line, i) => (
-                        <div key={i} className="flex items-start gap-2.5">
-                          <div className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full bg-ink-ghost" />
-                          <span className="text-[13.5px] leading-snug text-ink-prose">{line}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-
                   {resume.warnings.length > 0 ? (
                     <div className="flex flex-col gap-2 rounded-md border border-flag-line bg-flag-bg p-4">
                       <span className="text-[11px] uppercase tracking-[0.12em] text-flag">Worth checking</span>
@@ -244,6 +230,26 @@ export default function ApplicationView({ applicationId, status, posting, resume
                         <span key={i} className="text-[13px] leading-snug text-flag-ink">{w}</span>
                       ))}
                     </div>
+                  ) : null}
+
+                  {resume.log.length > 0 ? (
+                    <details className="group rounded-md border border-rule bg-ground-surface">
+                      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
+                        <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                          What changed &middot; {resume.log.length} {resume.log.length === 1 ? 'edit' : 'edits'}
+                        </span>
+                        <span className="text-[12.5px] text-accent transition group-open:hidden">Show</span>
+                        <span className="hidden text-[12.5px] text-accent group-open:inline">Hide</span>
+                      </summary>
+                      <div className="flex flex-col gap-3 border-t border-rule px-4 py-3.5">
+                        {resume.log.map((line, i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <div className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full bg-ink-ghost" />
+                            <span className="text-[13.5px] leading-snug text-ink-prose">{line}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                   ) : null}
                 </>
               ) : (
