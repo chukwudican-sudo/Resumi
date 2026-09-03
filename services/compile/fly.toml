@@ -1,0 +1,30 @@
+# Deploy:  fly launch --no-deploy   (once, to create the app)
+#          fly secrets set COMPILE_TOKEN=...
+#          fly deploy
+app = "resumi-compile"
+primary_region = "yyz"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Deliberately NOT scaling to zero. A cold start means waking a machine and
+  # a first request that takes seconds, on a path where somebody is waiting to
+  # download their resume. Keeping one machine up costs a few dollars a month
+  # and is worth more than that.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks.health]
+  type = "http"
+  port = 8080
+  path = "/health"
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
