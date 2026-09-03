@@ -3,8 +3,9 @@
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { buildResume, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
+import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
 import ResumePaper from '../applications/ResumePaper';
+import DownloadPdf from '../applications/DownloadPdf';
 import ContactSection, { type Contact } from './ContactSection';
 import EntrySection from './EntrySection';
 import SkillsSection, { type SkillGroup } from './SkillsSection';
@@ -44,6 +45,9 @@ export default function SetupShell({
   const status = useMemo(() => sectionStatus(entries, facts), [entries, facts]);
   const resume = useMemo(() => buildResume(entries, facts), [entries, facts]);
   const doneCount = status.filter((s) => s.done).length;
+  // Offering a download of a resume with no name and no history on it would
+  // produce a page nobody wants to have sent.
+  const usable = useMemo(() => isResumeUsable(entries, facts), [entries, facts]);
 
   function afterSave() {
     startTransition(() => router.refresh());
@@ -73,6 +77,7 @@ export default function SetupShell({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of 5 sections</span>
+          {usable ? <DownloadPdf /> : null}
           <Link
             href="/applications"
             className="rounded bg-accent px-5 py-2.5 text-sm font-medium text-ground transition hover:bg-accent-hover"

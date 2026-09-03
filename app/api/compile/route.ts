@@ -1,68 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execFile } from 'node:child_process';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { promisify } from 'node:util';
-
-const run = promisify(execFile);
+import { renderResumeLatex } from '../../lib/latexEngine';
+import { buildDefaultFilenameBase } from '../../lib/filename';
+import type { ResumeStructure } from '../../lib/types';
+import { requireUserId } from '../../server/auth';
+import { getApplication, getLatestResume, getProfile } from '../../server/db/repository';
+import { LatexCompileError, compileToPdf } from '../../server/pdf';
 
 // tectonic must run in Node (child_process), not the edge runtime.
 export const runtime = 'nodejs';
-// First compile on a fresh machine downloads tectonic's package bundle.
 export const maxDuration = 60;
 
-// Compile a LaTeX string to a PDF server-side via tectonic. Replaced the old
-// in-browser SwiftLaTeX WASM engine once the client-only/offline requirement
-// was dropped (see docs/adr/0003). tectonic resolves every package on its own,
-// so nothing depends on the dead texlive2.swiftlatex.com server anymore.
+/**
+ * Turns one of your saved resumes into a PDF.
+ *
+ * This endpoint used to accept a LaTeX string and compile whatever it was
+ * given, from anyone, with no sign-in. That is remote code execution wearing a
+ * hat: TeX can read files (`\input{/etc/passwd}` renders them into the returned
+ * PDF) and loop forever, so the returned document was an exfiltration channel
+ * and the timeout was a denial-of-service budget.
+ *
+ * The fix is not to filter the LaTeX — you cannot reliably filter a Turing
+ * complete macro language. It is to stop accepting it. Callers name a resume
+ * they own; the server loads it and renders the LaTeX itself. User text now
+ * reaches TeX only as escaped arguments, through exactly one function.
+ */
 export async function POST(req: NextRequest) {
-  let latex: unknown;
+  const userId = await requireUserId();
+
+  let body: { applicationId?: unknown };
   try {
-    ({ latex } = await req.json());
+    body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
-  if (typeof latex !== 'string' || !latex.trim()) {
-    return NextResponse.json({ error: 'Missing "latex" string' }, { status: 400 });
+
+  const { applicationId } = body;
+  if (applicationId !== undefined && typeof applicationId !== 'string') {
+    return NextResponse.json({ error: '"applicationId" must be a string' }, { status: 400 });
   }
 
-  const dir = await mkdtemp(join(tmpdir(), 'resumi-'));
-  try {
-    const tex = join(dir, 'main.tex');
-    await writeFile(tex, latex, 'utf8');
-    // ponytail: tectonic must be on PATH; TECTONIC_BIN overrides for odd installs.
-    const bin = process.env.TECTONIC_BIN || 'tectonic';
-    try {
-      await run(bin, ['-X', 'compile', tex, '--outdir', dir, '--outfmt', 'pdf'], {
-        cwd: dir,
-        timeout: 55_000,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-    } catch (err) {
-      // tectonic missing from PATH -> ENOENT: a config problem, not bad LaTeX.
-      if ((err as { code?: string }).code === 'ENOENT') {
-        return NextResponse.json(
-          {
-            error:
-              `tectonic not found (tried "${bin}"). Install it and ensure it is on ` +
-              `the server's PATH, or set TECTONIC_BIN to its absolute path.`,
-          },
-          { status: 500 },
-        );
-      }
-      // tectonic writes the TeX error to stderr; surface it so the UI can show why.
-      const log = (err as { stderr?: string }).stderr || String(err);
-      return NextResponse.json({ error: 'LaTeX compilation failed', log }, { status: 422 });
+  // Both reads are scoped by userId, so naming someone else's id finds nothing
+  // rather than compiling their resume.
+  let structure: ResumeStructure | null = null;
+  let filename: string;
+
+  if (applicationId) {
+    const [record, resume] = await Promise.all([
+      getApplication(userId, applicationId),
+      getLatestResume(userId, applicationId),
+    ]);
+    if (!record || !resume) {
+      return NextResponse.json({ error: 'No resume found for that application.' }, { status: 404 });
     }
-    const pdf = await readFile(join(dir, 'main.pdf'));
+    structure = resume.structure as ResumeStructure;
+    filename = `${buildDefaultFilenameBase(
+      structure.name ?? '',
+      record.posting?.role ?? '',
+      record.posting?.company ?? '',
+    )}.pdf`;
+  } else {
+    const profile = await getProfile(userId);
+    structure = (profile?.resumeStructure as ResumeStructure | null) ?? null;
+    if (!structure) {
+      return NextResponse.json(
+        { error: 'Your resume is empty. Add your details first.' },
+        { status: 404 },
+      );
+    }
+    filename = `${buildDefaultFilenameBase(structure.name ?? '', '', '')}.pdf`;
+  }
+
+  try {
+    const pdf = await compileToPdf(renderResumeLatex(structure));
     return new NextResponse(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Length': String(pdf.length),
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
     });
-  } finally {
-    await rm(dir, { recursive: true, force: true });
+  } catch (err) {
+    if (err instanceof LatexCompileError) {
+      if (err.kind === 'config') {
+        console.error(`[Resumi] ${err.message}`);
+        return NextResponse.json({ error: err.message }, { status: 500 });
+      }
+      // The LaTeX was ours, so the log is our debugging material, not theirs —
+      // and a TeX trace is not something to put in front of someone who only
+      // asked for a PDF.
+      console.error(`[Resumi] Resume failed to compile for ${userId}:\n${err.log}`);
+      return NextResponse.json(
+        { error: "We couldn't build that PDF. This one is on us — it has been logged." },
+        { status: 500 },
+      );
+    }
+    throw err;
   }
 }

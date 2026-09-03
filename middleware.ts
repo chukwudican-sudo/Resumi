@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 /**
@@ -22,7 +23,16 @@ export default clerkMiddleware(async (auth, request) => {
   // not exist when the truth is that they need to sign in. Sending them to
   // sign-in — and back afterwards — is the behaviour people expect.
   const { userId, redirectToSignIn } = await auth();
-  if (!userId) return redirectToSignIn({ returnBackUrl: request.url });
+  if (userId) return;
+
+  // An API call gets an answer it can read. Redirecting a fetch to the sign-in
+  // page hands it 200 OK and a page of HTML, so the caller's error handling
+  // never fires and the failure surfaces later as an unparseable response.
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+  }
+
+  return redirectToSignIn({ returnBackUrl: request.url });
 });
 
 export const config = {

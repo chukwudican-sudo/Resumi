@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { markApplicationApplied } from '../../server/actions';
 import type { ResumeStructure } from '../../lib/types';
+import DownloadPdf from './DownloadPdf';
 import ResumePaper from './ResumePaper';
 import StrengthenPanel from './StrengthenPanel';
 
@@ -76,6 +77,7 @@ export default function ApplicationView({ applicationId, status, posting, resume
             <span className="rounded border border-rule-field px-3 py-2 text-[13px] text-ink-prose">
               Version {resume.version}
             </span>
+            <DownloadPdf applicationId={applicationId} />
             {status === 'draft' ? (
               <button
                 type="button"
