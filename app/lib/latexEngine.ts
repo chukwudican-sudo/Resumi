@@ -143,6 +143,18 @@ function renderContact(c: ResumeStructure['contact']): string {
   return parts.join(' $|$ ');
 }
 
+/**
+ * A section is omitted entirely when it has nothing in it.
+ *
+ * Not cosmetic. Both list macros open an `itemize`, and LaTeX refuses to
+ * typeset an `itemize` containing no `\item` — "Something's wrong--perhaps a
+ * missing \item" — which aborts the whole compile. So an account with no
+ * projects yet, or a job whose bullets have not been written, produced no PDF
+ * at all rather than a PDF without that section.
+ *
+ * Printing an empty heading would be wrong anyway: a resume with the word
+ * "Projects" and nothing under it reads worse than one that never mentions it.
+ */
 export function renderResumeLatex(r: ResumeStructure): string {
   const lines: string[] = [];
 
@@ -159,58 +171,72 @@ export function renderResumeLatex(r: ResumeStructure): string {
     lines.push(`\\small{${escapeLatex(r.summary)}}`);
   }
 
+  /** Bullets under one entry, or nothing at all when there are none yet. */
+  const pushBullets = (bullets: string[] | undefined) => {
+    const written = (bullets ?? []).filter((b) => b.trim());
+    if (!written.length) return;
+    lines.push('      \\resumeItemListStart');
+    for (const b of written) {
+      lines.push(`        \\resumeItem{${escapeLatex(b)}}`);
+    }
+    lines.push('      \\resumeItemListEnd');
+  };
+
   // Education
-  lines.push('');
-  lines.push('\\section{Education}');
-  lines.push('  \\resumeSubHeadingListStart');
-  for (const e of r.education) {
-    lines.push(
-      `    \\resumeSubheading{${escapeLatex(e.school)}}{${escapeLatex(e.location)}}{${escapeLatex(e.degree)}}{${escapeLatex(e.dates)}}`,
-    );
+  if (r.education.length) {
+    lines.push('');
+    lines.push('\\section{Education}');
+    lines.push('  \\resumeSubHeadingListStart');
+    for (const e of r.education) {
+      lines.push(
+        `    \\resumeSubheading{${escapeLatex(e.school)}}{${escapeLatex(e.location)}}{${escapeLatex(e.degree)}}{${escapeLatex(e.dates)}}`,
+      );
+    }
+    lines.push('  \\resumeSubHeadingListEnd');
   }
-  lines.push('  \\resumeSubHeadingListEnd');
 
   // Experience
-  lines.push('');
-  lines.push('\\section{Experience}');
-  lines.push('  \\resumeSubHeadingListStart');
-  for (const x of r.experience) {
-    lines.push(
-      `    \\resumeSubheading{${escapeLatex(x.title)}}{${escapeLatex(x.dates)}}{${escapeLatex(x.org)}}{${escapeLatex(x.location)}}`,
-    );
-    lines.push('      \\resumeItemListStart');
-    for (const b of x.bullets) {
-      lines.push(`        \\resumeItem{${escapeLatex(b)}}`);
+  if (r.experience.length) {
+    lines.push('');
+    lines.push('\\section{Experience}');
+    lines.push('  \\resumeSubHeadingListStart');
+    for (const x of r.experience) {
+      lines.push(
+        `    \\resumeSubheading{${escapeLatex(x.title)}}{${escapeLatex(x.dates)}}{${escapeLatex(x.org)}}{${escapeLatex(x.location)}}`,
+      );
+      pushBullets(x.bullets);
     }
-    lines.push('      \\resumeItemListEnd');
+    lines.push('  \\resumeSubHeadingListEnd');
   }
-  lines.push('  \\resumeSubHeadingListEnd');
 
   // Projects
-  lines.push('');
-  lines.push('\\section{Projects}');
-  lines.push('  \\resumeSubHeadingListStart');
-  for (const p of r.projects) {
-    lines.push(
-      `    \\resumeProjectHeading{\\textbf{${escapeLatex(p.name)}} $|$ \\emph{${escapeLatex(p.tech)}}}{${escapeLatex(p.dates)}}`,
-    );
-    lines.push('      \\resumeItemListStart');
-    for (const b of p.bullets) {
-      lines.push(`        \\resumeItem{${escapeLatex(b)}}`);
+  if (r.projects.length) {
+    lines.push('');
+    lines.push('\\section{Projects}');
+    lines.push('  \\resumeSubHeadingListStart');
+    for (const p of r.projects) {
+      // Without tech the separator would dangle after the project name.
+      const heading = p.tech
+        ? `\\textbf{${escapeLatex(p.name)}} $|$ \\emph{${escapeLatex(p.tech)}}`
+        : `\\textbf{${escapeLatex(p.name)}}`;
+      lines.push(`    \\resumeProjectHeading{${heading}}{${escapeLatex(p.dates)}}`);
+      pushBullets(p.bullets);
     }
-    lines.push('      \\resumeItemListEnd');
+    lines.push('  \\resumeSubHeadingListEnd');
   }
-  lines.push('  \\resumeSubHeadingListEnd');
 
   // Technical Skills
-  lines.push('');
-  lines.push('\\section{Technical Skills}');
-  lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
-  const skillLines = r.skills
-    .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
-    .join('\n');
-  lines.push(`    \\small{\\item{\n${skillLines}\n    }}`);
-  lines.push(' \\end{itemize}');
+  const skills = r.skills.filter((s) => s.items.trim());
+  if (skills.length) {
+    lines.push('');
+    lines.push('\\section{Technical Skills}');
+    lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
+    const skillLines = skills
+      .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
+      .join('\n');
+    lines.push(`    \\small{\\item{\n${skillLines}\n    }}`);
+    lines.push(' \\end{itemize}');
+  }
 
   // Optional Certifications
   if (r.certifications && r.certifications.length > 0) {

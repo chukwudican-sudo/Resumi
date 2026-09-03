@@ -115,6 +115,48 @@ function run() {
   assert.ok(hostile.includes('\\textbackslash'), 'hostile input should render as visible text');
   assert.ok(hostile.includes('\\{'), 'braces in user text must be escaped');
 
+  // (f) no empty itemize, ever.
+  //
+  // Both list macros open an itemize, and LaTeX aborts the whole compile on one
+  // containing no \\item. Every case below was a real failure: a job whose
+  // bullets had not been written yet, and an account with no projects, each
+  // produced no PDF at all rather than a PDF without that part.
+  const empties: [string, ResumeStructure][] = [
+    ['a job with no bullets', { ...fixture, experience: [{ ...fixture.experience[0], bullets: [] }] }],
+    ['a project with no bullets', { ...fixture, projects: [{ ...fixture.projects[0], bullets: [] }] }],
+    ['bullets that are only whitespace', { ...fixture, experience: [{ ...fixture.experience[0], bullets: ['  ', ''] }] }],
+    ['no education', { ...fixture, education: [] }],
+    ['no experience', { ...fixture, experience: [] }],
+    ['no projects', { ...fixture, projects: [] }],
+    ['no skills', { ...fixture, skills: [] }],
+    ['a new account with only a name', { ...fixture, summary: undefined, education: [], experience: [], projects: [], skills: [] }],
+  ];
+
+  for (const [label, structure] of empties) {
+    const rendered = renderResumeLatex(structure);
+    // Only the body: the preamble defines these macros with \newcommand, and a
+    // definition sitting beside its matching end is not an empty list.
+    const body = rendered.slice(rendered.indexOf('\\begin{document}'));
+    // An itemize whose next non-blank line closes it has no \item in it.
+    const lines = body.split('\n').map((l) => l.trim()).filter(Boolean);
+    for (let i = 0; i < lines.length - 1; i += 1) {
+      const opens = lines[i].includes('\\resumeItemListStart') || lines[i].includes('\\resumeSubHeadingListStart') || lines[i].startsWith('\\begin{itemize}');
+      const closesNext = lines[i + 1].includes('ListEnd') || lines[i + 1].startsWith('\\end{itemize}');
+      assert.ok(!(opens && closesNext), `${label}: emitted an empty itemize at line ${i + 1}`);
+    }
+  }
+
+  // The section heading goes with it — "Projects" over nothing reads worse than
+  // never mentioning projects.
+  const noProjects = renderResumeLatex({ ...fixture, projects: [] });
+  assert.ok(!noProjects.includes('\\section{Projects}'), 'no projects -> no Projects heading');
+  const noSkills = renderResumeLatex({ ...fixture, skills: [] });
+  assert.ok(!noSkills.includes('\\section{Technical Skills}'), 'no skills -> no Skills heading');
+
+  // A project with no tech must not leave a dangling separator after its name.
+  const noTech = renderResumeLatex({ ...fixture, projects: [{ ...fixture.projects[0], tech: '' }] });
+  assert.ok(!noTech.includes('$|$ \\emph{}'), 'empty tech should drop the separator, not render it empty');
+
   console.log('latexEngine.test.ts: all assertions passed');
 }
 
