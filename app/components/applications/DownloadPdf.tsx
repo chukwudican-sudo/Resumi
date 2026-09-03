@@ -59,8 +59,7 @@ export default function DownloadPdf({ applicationId }: { applicationId?: string 
   }
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex items-center gap-3">
+    <div className="relative flex items-center gap-3">
       {message && !blocking.length ? <span className="text-[12.5px] text-flag">{message}</span> : null}
       <button
         type="button"
@@ -73,12 +72,23 @@ export default function DownloadPdf({ applicationId }: { applicationId?: string 
         </svg>
         {state === 'working' ? 'Building…' : 'Download PDF'}
       </button>
-      </div>
 
       {blocking.length ? (
-        <div className="max-w-[320px] rounded-md border border-flag/40 bg-ground-surface p-3.5 text-left">
-          <span className="text-[11px] uppercase tracking-[0.12em] text-flag">Not ready to send</span>
-          <ul className="mt-1.5 flex flex-col gap-1.5">
+        <div className="absolute right-0 top-full z-50 mt-2 w-[360px] rounded-lg border border-flag/40 bg-ground-surface p-4 text-left shadow-xl shadow-ink/10">
+          <div className="mb-2 flex items-start justify-between gap-4">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-flag">Not ready to send</span>
+            <button
+              type="button"
+              onClick={() => setBlocking([])}
+              aria-label="Dismiss"
+              className="-mt-0.5 shrink-0 rounded p-1 text-ink-faint transition hover:bg-ground-panel hover:text-ink"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <ul className="flex flex-col gap-1.5">
             {blocking.map((b) => (
               <li key={b.message} className="text-[12.5px] leading-snug text-ink-prose">
                 {b.message}
