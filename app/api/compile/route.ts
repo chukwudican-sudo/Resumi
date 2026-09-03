@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { renderResumeLatex } from '../../lib/latexEngine';
 import { checkReadiness } from '../../lib/readiness';
-import { buildDefaultFilenameBase } from '../../lib/filename';
-import type { ResumeStructure } from '../../lib/types';
 import { requireUserId } from '../../server/auth';
-import { getApplication, getLatestResume, getProfile } from '../../server/db/repository';
 import { LatexCompileError, compileToPdf } from '../../server/pdf';
+import { resolveResume } from '../../server/resolveResume';
 
 // tectonic must run in Node (child_process), not the edge runtime.
 export const runtime = 'nodejs';
@@ -40,36 +38,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '"applicationId" must be a string' }, { status: 400 });
   }
 
-  // Both reads are scoped by userId, so naming someone else's id finds nothing
-  // rather than compiling their resume.
-  let structure: ResumeStructure | null = null;
-  let filename: string;
-
-  if (applicationId) {
-    const [record, resume] = await Promise.all([
-      getApplication(userId, applicationId),
-      getLatestResume(userId, applicationId),
-    ]);
-    if (!record || !resume) {
-      return NextResponse.json({ error: 'No resume found for that application.' }, { status: 404 });
-    }
-    structure = resume.structure as ResumeStructure;
-    filename = `${buildDefaultFilenameBase(
-      structure.name ?? '',
-      record.posting?.role ?? '',
-      record.posting?.company ?? '',
-    )}.pdf`;
-  } else {
-    const profile = await getProfile(userId);
-    structure = (profile?.resumeStructure as ResumeStructure | null) ?? null;
-    if (!structure) {
-      return NextResponse.json(
-        { error: 'Your resume is empty. Add your details first.' },
-        { status: 404 },
-      );
-    }
-    filename = `${buildDefaultFilenameBase(structure.name ?? '', '', '')}.pdf`;
+  const resolved = await resolveResume(userId, applicationId);
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }
+  const { structure, filename } = resolved;
 
   // Checked here rather than only in the page, because a disabled button is a
   // suggestion — this is where the PDF is actually produced.

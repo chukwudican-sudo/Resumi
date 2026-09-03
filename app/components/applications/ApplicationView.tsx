@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { markApplicationApplied } from '../../server/actions';
 import type { ResumeStructure } from '../../lib/types';
 import DownloadPdf from './DownloadPdf';
-import ResumePaper from './ResumePaper';
+import PdfPreview from './PdfPreview';
 import StrengthenPanel from './StrengthenPanel';
 
 interface Props {
@@ -156,7 +156,7 @@ export default function ApplicationView({ applicationId, status, posting, resume
                 ATS-safe
               </span>
             </div>
-            <ResumePaper structure={resume.structure} />
+            <PdfPreview applicationId={applicationId} reloadKey={resume.version} />
           </div>
 
           <aside className="flex min-h-0 flex-col border-t border-rule bg-ground-surface lg:border-l lg:border-t-0">
