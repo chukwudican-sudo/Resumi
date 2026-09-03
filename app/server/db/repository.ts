@@ -12,6 +12,7 @@ import {
   profiles,
   resumes,
   rules,
+  usageEvents,
   users,
 } from './schema';
 
@@ -835,3 +836,74 @@ export async function deleteUserData(userId: string) {
 }
 
 export { newId };
+
+// ── Metering ───────────────────────────────────────────────────────────────
+
+/**
+ * Records one model call.
+ *
+ * Written after every call rather than on a sampled or batched basis: this
+ * table is what the spend ceiling reads, and a ceiling computed from an
+ * incomplete record is not a ceiling.
+ */
+export async function recordUsage(
+  userId: string,
+  event: {
+    kind: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+    costUsd: number;
+    resumeId?: string | null;
+    sessionId?: string | null;
+  },
+) {
+  await db.insert(usageEvents).values({
+    userId,
+    kind: event.kind,
+    model: event.model,
+    inputTokens: event.inputTokens,
+    outputTokens: event.outputTokens,
+    cacheReadTokens: event.cacheReadTokens,
+    cacheWriteTokens: event.cacheWriteTokens,
+    // numeric() takes a string; passing a float would round-trip through
+    // double and lose fractions of a cent across thousands of rows.
+    costUsd: event.costUsd.toFixed(6),
+    resumeId: event.resumeId ?? null,
+    sessionId: event.sessionId ?? null,
+  });
+}
+
+/**
+ * What has been spent, and how hard this person has been going.
+ *
+ * One query rather than two because it runs before every model call, and the
+ * point of a cost guard is undermined if the guard itself is expensive.
+ *
+ * A rolling 24 hours, not a calendar day: a calendar day has a moment when the
+ * budget resets, and anyone who notices can wait for it.
+ */
+export async function getUsageWindow(userId: string): Promise<{
+  spentLast24hUsd: number;
+  userCallsLastMinute: number;
+  userSpentLast24hUsd: number;
+}> {
+  const [row] = await db.execute(sql`
+    select
+      coalesce(sum(cost_usd), 0)::float8 as spent_24h,
+      coalesce(count(*) filter (
+        where user_id = ${userId} and created_at >= now() - interval '1 minute'
+      ), 0)::int as user_calls_1m,
+      coalesce(sum(cost_usd) filter (where user_id = ${userId}), 0)::float8 as user_spent_24h
+    from usage_events
+    where created_at >= now() - interval '24 hours'
+  `) as unknown as [{ spent_24h: number; user_calls_1m: number; user_spent_24h: number }];
+
+  return {
+    spentLast24hUsd: Number(row?.spent_24h ?? 0),
+    userCallsLastMinute: Number(row?.user_calls_1m ?? 0),
+    userSpentLast24hUsd: Number(row?.user_spent_24h ?? 0),
+  };
+}

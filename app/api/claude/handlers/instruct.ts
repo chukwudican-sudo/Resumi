@@ -18,7 +18,7 @@ interface InstructResult {
 }
 
 /** Applies a single mid-session instruction as a surgical edit. */
-export async function handleInstruct(body: any) {
+export async function handleInstruct(userId: string, body: any) {
   const { instruction, structure, aboutMe, rules, jobPosting } = body;
   if (!instruction || !structure) {
     return errorResponse({ type: 'generic', message: 'Missing instruction or current resume content.' }, 400);
@@ -53,6 +53,7 @@ export async function handleInstruct(body: any) {
   console.log(`  Instruction       : "${instruction}"`);
 
   const { toolInput, usage } = await callClaude<InstructResult>({
+    userId,
     kind: 'instruct',
     system: UNIVERSAL_RULES,
     content,

@@ -11,7 +11,7 @@ import {
   saveResume,
   spendCredit,
 } from '../../../../server/db/repository';
-import { TAILOR_TOOL, errorResponse, SERVICE_UNAVAILABLE } from '../../../claude/shared';
+import { capacityResponse, TAILOR_TOOL, errorResponse, SERVICE_UNAVAILABLE } from '../../../claude/shared';
 
 export const maxDuration = 60;
 
@@ -82,6 +82,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   try {
     const { toolInput } = await callClaude<TailorResult>({
+      userId,
       kind: 'tailor',
       system: UNIVERSAL_RULES,
       content,
@@ -99,6 +100,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
     return NextResponse.json({ resumeId, creditsLeft: remaining });
   } catch (error) {
+    const refused = capacityResponse(error);
+    if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
     }

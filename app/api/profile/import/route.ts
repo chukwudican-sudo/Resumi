@@ -7,7 +7,7 @@ import type { ResumeStructure } from '../../../lib/types';
 import { requireUserId } from '../../../server/auth';
 import { profileStrength } from '../../../lib/profileStrength';
 import { replaceProfileFromResume } from '../../../server/db/repository';
-import { DOCX_MIME, SOURCE_EXTRACTION_TOOL, buildDocumentBlock, errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
+import { capacityResponse, DOCX_MIME, SOURCE_EXTRACTION_TOOL, buildDocumentBlock, errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
 
 export const maxDuration = 60;
 
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { toolInput } = await callClaude<SourceExtraction>({
+      userId,
       kind: 'extract_resume',
       system: SOURCE_EXTRACTION_PROMPT,
       content,
@@ -86,6 +87,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ structure });
   } catch (error) {
+    const refused = capacityResponse(error);
+    if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
     }

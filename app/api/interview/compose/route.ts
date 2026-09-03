@@ -10,7 +10,7 @@ import {
   getProfileEntries,
   saveComposedProfile,
 } from '../../../server/db/repository';
-import { errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
+import { capacityResponse, errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
 
 export const maxDuration = 60;
 
@@ -52,7 +52,7 @@ export async function POST() {
   }));
 
   try {
-    const result = await composeProfile(entries, facts);
+    const result = await composeProfile(userId, entries, facts);
 
     // A bullet the model could not trace back to anything is one it invented.
     // Surfaced rather than silently shipped into someone's resume.
@@ -73,6 +73,8 @@ export async function POST() {
 
     return NextResponse.json({ structure: result.structure, warnings });
   } catch (error) {
+    const refused = capacityResponse(error);
+    if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
     }

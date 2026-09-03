@@ -175,6 +175,7 @@ export interface TurnOptions {
 }
 
 export async function runTurn(
+  userId: string,
   state: InterviewState,
   answer: string | null,
   skipped = false,
@@ -196,6 +197,7 @@ export async function runTurn(
   });
 
   let { toolInput, usage } = await callClaude<RawTurnOutput>({
+    userId,
     kind: 'interview_turn',
     system: INTERVIEW_PROMPT,
     content: [{ type: 'text', text: message }],
@@ -210,6 +212,7 @@ export async function runTurn(
   const duplicate = findDuplicate(toAsked(toolInput.nextQuestion), asked);
   if (duplicate) {
     const retry = await callClaude<RawTurnOutput>({
+    userId,
       kind: 'interview_turn',
       system: INTERVIEW_PROMPT,
       content: [

@@ -75,6 +75,7 @@ export interface JobQuestion {
 }
 
 export async function generateJobQuestions(input: {
+  userId: string;
   posting: { company: string | null; role: string | null; description: string | null };
   resume: ResumeStructure;
   missingRequirements: string[];
@@ -100,6 +101,7 @@ export async function generateJobQuestions(input: {
   ];
 
   const { toolInput, usage } = await callClaude<{ questions: JobQuestion[] }>({
+    userId: input.userId,
     kind: 'interview_turn',
     system: JOB_QUESTIONS_PROMPT,
     content,
@@ -160,6 +162,7 @@ export interface AnswerFact {
 }
 
 export async function extractAnswerFacts(
+  userId: string,
   pairs: { question: string; answer: string }[],
   entries: ProfileEntry[],
 ): Promise<{ facts: AnswerFact[]; usage: TokenUsage }> {
@@ -179,6 +182,7 @@ export async function extractAnswerFacts(
   ];
 
   const { toolInput, usage } = await callClaude<{ facts: AnswerFact[] }>({
+    userId,
     kind: 'interview_turn',
     system: EXTRACT_ANSWERS_PROMPT,
     content,

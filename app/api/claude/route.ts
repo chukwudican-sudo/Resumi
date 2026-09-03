@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { HEALTH_CHECK_MODEL, NoToolUseError } from '../../lib/anthropic';
 import { mockApiResponse } from '../../lib/mockApi';
-import { SERVICE_UNAVAILABLE, errorResponse } from './shared';
+import { requireUserId } from '../../server/auth';
+import { SERVICE_UNAVAILABLE, capacityResponse, errorResponse } from './shared';
 import { handleExtract } from './handlers/extract';
 import { handleExtractResume } from './handlers/extractResume';
 import { handleInstruct } from './handlers/instruct';
@@ -14,7 +15,7 @@ import { handleTailor } from './handlers/tailor';
  * most expensive path with whatever body it happened to be given. An unknown
  * mode is now a 400.
  */
-const HANDLERS: Record<string, (body: any) => Promise<Response>> = {
+const HANDLERS: Record<string, (userId: string, body: any) => Promise<Response>> = {
   extract: handleExtract,
   extract_resume: handleExtractResume,
   instruct: handleInstruct,
@@ -66,8 +67,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return await handler(body);
+    return await handler(await requireUserId(), body);
   } catch (error) {
+    const refused = capacityResponse(error);
+    if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits. Check console.anthropic.com.' }, 401);
     }

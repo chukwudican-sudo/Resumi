@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { recordUsage } from '../server/db/repository';
+import { assertWithinLimits } from '../server/limits';
 import { estimateCostUsd } from './pricing';
 import type { TokenUsage } from './types';
 
@@ -43,6 +45,12 @@ const CALL_CONFIG: Record<UsageKind, { model: string; maxTokens: number; effort:
 export const HEALTH_CHECK_MODEL = CALL_CONFIG.tailor.model;
 
 export interface CallClaudeOptions {
+  /**
+   * Who this call is for. Required, and required for a reason: it is what makes
+   * metering unforgettable. A new handler cannot reach Claude without naming an
+   * owner, so it cannot spend money anonymously.
+   */
+  userId: string;
   kind: UsageKind;
   system: string;
   content: unknown[];
@@ -50,6 +58,8 @@ export interface CallClaudeOptions {
   /** Overrides the per-kind default. Rarely needed. */
   maxTokens?: number;
   effort?: Effort;
+  /** Ties the spend to an interview, for per-session cost reporting. */
+  sessionId?: string | null;
 }
 
 export interface CallClaudeResult<T> {
@@ -74,6 +84,9 @@ export class NoToolUseError extends Error {
 export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaudeResult<T>> {
   const config = CALL_CONFIG[opts.kind];
   const model = config.model;
+
+  // Before spending anything, not after.
+  await assertWithinLimits(opts.userId, opts.kind);
 
   const client = new Anthropic();
 
@@ -117,6 +130,20 @@ export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaude
     cacheWriteTokens,
     costUsd: estimateCostUsd(model, { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens }),
   };
+
+  // Recorded even though the caller may throw on what comes back: the tokens
+  // were spent regardless, and a ceiling that only counts successful calls is
+  // blind to exactly the failure loop it exists to stop.
+  await recordUsage(opts.userId, {
+    kind: opts.kind,
+    model,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    costUsd: usage.costUsd,
+    sessionId: opts.sessionId ?? null,
+  });
 
   return { toolInput: toolUse.input as T, usage };
 }

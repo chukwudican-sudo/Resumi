@@ -24,7 +24,7 @@ interface TailorResult {
 }
 
 /** Tailors the source resume to a job posting. */
-export async function handleTailor(body: any) {
+export async function handleTailor(userId: string, body: any) {
   const { aboutMe, rules, jobPosting, structure } = body;
 
   // About Me is optional. The structure is the resume of record — it can come
@@ -73,6 +73,7 @@ export async function handleTailor(body: any) {
   });
 
   const { toolInput, usage } = await callClaude<TailorResult>({
+    userId,
     kind: 'tailor',
     system: UNIVERSAL_RULES,
     content,

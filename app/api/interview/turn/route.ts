@@ -14,7 +14,7 @@ import {
   saveInterviewTurn,
   startInterview,
 } from '../../../server/db/repository';
-import { errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
+import { capacityResponse, errorResponse, SERVICE_UNAVAILABLE } from '../../claude/shared';
 
 export const maxDuration = 60;
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const result = await runTurn(state, body.answer ?? null, Boolean(body.skipped), {
+    const result = await runTurn(userId, state, body.answer ?? null, Boolean(body.skipped), {
       goal: { stage: user?.stage ?? '', targetField: user?.targetField ?? '' },
       openQuestions: (session.openQuestions as string[]) ?? undefined,
     });
@@ -152,6 +152,8 @@ export async function POST(request: NextRequest) {
       finishReason: result.state.finishReason,
     });
   } catch (error) {
+    const refused = capacityResponse(error);
+    if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
     }

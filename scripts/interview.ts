@@ -5,7 +5,12 @@
  * do not feel sharp here, they will not feel sharp in a chat bubble, and the
  * component work would be premature.
  *
- *   npx tsx scripts/interview.ts
+ *   RESUMI_DEV_USER_ID=user_... npx tsx scripts/interview.ts
+ *
+ * The user id is required because every model call is metered against an
+ * account, and metering is not something a script gets to opt out of — a
+ * dogfood run costs real money and should show up in the same ledger as
+ * everything else. Use your own id from the users table.
  *
  * Commands during the interview:
  *   :skip    skip the current question
@@ -16,6 +21,16 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { computeCoverage } from '../app/lib/interview/coverage';
 import { MAX_TURNS, emptyInterviewState, runTurn, type InterviewState } from '../app/lib/interview/engine';
+
+const envUserId = process.env.RESUMI_DEV_USER_ID;
+if (!envUserId) {
+  console.error(
+    'Set RESUMI_DEV_USER_ID to an existing users.id. Every model call is billed\n' +
+      'to an account, and this script is not exempt from that.',
+  );
+  process.exit(1);
+}
+const devUserId: string = envUserId;
 
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -81,7 +96,7 @@ async function main() {
     const started = Date.now();
     let result;
     try {
-      result = await runTurn(state, answer, skipped);
+      result = await runTurn(devUserId, state, answer, skipped);
     } catch (err) {
       console.error(`\n${YELLOW}Turn failed:${RESET}`, err instanceof Error ? err.message : err);
       break;

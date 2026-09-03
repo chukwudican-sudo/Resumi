@@ -10,7 +10,7 @@ interface ExtractionResult {
 }
 
 /** Reads a job posting out of screenshots and/or pasted text. */
-export async function handleExtract(body: any) {
+export async function handleExtract(userId: string, body: any) {
   const { images, text } = body;
   const imageList = Array.isArray(images) ? images : [];
   if (imageList.length === 0 && !text) {
@@ -29,6 +29,7 @@ export async function handleExtract(body: any) {
   });
 
   const { toolInput } = await callClaude<ExtractionResult>({
+    userId,
     kind: 'extract',
     system: EXTRACTION_PROMPT,
     content,

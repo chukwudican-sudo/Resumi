@@ -114,7 +114,7 @@ function renderFacts(entries: ProfileEntry[], facts: Fact[]): string {
   return lines.join('\n');
 }
 
-export async function composeProfile(entries: ProfileEntry[], facts: Fact[]): Promise<ComposeResult> {
+export async function composeProfile(userId: string, entries: ProfileEntry[], facts: Fact[]): Promise<ComposeResult> {
   const content = [
     {
       type: 'text' as const,
@@ -132,6 +132,7 @@ export async function composeProfile(entries: ProfileEntry[], facts: Fact[]): Pr
     bulletSources: BulletSource[];
     warnings: string[];
   }>({
+    userId,
     kind: 'compose',
     system: COMPOSE_PROMPT,
     content,

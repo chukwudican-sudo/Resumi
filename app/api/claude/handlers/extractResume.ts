@@ -12,7 +12,7 @@ interface SourceExtractionResult {
 }
 
 /** Parses an uploaded resume (PDF or .docx) into a ResumeStructure. */
-export async function handleExtractResume(body: any) {
+export async function handleExtractResume(userId: string, body: any) {
   const { file } = body;
   if (!file?.base64 || !file?.mimeType) {
     return errorResponse({ type: 'generic', message: 'No resume file to extract from.' }, 400);
@@ -38,6 +38,7 @@ export async function handleExtractResume(body: any) {
   });
 
   const { toolInput } = await callClaude<SourceExtractionResult>({
+    userId,
     kind: 'extract_resume',
     system: SOURCE_EXTRACTION_PROMPT,
     content,

@@ -4,7 +4,7 @@ import { NoToolUseError, callClaude } from '../../lib/anthropic';
 import { EXTRACTION_PROMPT } from '../../lib/systemPrompt';
 import { requireUserId } from '../../server/auth';
 import { createApplication } from '../../server/db/repository';
-import { EXTRACT_TOOL, buildImageBlock, errorResponse, SERVICE_UNAVAILABLE } from '../claude/shared';
+import { capacityResponse, EXTRACT_TOOL, buildImageBlock, errorResponse, SERVICE_UNAVAILABLE } from '../claude/shared';
 
 export const maxDuration = 60;
 
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { toolInput } = await callClaude<Extraction>({
+      userId,
       kind: 'extract',
       system: EXTRACTION_PROMPT,
       content,
@@ -88,6 +89,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ applicationId });
   } catch (error) {
+    const refused = capacityResponse(error);
+    if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
     }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { CapacityError } from '../../server/limits';
 import type { ApiErrorPayload } from '../../lib/types';
 
 export const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -10,6 +11,19 @@ export function errorResponse(payload: ApiErrorPayload, status: number) {
 
 /** Standard message for a transient upstream failure. Used in several places. */
 export const SERVICE_UNAVAILABLE = 'The AI service is temporarily unavailable. Please try again.';
+
+/**
+ * Turns a refused call into a response, or returns null if this was not one.
+ *
+ * 429 rather than 503: the call was understood and declined, and the
+ * distinction matters to anything that retries automatically. Only the
+ * user-facing half of the error is sent — the figures stay in the log, because
+ * a limit you can read off a response is a limit you can probe.
+ */
+export function capacityResponse(error: unknown) {
+  if (!(error instanceof CapacityError)) return null;
+  return errorResponse({ type: 'generic', message: error.userMessage }, 429);
+}
 
 export function buildDocumentBlock(file: { base64?: string; mimeType?: string } | undefined) {
   if (!file?.base64) return null;

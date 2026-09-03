@@ -12,7 +12,7 @@ import {
   getProfile,
   getProfileEntries,
 } from '../../../../server/db/repository';
-import { errorResponse, SERVICE_UNAVAILABLE } from '../../../claude/shared';
+import { capacityResponse, errorResponse, SERVICE_UNAVAILABLE } from '../../../claude/shared';
 
 export const maxDuration = 60;
 
@@ -41,6 +41,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 
   try {
     const { questions } = await generateJobQuestions({
+      userId,
       posting: {
         company: record.posting?.company ?? null,
         role: record.posting?.role ?? null,
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }));
 
   try {
-    const { facts } = await extractAnswerFacts(answered, typed);
+    const { facts } = await extractAnswerFacts(userId, answered, typed);
 
     // Match "about" back to a real entry by title; anything unmatched becomes a
     // fact about the person rather than being dropped.
@@ -104,6 +105,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 }
 
 function handle(error: unknown) {
+  const refused = capacityResponse(error);
+  if (refused) return refused;
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
     return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
   }
