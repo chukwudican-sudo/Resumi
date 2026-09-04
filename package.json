@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test \"app/**/*.test.ts\""
+    "test": "tsx --test \"app/**/*.test.ts\"",
+    "postinstall": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.107.0",
@@ -17,6 +18,7 @@
     "drizzle-orm": "^0.45.2",
     "jszip": "^3.10.1",
     "next": "14.2.35",
+    "pdfjs-dist": "^6.3.289",
     "postgres": "^3.4.9",
     "react": "18.3.1",
     "react-dom": "18.3.1",
