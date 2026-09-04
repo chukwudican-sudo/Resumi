@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
 import ResumePaper from '../applications/ResumePaper';
 import DownloadPdf from '../applications/DownloadPdf';
+import PolishButton from './PolishButton';
 import type { ResumeStructure } from '../../lib/types';
 import ContactSection, { type Contact } from './ContactSection';
 import EntrySection from './EntrySection';
@@ -86,6 +87,7 @@ export default function SetupShell({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of 5 sections</span>
+          {usable ? <PolishButton stale={stale} /> : null}
           {usable ? <DownloadPdf polishFirst={stale} /> : null}
           <Link
             href="/applications"

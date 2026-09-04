@@ -473,6 +473,11 @@ export async function upsertEntry(
  *
  * Whole words only. A substring replace would turn a correction of "ap" into
  * damage spread across every field that happens to contain those letters.
+ *
+ * Dates and urls are deliberately not included. A "correction" to a date is a
+ * change of fact rather than of spelling, and a url looks misspelled to any
+ * spellchecker — "fixing" github.com/chukwudican-sudo produces a dead link on
+ * a resume, which is worse than the typo it was trying to solve.
  */
 export async function applyCorrectionsToEntries(
   userId: string,
@@ -481,7 +486,7 @@ export async function applyCorrectionsToEntries(
   if (!corrections.length) return 0;
 
   const rows = await db.select().from(profileEntries).where(eq(profileEntries.userId, userId));
-  const fields = ['title', 'org', 'location', 'city', 'region', 'country'] as const;
+  const fields = ['title', 'org', 'location', 'city', 'region', 'country', 'tech'] as const;
 
   // Built once rather than per field per row, and escaped because a correction
   // is text somebody typed, not a pattern we wrote.
@@ -510,6 +515,16 @@ export async function applyCorrectionsToEntries(
     const fixedBullets = bullets.map(fix);
     if (fixedBullets.some((b, i) => b !== bullets[i])) patch.bullets = fixedBullets;
 
+    // GPA, honours, the credential. Text somebody typed, so text that can be
+    // misspelled.
+    const extra = (row.extra as Record<string, string> | null) ?? null;
+    if (extra) {
+      const fixedExtra = Object.fromEntries(
+        Object.entries(extra).map(([k, v]) => [k, typeof v === 'string' ? fix(v) : v]),
+      );
+      if (JSON.stringify(fixedExtra) !== JSON.stringify(extra)) patch.extra = fixedExtra;
+    }
+
     if (Object.keys(patch).length) {
       await db
         .update(profileEntries)
@@ -519,6 +534,42 @@ export async function applyCorrectionsToEntries(
     }
   }
 
+  return changed;
+}
+
+/**
+ * The same corrections, applied to the skills.
+ *
+ * Skills are facts rather than entry columns, so they are not reached by the
+ * loop above — which meant a misspelled skill was carried through the grouping
+ * and printed exactly as typed.
+ */
+export async function applyCorrectionsToSkillFacts(
+  userId: string,
+  corrections: { from: string; to: string }[],
+): Promise<number> {
+  if (!corrections.length) return 0;
+
+  const rows = await db
+    .select({ id: facts.id, text: facts.text })
+    .from(facts)
+    .where(and(eq(facts.userId, userId), eq(facts.category, 'skill')));
+
+  const patterns = corrections.map((c) => ({
+    pattern: new RegExp(`\\b${c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'),
+    to: c.to,
+  }));
+
+  let changed = 0;
+  for (const row of rows) {
+    const after = patterns.reduce((acc, p) => acc.replace(p.pattern, p.to), row.text);
+    if (after === row.text) continue;
+    await db
+      .update(facts)
+      .set({ text: after })
+      .where(and(eq(facts.userId, userId), eq(facts.id, row.id)));
+    changed += 1;
+  }
   return changed;
 }
 
@@ -566,19 +617,34 @@ export async function saveSkillGroups(
 }
 
 /** Stores the deterministic render so other pages can read one shape. */
-export async function saveMasterResume(userId: string, structure: unknown, strength: number) {
+/**
+ * Stores the rendered master resume.
+ *
+ * `stale` says whether the resume still needs the editorial pass, and the
+ * caller has to say which it is. It used to be hardcoded false, which meant
+ * saving an entry marked the resume as freshly polished — so editing your
+ * resume declared it did not need polishing, and polish could never run at the
+ * one moment it was needed. A typo typed into a bullet went straight through to
+ * the PDF, and the flag said everything was fine.
+ */
+export async function saveMasterResume(
+  userId: string,
+  structure: unknown,
+  strength: number,
+  stale = true,
+) {
   await db
     .insert(profiles)
     .values({
       id: newId('prof'), userId,
       resumeStructure: structure as object, bulletSources: [],
-      strength, composedAt: new Date(), stale: false,
+      strength, composedAt: new Date(), stale,
     })
     .onConflictDoUpdate({
       target: profiles.userId,
       set: {
         resumeStructure: structure as object,
-        strength, composedAt: new Date(), stale: false, updatedAt: new Date(),
+        strength, composedAt: new Date(), stale, updatedAt: new Date(),
       },
     });
 }

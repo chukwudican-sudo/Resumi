@@ -4,6 +4,7 @@ import { profileStrength } from '../lib/profileStrength';
 import type { ResumeStructure } from '../lib/types';
 import {
   applyCorrectionsToEntries,
+  applyCorrectionsToSkillFacts,
   getProfile,
   getResumeInputs,
   getUser,
@@ -26,13 +27,16 @@ export async function runPolish(
 ): Promise<PolishResult> {
   const { polish } = await polishResume(userId, structure, locale);
 
-  await applyCorrectionsToEntries(userId, polish.corrections);
+  await Promise.all([
+    applyCorrectionsToEntries(userId, polish.corrections),
+    applyCorrectionsToSkillFacts(userId, polish.corrections),
+  ]);
 
   const { entryRows, factRows } = await getResumeInputs(userId);
   const corrected = buildResume(entryRows.map(entryFromRow), factRows);
   const applied = applyPolish(corrected, polish);
 
-  await saveMasterResume(userId, applied, profileStrength(applied));
+  await saveMasterResume(userId, applied, profileStrength(applied), false);
   return polish;
 }
 
