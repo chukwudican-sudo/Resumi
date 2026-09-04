@@ -61,6 +61,8 @@ WHAT YOU DECIDE
 
 4. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
 
+   Overlapping dates are worked out for you and stated below. Say nothing about an overlap unless you are told it is unexplained.
+
    One sentence each, at most two. Say the problem and what to do about it, then stop. Do not restate the dates back to them, do not reason out loud, and do not raise the same issue twice in different words. At most five warnings; if there are more, keep the five that would cost them the most.
 
    Never write a warning that ends in "no action needed" — if there is no action, it is not a warning. Never mention internal ids or field names.
@@ -285,6 +287,76 @@ export function applyPolish(structure: ResumeStructure, polish: PolishResult): R
   };
 }
 
+const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+
+/**
+ * A rendered date range back into months, for arithmetic.
+ *
+ * Safe to parse because we generated it: `formatDates` produces "May 2025 –
+ * Aug 2026", "Nov 2025 – Present", "2024", and nothing else.
+ */
+function monthRange(dates: string): { from: number; to: number } | null {
+  const point = (text: string): number | null => {
+    if (/present|current/i.test(text)) return 9999 * 12;
+    const match = /(?:([A-Za-z]{3})[a-z]*\s+)?(\d{4})/.exec(text);
+    if (!match) return null;
+    const month = match[1] ? MONTHS.indexOf(match[1].toLowerCase()) : 0;
+    return Number(match[2]) * 12 + (month < 0 ? 0 : month);
+  };
+
+  const [rawFrom, rawTo] = dates.split(/[–—-]/);
+  const from = point(rawFrom ?? '');
+  if (from === null) return null;
+  const to = rawTo ? point(rawTo) : from;
+  return { from, to: to ?? from };
+}
+
+/**
+ * What to tell the model about concurrent roles.
+ *
+ * Worked out here rather than left to the model. Told to weigh it itself, it
+ * read a title ending in "(Part-time)" and still advised marking one of the
+ * roles part-time; given a list of full-time roles without the arithmetic done,
+ * it reported an overlap between two that do not overlap at all. Both failures
+ * are the same failure — this is date comparison, and a date comparison should
+ * not be a judgement call.
+ *
+ * Holding two jobs at once is ordinary. It is worth raising only when nothing
+ * on the page accounts for it: two roles that both read as full-time, running
+ * at the same time.
+ */
+export function overlapNote(structure: ResumeStructure): string {
+  const roles = structure.experience
+    // A job type is printed in the title only when it is not full-time, so a
+    // title with no bracketed type is a role that reads as full-time.
+    .filter(
+      (x) =>
+        !/\((part-time|internship|co-op|contract|freelance|temporary|casual|volunteer|seasonal|apprenticeship)\)/i.test(
+          x.title,
+        ),
+    )
+    .map((x) => ({ label: `${x.title} at ${x.org} (${x.dates})`, span: monthRange(x.dates) }))
+    .filter((r): r is { label: string; span: { from: number; to: number } } => r.span !== null);
+
+  const clashes: string[] = [];
+  for (let i = 0; i < roles.length; i += 1) {
+    for (let j = i + 1; j < roles.length; j += 1) {
+      const a = roles[i].span;
+      const b = roles[j].span;
+      if (a.from < b.to && b.from < a.to) clashes.push(`  - ${roles[i].label} and ${roles[j].label}`);
+    }
+  }
+
+  if (!clashes.length) {
+    return 'Overlapping dates: none that need raising. Do not mention overlaps, concurrency, or job types in your warnings.';
+  }
+
+  return [
+    'Overlapping dates: these pairs both read as full-time and genuinely run at the same time. Raise this once:',
+    ...clashes,
+  ].join('\n');
+}
+
 /** One call. Cheap and short — this runs whenever a resume changes. */
 export async function polishResume(
   userId: string,
@@ -305,7 +377,11 @@ export async function polishResume(
         'Their education:',
         structure.education.map((e) => `- ${e.degree} at ${e.school}, ${e.location}, ${e.dates}`).join('\n') || '(none)',
         '',
-        'Their experience. Read the bullets for spelling only — you cannot rewrite them:',
+        `Today is ${new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long' })}. Nothing dated before that is in the future.`,
+        '',
+        overlapNote(structure),
+        '',
+        'Their experience. Read the bullets for spelling only — you cannot rewrite them.',
         structure.experience
           .map((x) =>
             [`- ${x.title} at ${x.org}, ${x.location}, ${x.dates}`, ...x.bullets.map((b) => `    ${b}`)].join('\n'),

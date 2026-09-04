@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { db } from './client';
 import type { ResumeStructure } from '../../lib/types';
+import { splitEmployment } from '../../lib/employment';
 import {
   applications,
   documents,
@@ -544,6 +545,42 @@ export async function applyCorrectionsToEntries(
  * loop above — which meant a misspelled skill was carried through the grouping
  * and printed exactly as typed.
  */
+/**
+ * Moves a job type out of a title and into the chip that owns it.
+ *
+ * People write "Operations & Client Engagement (Full-Time)" because a resume
+ * has nowhere else to put it. Here there is somewhere else, so the title
+ * becomes just the title and the chip carries the type — and the chip wins when
+ * the two disagree, since it is the field that exists for the purpose.
+ */
+export async function normaliseEmploymentTitles(userId: string): Promise<number> {
+  const rows = await db
+    .select()
+    .from(profileEntries)
+    .where(and(eq(profileEntries.userId, userId), eq(profileEntries.kind, 'experience')));
+
+  let changed = 0;
+  for (const row of rows) {
+    if (!row.title) continue;
+    const { title, employment } = splitEmployment(row.title);
+    if (title === row.title) continue;
+
+    const extra = (row.extra as Record<string, string> | null) ?? {};
+    await db
+      .update(profileEntries)
+      .set({
+        title,
+        // Only filled in when empty. A chip that was set deliberately is not
+        // overruled by something typed into a title.
+        extra: extra.employment ? extra : { ...extra, ...(employment ? { employment } : {}) },
+        updatedAt: new Date(),
+      })
+      .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, row.id)));
+    changed += 1;
+  }
+  return changed;
+}
+
 export async function applyCorrectionsToSkillFacts(
   userId: string,
   corrections: { from: string; to: string }[],

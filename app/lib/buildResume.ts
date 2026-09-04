@@ -1,4 +1,5 @@
 import { formatDates, formatPhone, formatPlace, formatWebsite, recencyKey } from './entryFormat';
+import { titleWithEmployment } from './employment';
 import type { ProfileEntry, ResumeStructure } from './types';
 
 /**
@@ -183,7 +184,10 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
       bullets: e.bullets ?? [],
     })),
     experience: byKind('experience').map((e) => ({
-      title: clean(e.title),
+      // "(Part-time)" earns its place by being rare — it explains why two roles
+      // overlap, or why a stint was short. "(Full-time)" on every entry is what
+      // a reader already assumed and makes the page look generated.
+      title: titleWithEmployment(clean(e.title), e.extra?.employment),
       org: clean(e.org),
       location: formatPlace(placeOf(e), e.location, home),
       dates: formatDates(datesOf(e), 'experience', e.datesDisplay),

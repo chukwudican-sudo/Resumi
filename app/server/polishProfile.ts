@@ -5,6 +5,7 @@ import type { ResumeStructure } from '../lib/types';
 import {
   applyCorrectionsToEntries,
   applyCorrectionsToSkillFacts,
+  normaliseEmploymentTitles,
   getProfile,
   getResumeInputs,
   getUser,
@@ -30,6 +31,7 @@ export async function runPolish(
   await Promise.all([
     applyCorrectionsToEntries(userId, polish.corrections),
     applyCorrectionsToSkillFacts(userId, polish.corrections),
+    normaliseEmploymentTitles(userId),
   ]);
 
   const { entryRows, factRows } = await getResumeInputs(userId);

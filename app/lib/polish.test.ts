@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { applyPolish, validatePolish, type PolishResult } from './polish';
+import { applyPolish, overlapNote, validatePolish, type PolishResult } from './polish';
 import type { ResumeStructure } from './types';
 
 const SOURCE_SKILLS = [
@@ -225,4 +225,71 @@ test('an entirely empty response still produces something renderable', () => {
   assert.deepEqual(result.corrections, []);
   assert.deepEqual(result.skillGroups, []);
   assert.equal(result.sections.length, 4, 'the conventional order stands in');
+});
+
+function withRoles(roles: { title: string; org: string; dates: string }[]): ResumeStructure {
+  return {
+    name: 'X', contact: {}, education: [], projects: [], skills: [],
+    experience: roles.map((r) => ({ ...r, location: '', bullets: ['did a thing'] })),
+  };
+}
+
+test('roles that do not overlap are not reported as overlapping', () => {
+  // The model claimed May 2025 – Aug 2026 overlapped Jun 2024 – Jan 2025. It
+  // does not. Date comparison should not be a judgement call.
+  const note = overlapNote(
+    withRoles([
+      { title: 'Wealth Manager', org: 'Aegon', dates: 'May 2025 – Aug 2026' },
+      { title: 'Operations Specialist', org: 'WesternBell', dates: 'Jun 2024 – Jan 2025' },
+    ]),
+  );
+  assert.match(note, /none that need raising/);
+});
+
+test('two full-time roles at the same time are reported', () => {
+  const note = overlapNote(
+    withRoles([
+      { title: 'Engineer', org: 'A', dates: 'Jan 2024 – Dec 2025' },
+      { title: 'Analyst', org: 'B', dates: 'Jun 2024 – Mar 2025' },
+    ]),
+  );
+  assert.match(note, /Raise this once/);
+  assert.match(note, /Engineer at A/);
+});
+
+test('an overlap the page already explains is not reported', () => {
+  // This is the whole point: holding a part-time job alongside a full-time one
+  // is ordinary, and the resume has already said so.
+  const note = overlapNote(
+    withRoles([
+      { title: 'Wealth Manager', org: 'Aegon', dates: 'May 2025 – Aug 2026' },
+      { title: 'Software Engineer (Part-time)', org: 'Droady', dates: 'Nov 2025 – May 2026' },
+    ]),
+  );
+  assert.match(note, /none that need raising/);
+});
+
+test('a role still running counts as overlapping what follows it', () => {
+  const note = overlapNote(
+    withRoles([
+      { title: 'Engineer', org: 'A', dates: 'Jan 2024 – Present' },
+      { title: 'Analyst', org: 'B', dates: 'Jun 2025 – Dec 2025' },
+    ]),
+  );
+  assert.match(note, /Raise this once/);
+});
+
+test('a year with no month still compares', () => {
+  const note = overlapNote(
+    withRoles([
+      { title: 'Engineer', org: 'A', dates: '2023 – 2026' },
+      { title: 'Analyst', org: 'B', dates: '2024 – 2025' },
+    ]),
+  );
+  assert.match(note, /Raise this once/);
+});
+
+test('one role cannot overlap itself', () => {
+  const note = overlapNote(withRoles([{ title: 'Engineer', org: 'A', dates: 'Jan 2024 – Dec 2025' }]));
+  assert.match(note, /none that need raising/);
 });
