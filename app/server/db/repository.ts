@@ -463,6 +463,54 @@ export async function upsertEntry(
   return id;
 }
 
+/**
+ * Applies spelling corrections to the entries themselves.
+ *
+ * The correction has to land on the data, not on the rendered resume. Fixing
+ * "San Fransisco" in the generated PDF leaves the Experience entry still
+ * spelling it wrong, and the resume is rebuilt from those entries on the next
+ * save — so the typo comes back, and it was never fixed anywhere it mattered.
+ *
+ * Whole words only. A substring replace would turn a correction of "ap" into
+ * damage spread across every field that happens to contain those letters.
+ */
+export async function applyCorrectionsToEntries(
+  userId: string,
+  corrections: { from: string; to: string }[],
+): Promise<number> {
+  if (!corrections.length) return 0;
+
+  const rows = await db.select().from(profileEntries).where(eq(profileEntries.userId, userId));
+  const fields = ['title', 'org', 'location', 'city', 'region', 'country'] as const;
+  let changed = 0;
+
+  for (const row of rows) {
+    const patch: Partial<Record<(typeof fields)[number], string>> = {};
+
+    for (const field of fields) {
+      const before = row[field];
+      if (!before) continue;
+      let after = before;
+      for (const c of corrections) {
+        // Escaped: a correction is user-adjacent text, not a pattern.
+        const pattern = new RegExp(`\\b${c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+        after = after.replace(pattern, c.to);
+      }
+      if (after !== before) patch[field] = after;
+    }
+
+    if (Object.keys(patch).length) {
+      await db
+        .update(profileEntries)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, row.id)));
+      changed += 1;
+    }
+  }
+
+  return changed;
+}
+
 export async function deleteEntry(userId: string, entryId: string) {
   await db
     .delete(profileEntries)

@@ -111,6 +111,17 @@ test('a rewrite dressed as a correction is refused', () => {
   assert.deepEqual(result.corrections, []);
 });
 
+test('a correction must be a whole word, so it cannot damage a longer one', () => {
+  // The write-back replaces on word boundaries. Without that, correcting "ap"
+  // would rewrite "app", "apply" and "apparent" everywhere in someone's data.
+  const replace = (text: string, from: string, to: string) =>
+    text.replace(new RegExp(`\\b${from}\\b`, 'g'), to);
+
+  assert.equal(replace('Built the app for Apple', 'ap', 'app'), 'Built the app for Apple');
+  assert.equal(replace('San Fransisco, CA', 'San Fransisco', 'San Francisco'), 'San Francisco, CA');
+  assert.equal(replace('Manger of Operations', 'Manger', 'Manager'), 'Manager of Operations');
+});
+
 test('applying polish never touches a bullet', () => {
   const structure: ResumeStructure = {
     name: 'Chukwudi Ndubuisi',
@@ -139,7 +150,9 @@ test('applying polish never touches a bullet', () => {
 
   assert.deepEqual(applied.experience[0].bullets, structure.experience[0].bullets);
   assert.deepEqual(applied.projects[0].bullets, structure.projects[0].bullets);
-  assert.equal(applied.experience[0].location, 'San Francisco, CA', 'the correction did apply');
+  // Corrections are applied to the entry the text came from, not here, so the
+  // rendered structure passed in is unchanged by them.
+  assert.equal(applied.experience[0].location, 'San Fransisco, CA');
   assert.equal(applied.name, 'Chukwudi Ndubuisi', 'the name is never touched');
   assert.equal(applied.education[0].dates, '2028', 'dates are never touched');
   assert.deepEqual(applied.sections?.map((s) => s.key), ['education', 'projects', 'experience', 'skills']);

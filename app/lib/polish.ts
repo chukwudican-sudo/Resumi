@@ -218,28 +218,21 @@ function editDistance(a: string, b: string): number {
 }
 
 /**
- * Applies the decisions to the resume.
+ * Applies the presentation decisions to the resume.
+ *
+ * Only presentation. Corrections are deliberately not applied here: a typo is
+ * wrong in the person's data, not just in one rendering of it, so it is fixed
+ * on the entry it came from and arrives here through the rebuild. Patching the
+ * output instead left the entry still misspelled and the fix was lost the next
+ * time anything was saved.
  *
  * Pure, so the interesting part is testable without a model. Bullets are copied
  * across untouched — there is nothing in `PolishResult` that could change one.
  */
 export function applyPolish(structure: ResumeStructure, polish: PolishResult): ResumeStructure {
-  const fix = (text: string): string => {
-    for (const c of polish.corrections) {
-      if (text === c.from) return c.to;
-    }
-    return text;
-  };
-
   return {
     ...structure,
-    education: structure.education.map((e) => ({ ...e, school: fix(e.school), location: fix(e.location) })),
-    experience: structure.experience.map((x) => ({
-      ...x,
-      org: fix(x.org),
-      location: fix(x.location),
-      bullets: x.bullets,
-    })),
+    experience: structure.experience.map((x) => ({ ...x, bullets: x.bullets })),
     projects: structure.projects.map((p) => ({ ...p, bullets: p.bullets })),
     skills: polish.skillGroups.length
       ? polish.skillGroups.map((g) => ({ category: g.category, items: g.items.join(', ') }))

@@ -1,7 +1,40 @@
-import { polishResume, type PolishResult } from '../lib/polish';
+import { applyPolish, polishResume, type PolishResult } from '../lib/polish';
+import { buildResume, entryFromRow } from '../lib/buildResume';
 import { profileStrength } from '../lib/profileStrength';
 import type { ResumeStructure } from '../lib/types';
-import { getProfile, getUser, saveMasterResume } from './db/repository';
+import {
+  applyCorrectionsToEntries,
+  getProfile,
+  getResumeInputs,
+  getUser,
+  saveMasterResume,
+} from './db/repository';
+
+/**
+ * Runs the pass and keeps what it decided.
+ *
+ * The order matters. Corrections go to the entries first, then the resume is
+ * rebuilt from those corrected entries, and only then are the presentation
+ * decisions laid on top — so the spelling fix lives in the data where it
+ * survives every future edit, and the grouping lives on the derived resume
+ * where it belongs.
+ */
+export async function runPolish(
+  userId: string,
+  structure: ResumeStructure,
+  locale: string | null,
+): Promise<PolishResult> {
+  const { polish } = await polishResume(userId, structure, locale);
+
+  await applyCorrectionsToEntries(userId, polish.corrections);
+
+  const { entryRows, factRows } = await getResumeInputs(userId);
+  const corrected = buildResume(entryRows.map(entryFromRow), factRows);
+  const applied = applyPolish(corrected, polish);
+
+  await saveMasterResume(userId, applied, profileStrength(applied));
+  return polish;
+}
 
 /**
  * Polishes the master resume, if it needs it.
@@ -29,9 +62,7 @@ export async function polishIfStale(userId: string): Promise<PolishResult | null
   if (!structure?.name) return null;
 
   try {
-    const { polish, applied } = await polishResume(userId, structure, user?.locale ?? null);
-    await saveMasterResume(userId, applied, profileStrength(applied));
-    return polish;
+    return await runPolish(userId, structure, user?.locale ?? null);
   } catch (error) {
     console.error('[Resumi] Automatic polish failed; continuing unpolished.', error);
     return null;

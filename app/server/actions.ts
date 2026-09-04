@@ -20,7 +20,7 @@ import {
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
 import type { ResumeStructure } from '../lib/types';
 import { profileStrength } from '../lib/profileStrength';
-import { polishResume } from '../lib/polish';
+import { runPolish } from './polishProfile';
 import { getProfile, getUser } from './db/repository';
 import { RULE_MAX_LENGTH } from '../lib/rules';
 
@@ -244,8 +244,7 @@ export async function polishMasterResume(): Promise<{
     return { warnings: ['Add your name and at least one entry first.'], corrections: [], sections: [] };
   }
 
-  const { polish, applied } = await polishResume(userId, structure, user?.locale ?? null);
-  await saveMasterResume(userId, applied, profileStrength(applied));
+  const polish = await runPolish(userId, structure, user?.locale ?? null);
 
   revalidatePath('/setup');
   revalidatePath('/profile');
