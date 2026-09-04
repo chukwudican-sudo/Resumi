@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveContactDetails, saveOnboardingGoal } from '../../server/actions';
 import { fileToBase64 } from '../../lib/fileToBase64';
+import { validateContact, validateContactField, type ContactField } from '../../lib/contactValidation';
 import type { ResumeStructure } from '../../lib/types';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -39,10 +40,18 @@ function ContactStep({
   onContinue: () => void;
   pending: boolean;
 }) {
+  // Shown only after a field has been left, and pressing Continue reveals them
+  // all — the same behaviour as the contact form in /setup, because it is the
+  // same information and the two disagreeing is how someone gets past
+  // onboarding with a phone number that will be rejected later.
+  const [touched, setTouched] = useState<Partial<Record<ContactField, boolean>>>({});
+  const problems = validateContact(contact as unknown as Record<ContactField, string>);
+  const visible = (key: ContactField) => (touched[key] ? problems[key] : undefined);
+
   const fields: { key: keyof Contact; label: string; placeholder: string; optional?: boolean }[] = [
     { key: 'name', label: 'Name', placeholder: 'Alex Ndubuisi' },
     { key: 'email', label: 'Email', placeholder: 'you@example.com' },
-    { key: 'phone', label: 'Phone', placeholder: '(416) 555-0134', optional: true },
+    { key: 'phone', label: 'Phone', placeholder: '(416) 555-0134' },
     { key: 'location', label: 'Location', placeholder: 'Toronto, ON', optional: true },
     { key: 'linkedin', label: 'LinkedIn', placeholder: 'linkedin.com/in/you', optional: true },
     { key: 'github', label: 'GitHub', placeholder: 'github.com/you', optional: true },
@@ -69,10 +78,22 @@ function ContactStep({
             <input
               type="text"
               value={contact[f.key]}
-              onChange={onChange(f.key)}
+              onChange={(e) => {
+                onChange(f.key)(e);
+                if (touched[f.key] && !validateContactField(f.key, e.target.value)) {
+                  setTouched((t) => ({ ...t, [f.key]: false }));
+                }
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, [f.key]: true }))}
               placeholder={f.placeholder}
-              className="w-full rounded border border-rule-field bg-ground-surface px-4 py-3 text-[15px] text-ink outline-none transition placeholder:text-ink-ghost focus:border-accent"
+              aria-invalid={visible(f.key) ? true : undefined}
+              className={`w-full rounded border bg-ground-surface px-4 py-3 text-[15px] text-ink outline-none transition placeholder:text-ink-ghost ${
+                visible(f.key) ? 'border-flag focus:border-flag' : 'border-rule-field focus:border-accent'
+              }`}
             />
+            {visible(f.key) ? (
+              <span className="text-[12.5px] leading-snug text-flag">{visible(f.key)}</span>
+            ) : null}
           </label>
         ))}
       </div>
@@ -88,7 +109,13 @@ function ContactStep({
         </button>
         <button
           type="button"
-          onClick={onContinue}
+          onClick={() => {
+            if (Object.keys(problems).length) {
+              setTouched(Object.fromEntries(fields.map((f) => [f.key, true])));
+              return;
+            }
+            onContinue();
+          }}
           disabled={pending}
           className="rounded bg-accent px-8 py-3.5 text-[15px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-60"
         >
