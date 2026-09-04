@@ -53,9 +53,11 @@ WHAT YOU DECIDE
 
    You are proofreading, not editing. You cannot rewrite a bullet, reword it, shorten it, or improve it, and an attempt to do so through this field will be discarded. If a sentence is clumsy, that is not yours to fix.
 
+   Check the well-known names carefully. Universities, companies, cities, awards and honours are things you know the spelling of — "Dean Listst" is "Dean's List", "Univeristy" is "University". A misspelled award is more embarrassing than a misspelled ordinary word, because it is the part someone was proud enough to include.
+
    Leave alone, always:
    - technical terms, libraries, tools and product names — pytest, matplotlib, RevenueCat, PostgreSQL, MealApp, FraudWatch. A spellchecker flags all of these and every "fix" would be damage.
-   - anything you are not confident is an error. Half the words on a resume are unusual on purpose.
+   - names you do not recognise. An unfamiliar company or product is far likelier to be spelled correctly than to be a typo you can fix.
    - numbers, dates, job titles, degrees, and people's names.
    - British or Canadian spellings when that is the person's convention. "organisation" is not a typo.
 
@@ -109,7 +111,8 @@ const POLISH_TOOL: Anthropic.Tool = {
       },
       corrections: {
         type: 'array',
-        description: 'Clear factual errors in short fields. Empty when there are none — that is the normal case.',
+        description:
+          'Every misspelling you found, anywhere in the resume — bullets, titles, companies, schools, awards, skills. Read all of it before deciding there are none.',
         items: {
           type: 'object',
           properties: {
@@ -374,8 +377,18 @@ export async function polishResume(
         'Their skills, as they entered them:',
         sourceSkills || '(none listed)',
         '',
-        'Their education:',
-        structure.education.map((e) => `- ${e.degree} at ${e.school}, ${e.location}, ${e.dates}`).join('\n') || '(none)',
+        'Their education, field by field:',
+        structure.education
+          .map((e) =>
+            [
+              `- School: ${e.school}`,
+              `  Degree: ${e.degree}`,
+              `  Where: ${e.location}`,
+              `  When: ${e.dates}`,
+              ...(e.bullets ?? []).map((b) => `  Also: ${b}`),
+            ].join('\n'),
+          )
+          .join('\n') || '(none)',
         '',
         `Today is ${new Date().toLocaleDateString('en-CA', { year: 'numeric', month: 'long' })}. Nothing dated before that is in the future.`,
         '',
@@ -398,7 +411,11 @@ export async function polishResume(
           )
           .join('\n') || '(none)',
         '',
-        'Decide the skill groups, the section order and names, any clear corrections, and any warnings.',
+        'Now, in this order.',
+        '1. Proofread. Go back over every line above — skills, school, degree, awards, job titles, companies, and every bullet — and list each misspelling you find as a correction. Do this before anything else; it is the part most easily skipped.',
+        '2. Group and name the skills.',
+        '3. Decide the section order and names.',
+        '4. Write the warnings.',
       ].join('\n'),
     },
   ];

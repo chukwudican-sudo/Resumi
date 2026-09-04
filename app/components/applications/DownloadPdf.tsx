@@ -15,6 +15,7 @@ import { polishMasterResume } from '../../server/actions';
 export default function DownloadPdf({
   applicationId,
   polishFirst = false,
+  disabled = false,
 }: {
   applicationId?: string;
   /**
@@ -27,6 +28,8 @@ export default function DownloadPdf({
    * telling them is not a thing to do quietly.
    */
   polishFirst?: boolean;
+  /** Held shut while a form has unsaved changes that a polish would undo. */
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [state, setState] = useState<'idle' | 'working' | 'error'>('idle');
@@ -96,7 +99,7 @@ export default function DownloadPdf({
       <button
         type="button"
         onClick={download}
-        disabled={state === 'working'}
+        disabled={state === 'working' || disabled}
         className="flex items-center gap-2 rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-50"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

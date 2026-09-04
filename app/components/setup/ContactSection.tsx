@@ -35,11 +35,13 @@ export default function ContactSection({
   onChange,
   onSaved,
   onNext,
+  onDirty,
 }: {
   contact: Contact;
   onChange: (c: Contact) => void;
   onSaved: () => void;
   onNext: () => void;
+  onDirty: (dirty: boolean) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -62,6 +64,7 @@ export default function ContactSection({
       await saveContactAndRefresh(contact);
       onSaved();
       setSaved(true);
+      onDirty(false);
       if (andContinue) onNext();
     });
   }
@@ -87,6 +90,7 @@ export default function ContactSection({
               value={contact[f.key]}
               onChange={(e) => {
                 setSaved(false);
+                onDirty(true);
                 onChange({ ...contact, [f.key]: e.target.value });
                 // Once a message is on screen it clears the moment it stops
                 // being true, rather than waiting for another blur.

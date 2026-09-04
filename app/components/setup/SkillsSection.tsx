@@ -13,9 +13,11 @@ const SUGGESTED = ['Languages', 'Frameworks', 'Tools', 'Databases', 'Cloud'];
 export default function SkillsSection({
   groups,
   onSaved,
+  onDirty,
 }: {
   groups: SkillGroup[];
   onSaved: () => void;
+  onDirty: (dirty: boolean) => void;
 }) {
   const [rows, setRows] = useState<SkillGroup[]>(
     groups.length ? groups : [{ category: 'Languages', items: '' }],
@@ -23,12 +25,21 @@ export default function SkillsSection({
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
 
+  // Wrapped rather than reported at each call site: there are five ways to edit
+  // this list and remembering at each of them is how one gets missed.
+  const edit = (next: SkillGroup[]) => {
+    setSaved(false);
+    onDirty(true);
+    edit(next);
+  };
+
   function save() {
     startTransition(async () => {
       const clean = rows.filter((r) => r.items.trim());
       await saveSkills(clean);
       onSaved();
       setSaved(true);
+      onDirty(false);
     });
   }
 
@@ -49,7 +60,7 @@ export default function SkillsSection({
               onChange={(e) => {
                 const next = [...rows];
                 next[i] = { ...row, category: e.target.value };
-                setRows(next);
+                edit(next);
                 setSaved(false);
               }}
               placeholder="Languages"
@@ -61,7 +72,7 @@ export default function SkillsSection({
               onChange={(e) => {
                 const next = [...rows];
                 next[i] = { ...row, items: e.target.value };
-                setRows(next);
+                edit(next);
                 setSaved(false);
               }}
               placeholder="Python, TypeScript, SQL"
@@ -70,7 +81,7 @@ export default function SkillsSection({
             {rows.length > 1 ? (
               <button
                 type="button"
-                onClick={() => setRows(rows.filter((_, j) => j !== i))}
+                onClick={() => edit(rows.filter((_, j) => j !== i))}
                 className="pt-3 text-ink-ghost transition hover:text-flag"
                 aria-label="Remove group"
               >
@@ -86,7 +97,7 @@ export default function SkillsSection({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => setRows([...rows, { category: '', items: '' }])}
+          onClick={() => edit([...rows, { category: '', items: '' }])}
           className="text-[13.5px] text-accent transition hover:text-accent-hover"
         >
           + Add a group
@@ -96,7 +107,7 @@ export default function SkillsSection({
           <button
             key={s}
             type="button"
-            onClick={() => setRows([...rows, { category: s, items: '' }])}
+            onClick={() => edit([...rows, { category: s, items: '' }])}
             className="rounded-full border border-rule-field px-2.5 py-1 text-[12px] text-ink-muted transition hover:border-accent hover:text-accent"
           >
             {s}

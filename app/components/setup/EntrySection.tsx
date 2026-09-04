@@ -32,11 +32,14 @@ export default function EntrySection({
   entries,
   onChange,
   onNext,
+  onDirty,
 }: {
   kind: Kind;
   entries: EntryWithBullets[];
   onChange: () => void;
   onNext: () => void;
+  /** True while an entry is open for editing and its changes are unsaved. */
+  onDirty: (dirty: boolean) => void;
 }) {
   const copy = COPY[kind];
   const mine = entries.filter((e) => e.kind === kind).sort((a, b) => a.orderIndex - b.orderIndex);
@@ -44,6 +47,7 @@ export default function EntrySection({
   const [pending, startTransition] = useTransition();
 
   function open(entry?: EntryWithBullets) {
+    onDirty(true);
     if (!entry) {
       setEditing(blankEntry(kind));
       return;
@@ -86,8 +90,8 @@ export default function EntrySection({
       <EntryEditor
         kind={kind}
         entry={editing}
-        onCancel={() => setEditing(null)}
-        onSaved={() => { setEditing(null); onChange(); }}
+        onCancel={() => { setEditing(null); onDirty(false); }}
+        onSaved={() => { setEditing(null); onDirty(false); onChange(); }}
       />
     );
   }

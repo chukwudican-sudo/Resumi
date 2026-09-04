@@ -38,6 +38,12 @@ export default function SetupShell({
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('contact');
   const [contact, setContact] = useState(initialContact);
+
+  // Polishing reads the database and writes corrections back to it, while an
+  // open form holds its own copy in memory. Saving that copy afterwards puts
+  // the old text back and the correction disappears — so the two are not
+  // allowed to happen at once.
+  const [dirty, setDirty] = useState(false);
   const [, startTransition] = useTransition();
 
   // Entries and facts come straight from props rather than being copied into
@@ -87,8 +93,11 @@ export default function SetupShell({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of 5 sections</span>
-          {usable ? <PolishButton stale={stale} /> : null}
-          {usable ? <DownloadPdf polishFirst={stale} /> : null}
+          {dirty ? (
+            <span className="text-[12.5px] text-ink-faint">Save or cancel first</span>
+          ) : null}
+          {usable ? <PolishButton stale={stale} disabled={dirty} /> : null}
+          {usable ? <DownloadPdf polishFirst={stale} disabled={dirty} /> : null}
           <Link
             href="/applications"
             className="rounded bg-accent px-5 py-2.5 text-sm font-medium text-ground transition hover:bg-accent-hover"
@@ -106,7 +115,7 @@ export default function SetupShell({
               <button
                 key={s.key}
                 type="button"
-                onClick={() => setSection(s.key)}
+                onClick={() => { setDirty(false); setSection(s.key); }}
                 className={`flex shrink-0 items-center gap-3 rounded-md px-3 py-2.5 text-left transition lg:w-full ${
                   section === s.key ? 'bg-accent-tint' : 'hover:bg-ground-panel'
                 }`}
@@ -142,11 +151,13 @@ export default function SetupShell({
                 onChange={setContact}
                 onSaved={afterSave}
                 onNext={() => setSection('experience')}
+                onDirty={setDirty}
               />
             ) : section === 'skills' ? (
               <SkillsSection
                 groups={skillGroups}
                 onSaved={afterSave}
+                onDirty={setDirty}
               />
             ) : (
               <EntrySection
@@ -156,6 +167,7 @@ export default function SetupShell({
                 onNext={() =>
                   setSection(section === 'experience' ? 'education' : section === 'education' ? 'projects' : 'skills')
                 }
+                onDirty={setDirty}
               />
             )}
           </div>

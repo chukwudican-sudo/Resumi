@@ -13,7 +13,13 @@ import { polishMasterResume } from '../../server/actions';
  * resume you had already sent. So it reports back: what it fixed, and what it
  * thinks is still weak.
  */
-export default function PolishButton({ stale }: { stale: boolean }) {
+export default function PolishButton({
+  stale,
+  disabled = false,
+}: {
+  stale: boolean;
+  disabled?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{
@@ -43,7 +49,7 @@ export default function PolishButton({ stale }: { stale: boolean }) {
       <button
         type="button"
         onClick={run}
-        disabled={pending}
+        disabled={pending || disabled}
         className={`flex items-center gap-2 rounded px-4 py-2 text-[13px] transition disabled:opacity-50 ${
           stale
             ? 'bg-accent font-medium text-ground hover:bg-accent-hover'
