@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { polishMasterResume } from '../../server/actions';
 
 /**
  * Gets the PDF onto someone's machine.
@@ -10,16 +12,44 @@ import { useState } from 'react';
  * whatever came back. What returns here is a finished PDF and a filename the
  * server chose, so the name is right without the client knowing the rule.
  */
-export default function DownloadPdf({ applicationId }: { applicationId?: string }) {
+export default function DownloadPdf({
+  applicationId,
+  polishFirst = false,
+}: {
+  applicationId?: string;
+  /**
+   * Polish before handing the file over.
+   *
+   * Set when the master resume has unpolished edits. The label changes to say
+   * so, because a button that silently regroups your skills on the way to a
+   * download is a button that surprises you after you have sent the thing.
+   */
+  polishFirst?: boolean;
+}) {
+  const router = useRouter();
   const [state, setState] = useState<'idle' | 'working' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [blocking, setBlocking] = useState<{ message: string }[]>([]);
+  const [polishNote, setPolishNote] = useState<string | null>(null);
 
   async function download() {
     setState('working');
     setMessage(null);
     setBlocking([]);
+    setPolishNote(null);
     try {
+      if (polishFirst) {
+        const outcome = await polishMasterResume();
+        const parts = [
+          outcome.corrections.length
+            ? `${outcome.corrections.length} correction${outcome.corrections.length === 1 ? '' : 's'}`
+            : null,
+          'skills grouped and sections ordered',
+        ].filter(Boolean);
+        setPolishNote(`Polished first \u2014 ${parts.join(', ')}.`);
+        router.refresh();
+      }
+
       const response = await fetch('/api/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,8 +100,20 @@ export default function DownloadPdf({ applicationId }: { applicationId?: string 
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
         </svg>
-        {state === 'working' ? 'Building…' : 'Download PDF'}
+        {state === 'working'
+          ? polishFirst
+            ? 'Polishing…'
+            : 'Building…'
+          : polishFirst
+            ? 'Polish & download'
+            : 'Download PDF'}
       </button>
+
+      {polishNote && !blocking.length ? (
+        <span className="max-w-[220px] text-right text-[12px] leading-snug text-ink-muted">
+          {polishNote}
+        </span>
+      ) : null}
 
       {blocking.length ? (
         <div className="absolute right-0 top-full z-50 mt-2 w-[360px] rounded-lg border border-flag/40 bg-ground-surface p-4 text-left shadow-xl shadow-ink/10">

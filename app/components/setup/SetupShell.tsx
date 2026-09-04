@@ -88,7 +88,7 @@ export default function SetupShell({
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of 5 sections</span>
           {usable ? <PolishButton stale={stale} /> : null}
-          {usable ? <DownloadPdf /> : null}
+          {usable ? <DownloadPdf polishFirst={stale} /> : null}
           <Link
             href="/applications"
             className="rounded bg-accent px-5 py-2.5 text-sm font-medium text-ground transition hover:bg-accent-hover"

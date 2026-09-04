@@ -4,6 +4,7 @@ import { NoToolUseError, callClaude } from '../../../../lib/anthropic';
 import { TAILOR_INVARIANT, buildUserContext } from '../../../../lib/systemPrompt';
 import type { ResumeStructure } from '../../../../lib/types';
 import { requireUserId } from '../../../../server/auth';
+import { polishIfStale } from '../../../../server/polishProfile';
 import {
   getActiveRules,
   getUser,
@@ -35,6 +36,11 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!process.env.ANTHROPIC_API_KEY) {
     return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 500);
   }
+
+  // Tailoring reads the master resume, so it should read the good version of
+  // it. Feeding the model "Uses Python for backend algorithm work" as a skill
+  // wastes the call it is about to make.
+  const polished = await polishIfStale(userId);
 
   const [record, profile, rules, user] = await Promise.all([
     getApplication(userId, params.id),
@@ -101,7 +107,14 @@ export async function POST(_request: Request, { params }: { params: { id: string
       estimatedPages: toolInput.estimatedPages ?? null,
     });
 
-    return NextResponse.json({ resumeId, creditsLeft: remaining });
+    // Said out loud rather than done quietly: polishing regroups skills and
+    // can reorder sections, and finding that out from a resume you already
+    // sent is worse than being told now.
+    return NextResponse.json({
+      resumeId,
+      creditsLeft: remaining,
+      polished: polished ? { corrections: polished.corrections, warnings: polished.warnings } : null,
+    });
   } catch (error) {
     const refused = capacityResponse(error);
     if (refused) return refused;
