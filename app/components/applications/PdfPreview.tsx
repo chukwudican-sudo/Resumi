@@ -90,14 +90,17 @@ export default function PdfPreview({
   }
 
   return (
-    <div className="relative w-full max-w-[640px] flex-grow">
+    <div className="relative w-full max-w-[640px]">
       {url ? (
         <iframe
           // Hides the viewer's own toolbar where the browser honours it. Chrome
           // and Edge do; Firefox and Safari ignore it and show their own.
           src={`${url}#toolbar=0&navpanes=0&view=FitH`}
           title="Your resume"
-          className="h-full min-h-[840px] w-full rounded border border-rule-field bg-white shadow-[0_2px_20px_rgba(26,24,21,0.06)]"
+          // Shaped like the page it holds. The viewer fills whatever space is
+          // left over with its own grey, so an iframe taller than a Letter
+          // page puts a slab of browser chrome under the resume.
+          className="aspect-[8.5/11] w-full rounded border border-rule-field bg-white shadow-[0_2px_20px_rgba(26,24,21,0.06)]"
         />
       ) : null}
 
