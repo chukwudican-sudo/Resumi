@@ -47,7 +47,17 @@ WHAT YOU DECIDE
 
    Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section.
 
-3. CORRECTIONS. Propose fixes for clear errors in short factual fields — a misspelled city or company name ("San Fransisco"), an inconsistent capitalisation. Only propose a correction you are confident is an error, and only a small one. Never "correct" a job title, a degree, a date, or anything you merely find stylistically unappealing. If you are not sure it is a typo, leave it.
+3. CORRECTIONS. Misspellings, anywhere in what you were given — including inside the bullets.
+
+   A correction is ONE WORD, or a short phrase that is a name. "recieve" -> "receive". "San Fransisco" -> "San Francisco". "Manger" -> "Manager". The word you give is replaced everywhere it appears, so give the word, not the sentence around it.
+
+   You are proofreading, not editing. You cannot rewrite a bullet, reword it, shorten it, or improve it, and an attempt to do so through this field will be discarded. If a sentence is clumsy, that is not yours to fix.
+
+   Leave alone, always:
+   - technical terms, libraries, tools and product names — pytest, matplotlib, RevenueCat, PostgreSQL, MealApp, FraudWatch. A spellchecker flags all of these and every "fix" would be damage.
+   - anything you are not confident is an error. Half the words on a resume are unusual on purpose.
+   - numbers, dates, job titles, degrees, and people's names.
+   - British or Canadian spellings when that is the person's convention. "organisation" is not a typo.
 
 4. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
 
@@ -185,14 +195,25 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
     ...DEFAULT_SECTIONS.filter((d) => !byKey.has(d.key)),
   ];
 
-  // A correction should be a correction. Anything that replaces most of the
-  // field is a rewrite, and rewrites are not what this pass is for.
+  // A correction is a word, not a sentence.
+  //
+  // These are replaced throughout the person's stored entries, bullets
+  // included, so the bar is deliberately higher than "looks plausible". Too
+  // short and a replacement lands inside unrelated words; too long and it stops
+  // being a spelling fix and becomes an edit of what somebody wrote about their
+  // own work, which is not what this pass is allowed to do.
   const corrections = (raw.corrections ?? []).filter((c) => {
     const from = c.from?.trim();
     const to = c.to?.trim();
     if (!from || !to || from === to) return false;
-    if (from.length > 80) return false;
-    return editDistance(from.toLowerCase(), to.toLowerCase()) <= Math.max(2, Math.floor(from.length * 0.25));
+    if (from.length < 3 || from.length > 40) return false;
+    // A word or a short name — never a clause.
+    if (from.split(/\s+/).length > 4) return false;
+    // Two edits for an ordinary word, because the commonest typo of all is a
+    // pair of swapped letters and plain edit distance scores that as two, not
+    // one. Three only for something long enough that two would be miserly.
+    const allowed = from.length <= 4 ? 1 : from.length <= 12 ? 2 : 3;
+    return editDistance(from.toLowerCase(), to.toLowerCase()) <= allowed;
   });
 
   return { skillGroups, sections, corrections, warnings: raw.warnings ?? [] };
@@ -261,14 +282,21 @@ export async function polishResume(
         'Their education:',
         structure.education.map((e) => `- ${e.degree} at ${e.school}, ${e.location}, ${e.dates}`).join('\n') || '(none)',
         '',
-        'Their experience (bullet counts only — the text is not yours to change):',
+        'Their experience. Read the bullets for spelling only — you cannot rewrite them:',
         structure.experience
-          .map((x) => `- ${x.title} at ${x.org}, ${x.location}, ${x.dates} — ${x.bullets.length} bullet(s)`)
+          .map((x) =>
+            [`- ${x.title} at ${x.org}, ${x.location}, ${x.dates}`, ...x.bullets.map((b) => `    ${b}`)].join('\n'),
+          )
           .join('\n') || '(none)',
         '',
         'Their projects:',
         structure.projects
-          .map((p) => `- ${p.name} (${p.tech || 'no stack listed'}), ${p.dates} — ${p.bullets.length} bullet(s)`)
+          .map((p) =>
+            [
+              `- ${p.name} (${p.tech || 'no stack listed'}), ${p.dates}`,
+              ...p.bullets.map((b) => `    ${b}`),
+            ].join('\n'),
+          )
           .join('\n') || '(none)',
         '',
         'Decide the skill groups, the section order and names, any clear corrections, and any warnings.',

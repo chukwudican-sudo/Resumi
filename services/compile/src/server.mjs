@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, createHash } from 'node:crypto';
 
 const run = promisify(execFile);
 
@@ -39,6 +39,37 @@ function authorised(header) {
   const a = Buffer.from(given);
   const b = Buffer.from(TOKEN);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Compiled PDFs, keyed by a hash of the LaTeX that produced them.
+ *
+ * The same resume compiles to the same bytes every time, and a resume is looked
+ * at far more often than it is edited — opening the page, switching tabs,
+ * coming back tomorrow. Without this, each of those is a second or two of CPU
+ * spent producing a file we already had.
+ *
+ * In memory and capped. A restart loses it, which costs one recompile, and
+ * bounding it matters more than keeping it: this machine has 1GB and a resume
+ * is ~35KB, so an unbounded map is a slow memory leak with a deadline.
+ */
+const CACHE_MAX = Number(process.env.COMPILE_CACHE_MAX || 200);
+const cache = new Map();
+
+function remember(key, pdf) {
+  // Oldest out first. Map keeps insertion order, so the first key is the least
+  // recently added.
+  if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);
+  cache.set(key, pdf);
+}
+
+function recall(key) {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  // Re-inserted so that what is being used stays, and what is not falls off.
+  cache.delete(key);
+  cache.set(key, hit);
+  return hit;
 }
 
 // One compile at a time per machine. Unbounded concurrency turns a slow
@@ -100,10 +131,27 @@ const server = createServer((req, res) => {
     }
     if (typeof latex !== 'string' || !latex.trim()) return json(400, { error: 'Missing "latex"' });
 
+    const key = createHash('sha256').update(latex).digest('hex');
+    const cached = recall(key);
+    if (cached) {
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(cached.length),
+        'X-Compile-Cache': 'hit',
+      });
+      res.end(cached);
+      return;
+    }
+
     inFlight += 1;
     try {
       const pdf = await compile(latex);
-      res.writeHead(200, { 'Content-Type': 'application/pdf', 'Content-Length': String(pdf.length) });
+      remember(key, pdf);
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(pdf.length),
+        'X-Compile-Cache': 'miss',
+      });
       res.end(pdf);
     } catch (err) {
       // The log stays here; the caller gets a status. A TeX trace is internal.

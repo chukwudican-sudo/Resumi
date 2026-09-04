@@ -111,6 +111,28 @@ test('a rewrite dressed as a correction is refused', () => {
   assert.deepEqual(result.corrections, []);
 });
 
+test('a correction is a word, not a sentence', () => {
+  const kept = (c: { from: string; to: string }) =>
+    validatePolish(polish({ corrections: [{ ...c, reason: 'spelling' }] }), SOURCE_SKILLS).corrections.length === 1;
+
+  // Real typos, of the kind that actually appear on a resume.
+  assert.ok(kept({ from: 'recieve', to: 'receive' }));
+  assert.ok(kept({ from: 'Manger', to: 'Manager' }));
+  assert.ok(kept({ from: 'San Fransisco', to: 'San Francisco' }));
+
+  // Too short to replace safely — "ap" appears inside dozens of ordinary words.
+  assert.ok(!kept({ from: 'ap', to: 'app' }));
+
+  // A whole clause is an edit of what somebody wrote, wearing a typo's clothes.
+  assert.ok(
+    !kept({
+      from: 'supporting design, build, and pre-launch integration',
+      to: 'supporting design, build and launch integration',
+    }),
+  );
+  assert.ok(!kept({ from: 'Contributed to the billing work', to: 'Led the billing work' }));
+});
+
 test('a correction must be a whole word, so it cannot damage a longer one', () => {
   // The write-back replaces on word boundaries. Without that, correcting "ap"
   // would rewrite "app", "apply" and "apparent" everywhere in someone's data.

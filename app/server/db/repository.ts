@@ -482,22 +482,33 @@ export async function applyCorrectionsToEntries(
 
   const rows = await db.select().from(profileEntries).where(eq(profileEntries.userId, userId));
   const fields = ['title', 'org', 'location', 'city', 'region', 'country'] as const;
+
+  // Built once rather than per field per row, and escaped because a correction
+  // is text somebody typed, not a pattern we wrote.
+  const patterns = corrections.map((c) => ({
+    pattern: new RegExp(`\\b${c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'),
+    to: c.to,
+  }));
+  const fix = (text: string) => patterns.reduce((acc, p) => acc.replace(p.pattern, p.to), text);
+
   let changed = 0;
 
   for (const row of rows) {
-    const patch: Partial<Record<(typeof fields)[number], string>> = {};
+    const patch: Record<string, unknown> = {};
 
     for (const field of fields) {
       const before = row[field];
       if (!before) continue;
-      let after = before;
-      for (const c of corrections) {
-        // Escaped: a correction is user-adjacent text, not a pattern.
-        const pattern = new RegExp(`\\b${c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
-        after = after.replace(pattern, c.to);
-      }
+      const after = fix(before);
       if (after !== before) patch[field] = after;
     }
+
+    // Bullets too. This is where a typo actually lives — a misspelling in a
+    // sentence someone wrote about their own work is far more likely than one
+    // in a company name, and it is the more embarrassing of the two.
+    const bullets = (row.bullets as string[] | null) ?? [];
+    const fixedBullets = bullets.map(fix);
+    if (fixedBullets.some((b, i) => b !== bullets[i])) patch.bullets = fixedBullets;
 
     if (Object.keys(patch).length) {
       await db

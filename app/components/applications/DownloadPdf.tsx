@@ -20,9 +20,11 @@ export default function DownloadPdf({
   /**
    * Polish before handing the file over.
    *
-   * Set when the master resume has unpolished edits. The label changes to say
-   * so, because a button that silently regroups your skills on the way to a
-   * download is a button that surprises you after you have sent the thing.
+   * Set when the master resume has unpolished edits. The button does not
+   * advertise it — polishing is how a resume gets made here, not a separate
+   * feature to be opted into — but it does report afterwards, because it now
+   * corrects the entries themselves and editing someone's stored data without
+   * telling them is not a thing to do quietly.
    */
   polishFirst?: boolean;
 }) {
@@ -100,13 +102,7 @@ export default function DownloadPdf({
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
         </svg>
-        {state === 'working'
-          ? polishFirst
-            ? 'Polishing…'
-            : 'Building…'
-          : polishFirst
-            ? 'Polish & download'
-            : 'Download PDF'}
+        {state === 'working' ? 'Building…' : 'Download PDF'}
       </button>
 
       {polishNote && !blocking.length ? (
