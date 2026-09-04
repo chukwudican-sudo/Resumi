@@ -148,6 +148,21 @@ const DEFAULT_SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'skills', label: 'Technical Skills' },
 ];
 
+/**
+ * Whatever came back, as a list.
+ *
+ * A tool schema describes what a model should return, not what it will. Ask for
+ * an array of warnings and get one warning as a bare string, and every `.map`,
+ * `.filter` and `for...of` downstream throws — three of them here on the
+ * server, one of them in React, in front of somebody who was only adding
+ * skills. Unusual input makes the drift likelier, which means it happens on
+ * exactly the profiles least able to afford it.
+ */
+function asList<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  return [];
+}
+
 /** Loose comparison for checking a term against what was actually provided. */
 function normalise(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9+#]/g, '');
@@ -165,10 +180,12 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
   const haystack = normalise(sourceSkills);
 
   const seen = new Set<string>();
-  const skillGroups = raw.skillGroups
+  const skillGroups = asList<PolishResult['skillGroups'][number]>(raw.skillGroups)
+    .filter((group) => group && typeof group.category === 'string')
     .map((group) => ({
       category: group.category.trim() || 'Skills',
-      items: (group.items ?? [])
+      items: asList<string>(group.items)
+        .filter((item): item is string => typeof item === 'string')
         .map((item) => item.trim())
         .filter((item) => {
           if (!item) return false;
@@ -185,8 +202,8 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
 
   // Every section appears exactly once, whatever came back.
   const byKey = new Map<SectionKey, string>();
-  for (const section of raw.sections ?? []) {
-    if (SECTION_KEYS.includes(section.key) && !byKey.has(section.key)) {
+  for (const section of asList<PolishResult['sections'][number]>(raw.sections)) {
+    if (section && SECTION_KEYS.includes(section.key) && !byKey.has(section.key)) {
       byKey.set(section.key, section.label.trim() || defaultLabel(section.key));
     }
   }
@@ -202,9 +219,10 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
   // short and a replacement lands inside unrelated words; too long and it stops
   // being a spelling fix and becomes an edit of what somebody wrote about their
   // own work, which is not what this pass is allowed to do.
-  const corrections = (raw.corrections ?? []).filter((c) => {
-    const from = c.from?.trim();
-    const to = c.to?.trim();
+  const corrections = asList<PolishResult['corrections'][number]>(raw.corrections).filter((c) => {
+    if (!c || typeof c.from !== 'string' || typeof c.to !== 'string') return false;
+    const from = c.from.trim();
+    const to = c.to.trim();
     if (!from || !to || from === to) return false;
     if (from.length < 3 || from.length > 40) return false;
     // A word or a short name — never a clause.
@@ -216,7 +234,12 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
     return editDistance(from.toLowerCase(), to.toLowerCase()) <= allowed;
   });
 
-  return { skillGroups, sections, corrections, warnings: raw.warnings ?? [] };
+  return {
+    skillGroups,
+    sections,
+    corrections,
+    warnings: asList<string>(raw.warnings).filter((w): w is string => typeof w === 'string' && w.trim() !== ''),
+  };
 }
 
 function defaultLabel(key: SectionKey): string {

@@ -188,3 +188,41 @@ test('an empty grouping leaves the existing skills alone rather than erasing the
   const applied = applyPolish(structure, validatePolish(polish({ skillGroups: [] }), SOURCE_SKILLS));
   assert.deepEqual(applied.skills, [{ category: 'Skills', items: 'Python' }]);
 });
+
+test('a malformed response cannot crash the page', () => {
+  // What the tool schema asks for and what comes back are different things,
+  // especially on unusual input. One warning returned as a bare string used to
+  // reach React and throw "warnings.map is not a function" at someone who was
+  // only adding skills.
+  const wrong = [
+    { warnings: 'Your dates overlap.' },
+    { warnings: null },
+    { warnings: { text: 'nope' } },
+    { skillGroups: 'Languages: Python' },
+    { skillGroups: null },
+    { sections: 'education' },
+    { corrections: 'San Fransisco -> San Francisco' },
+    { corrections: [null, 'nope', { from: 'x' }] },
+    { skillGroups: [{ category: 'Languages', items: 'Python, Java' }] },
+    { skillGroups: [null, { items: ['Python'] }] },
+  ];
+
+  for (const shape of wrong) {
+    const result = validatePolish({ ...polish(), ...shape } as PolishResult, SOURCE_SKILLS);
+    assert.ok(Array.isArray(result.warnings), `warnings not a list for ${JSON.stringify(shape)}`);
+    assert.ok(Array.isArray(result.corrections), `corrections not a list for ${JSON.stringify(shape)}`);
+    assert.ok(Array.isArray(result.skillGroups), `skillGroups not a list for ${JSON.stringify(shape)}`);
+    assert.ok(Array.isArray(result.sections), `sections not a list for ${JSON.stringify(shape)}`);
+    // Every section still accounted for, however mangled the answer was.
+    assert.equal(result.sections.length, 4);
+    for (const g of result.skillGroups) assert.ok(Array.isArray(g.items));
+  }
+});
+
+test('an entirely empty response still produces something renderable', () => {
+  const result = validatePolish({} as PolishResult, SOURCE_SKILLS);
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.corrections, []);
+  assert.deepEqual(result.skillGroups, []);
+  assert.equal(result.sections.length, 4, 'the conventional order stands in');
+});
