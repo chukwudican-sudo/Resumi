@@ -41,26 +41,41 @@ test('a name is required and nothing else', () => {
   assert.ok(!ok('name', '   '));
 });
 
-test('a linkedin field must hold a linkedin address', () => {
-  assert.ok(ok('linkedin', 'linkedin.com/in/chukwudi-ndubuisi'));
-  assert.ok(ok('linkedin', 'https://www.linkedin.com/in/someone/'));
-  assert.ok(!ok('linkedin', 'Chukwudi Ndubuisi'), 'a name is the common mistake here');
-  assert.ok(!ok('linkedin', 'github.com/someone'), 'wrong site');
-  assert.ok(ok('linkedin', ''), 'optional');
+test('a broken protocol is caught', () => {
+  // The one that got through: an earlier version stripped any letters before
+  // "://", so the malformed protocol vanished and the rest looked fine.
+  assert.ok(!ok('linkedin', 'htt://www.linkedin.com/in/chukwudi-ndubuisi/l'));
+  assert.ok(!ok('linkedin', 'ttps://linkedin.com/in/me'));
+  assert.ok(!ok('github', 'htt://github.com/me'));
+  assert.ok(!ok('website', 'ht!tp://meetalexius.com'));
 });
 
-test('a github field must hold a github address', () => {
-  assert.ok(ok('github', 'github.com/chukwudican-sudo'));
-  assert.ok(ok('github', 'https://github.com/someone'));
-  assert.ok(!ok('github', 'chukwudican-sudo'), 'a username is not an address');
-  assert.ok(ok('github', ''));
+test('anything that is not a link is caught', () => {
+  for (const field of ['linkedin', 'github', 'website'] as const) {
+    assert.ok(!ok(field, 'Chukwudi Ndubuisi'), `${field}: a name`);
+    assert.ok(!ok(field, 'chukwudican-sudo'), `${field}: a username`);
+    assert.ok(!ok(field, 'meetalexius'), `${field}: no domain ending`);
+    assert.ok(!ok(field, 'linkedin com/in/me'), `${field}: a space`);
+    assert.ok(!ok(field, 'https://'), `${field}: a protocol and nothing else`);
+  }
 });
 
-test('a website just has to look like one', () => {
-  assert.ok(ok('website', 'meetalexius.com'));
-  assert.ok(ok('website', 'https://meetalexius.com/work'));
-  assert.ok(!ok('website', 'meetalexius'));
-  assert.ok(ok('website', ''));
+test('real links are accepted, whatever site they point at', () => {
+  for (const field of ['linkedin', 'github', 'website'] as const) {
+    assert.ok(ok(field, 'linkedin.com/in/chukwudi-ndubuisi'), field);
+    assert.ok(ok(field, 'https://www.linkedin.com/in/someone/'), field);
+    assert.ok(ok(field, 'github.com/chukwudican-sudo'), field);
+    assert.ok(ok(field, 'meetalexius.com'), field);
+    assert.ok(ok(field, 'https://git.mycompany.co.uk/me'), field);
+    assert.ok(ok(field, ''), `${field}: optional`);
+  }
+});
+
+test('a link field does not care which site it points at', () => {
+  // The deliberate trade. A wrong-but-valid link is a mistake somebody can see
+  // and fix; a rejected real one is the tool being wrong about them.
+  assert.ok(ok('linkedin', 'github.com/someone'));
+  assert.ok(ok('github', 'gitlab.com/someone'));
 });
 
 test('location is never rejected, because every answer people give is real', () => {

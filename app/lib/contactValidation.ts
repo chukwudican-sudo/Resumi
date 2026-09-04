@@ -10,21 +10,28 @@
 export type ContactField = 'name' | 'email' | 'phone' | 'location' | 'linkedin' | 'github' | 'website';
 
 /**
- * The host part of whatever somebody pasted.
+ * Whether something is a web address at all.
  *
- * People paste all of "github.com/me", "https://github.com/me" and
- * "https://www.github.com/me/". Matching the raw string means writing a pattern
- * that copes with each, and the first version of this quietly failed on the
- * protocol form — it looked for github at the start or after a dot, and in
- * "https://github.com" it is after a slash.
+ * Deliberately not asking which site it points at. A GitHub field that insists
+ * on github.com rejects a self-hosted git server and a personal domain, and a
+ * rejected real address is the tool being wrong about somebody — worse than a
+ * link in the wrong box, which they can see and move.
+ *
+ * The protocol is checked rather than shrugged off. An earlier version stripped
+ * any letters before "://", so "htt://www.linkedin.com/in/me" had its broken
+ * protocol removed and the remainder sailed through as valid.
  */
-function host(value: string): string {
-  return value
-    .trim()
-    .replace(/^[a-z]+:\/\//i, '')
-    .replace(/^www\./i, '')
-    .split(/[/?#]/)[0]
-    .toLowerCase();
+export function isLink(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) return false;
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//i, '');
+  // Anything still carrying a scheme separator has one we did not recognise.
+  if (withoutProtocol.includes('://')) return false;
+
+  const host = withoutProtocol.split(/[/?#]/)[0];
+  // A name, at least one dot, and an ending that looks like a domain.
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(host);
 }
 
 /** Returns the problem, or null when there is not one. */
@@ -57,24 +64,14 @@ export function validateContactField(field: ContactField, raw: string): string |
       return null;
     }
 
+    // Every link field asks the same question, and none of them asks which site
+    // it is. Putting a GitHub address in the LinkedIn box is a mistake somebody
+    // can see on their own resume and move.
     case 'linkedin':
-      if (!value) return null;
-      if (host(value) !== 'linkedin.com') return 'Paste the address of your LinkedIn profile.';
-      return null;
-
     case 'github':
-      if (!value) return null;
-      // github.io covers someone linking their pages site instead.
-      if (!/^github\.(com|io)$/.test(host(value)) && !host(value).endsWith('.github.io')) {
-        return 'Paste the address of your GitHub profile.';
-      }
-      return null;
-
     case 'website':
       if (!value) return null;
-      if (!/^[^\s.]+(\.[^\s.]+)+/.test(value.replace(/^https?:\/\//i, ''))) {
-        return 'That does not look like a web address.';
-      }
+      if (!isLink(value)) return 'That does not look like a link.';
       return null;
 
     case 'location':

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { saveEntry, type EntryInput } from '../../server/actions';
+import { isLink } from '../../lib/contactValidation';
 import type { DateParts, PlaceParts } from '../../lib/entryFormat';
 import DateRange from './DateRange';
 import PlaceFields from './PlaceFields';
@@ -75,7 +76,10 @@ export default function EntryEditor({
   const [draft, setDraft] = useState(entry);
   const [pending, startTransition] = useTransition();
 
-  const canSave = draft.title.trim().length > 0;
+  // The same question the contact form asks of its link fields, so a link is
+  // judged the same way wherever it is typed.
+  const urlProblem = draft.url.trim() && !isLink(draft.url) ? 'That does not look like a link.' : null;
+  const canSave = draft.title.trim().length > 0 && !urlProblem;
 
   function save() {
     startTransition(async () => {
@@ -135,6 +139,7 @@ export default function EntryEditor({
             value={draft.url}
             onChange={(v) => setDraft({ ...draft, url: v })}
             placeholder="github.com/you/project"
+            problem={urlProblem}
           />
         </div>
       ) : null}
@@ -282,7 +287,7 @@ export default function EntryEditor({
 }
 
 function Field({
-  label, value, onChange, placeholder, optional, hint,
+  label, value, onChange, placeholder, optional, hint, problem,
 }: {
   label: string;
   value: string;
@@ -290,7 +295,12 @@ function Field({
   placeholder?: string;
   optional?: boolean;
   hint?: string;
+  /** Shown beneath, once the field has been left. */
+  problem?: string | null;
 }) {
+  const [touched, setTouched] = useState(false);
+  const visible = touched ? problem : null;
+
   return (
     <label className="flex flex-col gap-2">
       <span className="text-[13.5px] text-ink-prose">
@@ -300,10 +310,18 @@ function Field({
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (touched) setTouched(false);
+        }}
+        onBlur={() => setTouched(true)}
         placeholder={placeholder}
-        className="w-full rounded border border-rule-field bg-ground-surface px-4 py-3 text-[15px] outline-none transition placeholder:text-ink-ghost focus:border-accent"
+        aria-invalid={visible ? true : undefined}
+        className={`w-full rounded border bg-ground-surface px-4 py-3 text-[15px] outline-none transition placeholder:text-ink-ghost ${
+          visible ? 'border-flag focus:border-flag' : 'border-rule-field focus:border-accent'
+        }`}
       />
+      {visible ? <span className="text-[12.5px] leading-snug text-flag">{visible}</span> : null}
     </label>
   );
 }
