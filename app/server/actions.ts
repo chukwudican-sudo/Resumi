@@ -12,6 +12,8 @@ import {
   updateRule as updateRuleRow,
   getResumeInputs,
   markApplied as markAppliedRow,
+  restoreResumeVersion as restoreResumeVersionRow,
+  setApplicationStatus as setApplicationStatusRow,
   saveContactDetails as saveContactRow,
   saveMasterResume,
   saveSkillGroups,
@@ -274,4 +276,34 @@ export async function deleteEverything() {
   const userId = await requireUserId();
   await deleteUserData(userId);
   revalidatePath('/', 'layout');
+}
+
+
+/**
+ * Records where an application now stands.
+ *
+ * The list of allowed values lives here rather than being trusted from the
+ * client: a status arrives as a string from a browser, and an unrecognised one
+ * would be written straight into the column and then read by code that
+ * switches on it.
+ */
+const STATUSES = ['draft', 'applied', 'interviewing', 'offer', 'rejected', 'withdrawn'] as const;
+
+export async function setApplicationStatus(applicationId: string, status: string) {
+  const userId = await requireUserId();
+  if (!(STATUSES as readonly string[]).includes(status)) {
+    throw new Error(`Unknown application status: ${status}`);
+  }
+  await setApplicationStatusRow(userId, applicationId, status);
+  revalidatePath('/applications');
+  revalidatePath(`/applications/${applicationId}`);
+}
+
+
+/** Brings back an earlier version of a tailored resume, as a new version. */
+export async function restoreResumeVersion(applicationId: string, resumeId: string) {
+  const userId = await requireUserId();
+  const restored = await restoreResumeVersionRow(userId, applicationId, resumeId);
+  if (!restored) throw new Error('That version could not be found.');
+  revalidatePath(`/applications/${applicationId}`);
 }

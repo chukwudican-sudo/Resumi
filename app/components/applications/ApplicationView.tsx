@@ -3,15 +3,17 @@
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { markApplicationApplied } from '../../server/actions';
 import type { ResumeStructure } from '../../lib/types';
 import DownloadPdf from './DownloadPdf';
+import StatusPicker from './StatusPicker';
+import VersionPicker, { type ResumeVersion } from './VersionPicker';
+import type { ApplicationStatus } from './ApplicationRow';
 import PdfPreview from './PdfPreview';
 import StrengthenPanel from './StrengthenPanel';
 
 interface Props {
   applicationId: string;
-  status: string;
+  status: ApplicationStatus;
   posting: {
     company: string | null;
     role: string | null;
@@ -28,9 +30,10 @@ interface Props {
     warnings: string[];
     version: number;
   } | null;
+  versions: ResumeVersion[];
 }
 
-export default function ApplicationView({ applicationId, status, posting, resume }: Props) {
+export default function ApplicationView({ applicationId, status, posting, resume, versions }: Props) {
   const router = useRouter();
   const [tailoring, setTailoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,27 +77,13 @@ export default function ApplicationView({ applicationId, status, posting, resume
 
         {resume ? (
           <div className="flex items-center gap-2.5">
-            <span className="rounded border border-rule-field px-3 py-2 text-[13px] text-ink-prose">
-              Version {resume.version}
-            </span>
+            <VersionPicker
+              applicationId={applicationId}
+              current={resume.version}
+              versions={versions}
+            />
             <DownloadPdf applicationId={applicationId} />
-            {status === 'draft' ? (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => startTransition(() => markApplicationApplied(applicationId).then(() => router.refresh()))}
-                className="flex items-center gap-2 rounded border border-rule-field bg-ground-surface px-4 py-2 text-[13px] text-ink transition hover:border-accent disabled:opacity-50"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                {pending ? 'Marking…' : 'Mark as applied'}
-              </button>
-            ) : (
-              <span className="rounded bg-accent-wash px-3 py-2 text-[13px] text-accent">
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-              </span>
-            )}
+            <StatusPicker applicationId={applicationId} status={status} />
           </div>
         ) : null}
       </div>

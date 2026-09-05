@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import ApplicationView from '../../components/applications/ApplicationView';
+import type { ApplicationStatus } from '../../components/applications/ApplicationRow';
 import type { ResumeStructure } from '../../lib/types';
 import { requireUserId } from '../../server/auth';
-import { getApplication, getLatestResume } from '../../server/db/repository';
+import { getApplication, getLatestResume, listResumeVersions } from '../../server/db/repository';
 
 /**
  * One application: its posting, and the resume written for it.
@@ -17,12 +18,16 @@ export default async function ApplicationPage({ params }: { params: { id: string
   const record = await getApplication(userId, params.id);
   if (!record) notFound();
 
-  const resume = await getLatestResume(userId, params.id);
+  const [resume, versions] = await Promise.all([
+    getLatestResume(userId, params.id),
+    listResumeVersions(userId, params.id),
+  ]);
 
   return (
     <ApplicationView
       applicationId={params.id}
-      status={record.application.status}
+      versions={versions.map((v) => ({ ...v, createdAt: v.createdAt.toISOString() }))}
+      status={record.application.status as ApplicationStatus}
       posting={{
         company: record.posting?.company ?? null,
         role: record.posting?.role ?? null,

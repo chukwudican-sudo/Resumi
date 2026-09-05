@@ -879,6 +879,41 @@ export async function getApplication(userId: string, applicationId: string) {
  * Seven days is the point at which a follow-up is normal rather than pushy,
  * and applications mostly die of silence rather than rejection.
  */
+/**
+ * Moves an application to wherever it now stands.
+ *
+ * The six states have existed since the schema was written and only one of them
+ * was reachable, so `nextAction` — which knows what to say about an interview,
+ * an offer and a rejection — could never run past "applied".
+ *
+ * The dates move with the status rather than being set once. Reaching "applied"
+ * starts the follow-up clock; passing it clears the clock, because chasing a
+ * company that has already replied is the wrong advice. Going back to draft
+ * clears both, so a mistake leaves nothing behind.
+ */
+export async function setApplicationStatus(
+  userId: string,
+  applicationId: string,
+  status: string,
+  followUpDays = 7,
+): Promise<void> {
+  const now = new Date();
+
+  const dates =
+    status === 'applied'
+      ? { appliedAt: now, followUpDueAt: new Date(now.getTime() + followUpDays * 86_400_000) }
+      : status === 'draft'
+        ? { appliedAt: null, followUpDueAt: null }
+        // Interviewing, offer, rejected, withdrawn: they have replied, or it is
+        // over. Either way there is nothing left to chase.
+        : { followUpDueAt: null };
+
+  await db
+    .update(applications)
+    .set({ status, ...dates, updatedAt: now })
+    .where(and(eq(applications.userId, userId), eq(applications.id, applicationId)));
+}
+
 export async function markApplied(userId: string, applicationId: string, followUpDays = 7) {
   const now = new Date();
   const due = new Date(now.getTime() + followUpDays * 24 * 60 * 60 * 1000);
@@ -1015,6 +1050,75 @@ export async function getLatestResume(userId: string, applicationId: string) {
  * free, and it means an instruction edit can never destroy the thing it was
  * meant to improve.
  */
+/**
+ * Every version of the resume written for one application.
+ *
+ * They have always been stored — each tailor keeps the last one and records
+ * which it came from — and there has never been a way to see them. Somebody
+ * whose second attempt came out worse than the first had no way back.
+ */
+export async function listResumeVersions(userId: string, applicationId: string) {
+  return db
+    .select({
+      id: resumes.id,
+      version: resumes.version,
+      matchScore: resumes.matchScore,
+      createdAt: resumes.createdAt,
+    })
+    .from(resumes)
+    .where(and(eq(resumes.userId, userId), eq(resumes.applicationId, applicationId)))
+    .orderBy(desc(resumes.version));
+}
+
+/**
+ * Brings an older version back as the newest one.
+ *
+ * Copied forward rather than deleting what came after. Restoring is then just
+ * another version, so it is itself undoable — and someone who restores by
+ * mistake has lost nothing.
+ */
+export async function restoreResumeVersion(
+  userId: string,
+  applicationId: string,
+  resumeId: string,
+): Promise<string | null> {
+  const [source] = await db
+    .select()
+    .from(resumes)
+    .where(and(eq(resumes.userId, userId), eq(resumes.id, resumeId)))
+    .limit(1);
+
+  // Scoped by userId, so an id belonging to somebody else finds nothing rather
+  // than copying their resume into this application.
+  if (!source || source.applicationId !== applicationId) return null;
+
+  const previous = await getLatestResume(userId, applicationId);
+  const id = newId('res');
+
+  await db.insert(resumes).values({
+    id,
+    userId,
+    applicationId,
+    mode: source.mode,
+    structure: source.structure as object,
+    matchScore: source.matchScore,
+    missingRequirements: source.missingRequirements as string[],
+    log: [`Restored from version ${source.version}.`],
+    warnings: source.warnings as string[],
+    estimatedPages: source.estimatedPages,
+    version: (previous?.version ?? 0) + 1,
+    parentResumeId: source.id,
+    status: 'complete',
+  });
+
+  await db
+    .update(applications)
+    .set({ updatedAt: new Date() })
+    .where(and(eq(applications.userId, userId), eq(applications.id, applicationId)));
+
+  return id;
+}
+
 export async function saveResume(
   userId: string,
   applicationId: string,
