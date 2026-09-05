@@ -51,7 +51,7 @@ export const users = pgTable('users', {
 
   plan: text('plan').notNull().default('free'),
   /** One credit is one generation. An entire interview costs one, regardless of length. */
-  credits: integer('credits').notNull().default(5),
+  credits: integer('credits').notNull().default(10),
   creditsResetAt: timestamp('credits_reset_at', { withTimezone: true }),
 
   createdAt: createdAt(),

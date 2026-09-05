@@ -62,7 +62,7 @@ export default async function LandingPage() {
             >
               Build my profile
             </Link>
-            <span className="text-sm text-ink-muted">Free for your first five applications</span>
+            <span className="text-sm text-ink-muted">Ten free applications a month</span>
           </div>
         </div>
 

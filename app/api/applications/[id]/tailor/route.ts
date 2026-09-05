@@ -4,6 +4,7 @@ import { NoToolUseError, callClaude } from '../../../../lib/anthropic';
 import { TAILOR_INVARIANT, buildUserContext } from '../../../../lib/systemPrompt';
 import type { ResumeStructure } from '../../../../lib/types';
 import { requireUserId } from '../../../../server/auth';
+import { MONTHLY_CREDITS } from '../../../../lib/credits';
 import { polishIfStale } from '../../../../server/polishProfile';
 import {
   getActiveRules,
@@ -61,7 +62,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const remaining = await spendCredit(userId);
   if (remaining === null) {
     return errorResponse(
-      { type: 'generic', message: "You've used your free applications for this month." },
+      {
+        type: 'generic',
+        message: `You've used all ${MONTHLY_CREDITS} free applications this month. They come back on the 1st.`,
+      },
       402,
     );
   }

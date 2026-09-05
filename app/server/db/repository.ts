@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { db } from './client';
 import type { ResumeStructure } from '../../lib/types';
+import { MONTHLY_CREDITS, nextReset } from '../../lib/credits';
 import { splitEmployment } from '../../lib/employment';
 import {
   applications,
@@ -50,12 +51,36 @@ export async function upsertUser(userId: string, email: string, displayName?: st
 }
 
 export async function getUser(userId: string) {
+  await resetCreditsIfDue(userId);
   const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return row ?? null;
 }
 
 export async function setOnboardingGoal(userId: string, stage: string, targetField: string) {
   await db.update(users).set({ stage, targetField }).where(eq(users.id, userId));
+}
+
+/**
+ * Starts a new month if this account's is over.
+ *
+ * One statement, and the where clause carries the condition. Read-then-write
+ * would let two tabs both decide a reset is due and both grant a month, which
+ * is the same race the spend below is written to avoid.
+ *
+ * Lazy rather than scheduled: it runs on a row that is being read anyway, so
+ * there is no cron job to deploy, monitor, or discover has silently stopped.
+ */
+export async function resetCreditsIfDue(userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ credits: MONTHLY_CREDITS, creditsResetAt: nextReset() })
+    .where(
+      and(
+        eq(users.id, userId),
+        // Null covers every account created before resets existed.
+        sql`(${users.creditsResetAt} is null or ${users.creditsResetAt} <= now())`,
+      ),
+    );
 }
 
 /**
@@ -66,6 +91,10 @@ export async function setOnboardingGoal(userId: string, stage: string, targetFie
  * last remaining credit. Returns null when there was nothing left to spend.
  */
 export async function spendCredit(userId: string): Promise<number | null> {
+  // A month that has rolled over is granted before the spend, so somebody
+  // returning after a gap is not told they are out on their first attempt.
+  await resetCreditsIfDue(userId);
+
   const [row] = await db
     .update(users)
     .set({ credits: sql`${users.credits} - 1` })

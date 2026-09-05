@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { UserButton } from '@clerk/nextjs';
+import { creditsLabel } from '../lib/credits';
 
 export type NavKey = 'applications' | 'insights' | 'profile' | 'rules';
 
@@ -64,11 +65,7 @@ export default function AppNav({ active, credits }: { active: NavKey; credits?: 
                   : 'text-ink-muted'
             }`}
           >
-            {credits === 0
-              ? 'No applications left'
-              : credits === 1
-                ? '1 application left'
-                : `${credits} of 5 free left`}
+            {creditsLabel(credits)}
           </span>
         ) : null}
         <UserButton
