@@ -42,6 +42,9 @@ export default async function SetupPage() {
       initialContact={contact}
       polished={polished}
       stale={profile?.stale ?? true}
+      // Changes on every save, which is what the preview keys its rebuild off.
+      // Counting entries would miss an edit to one that already existed.
+      savedAt={profile?.updatedAt?.toISOString() ?? ''}
     />
   );
 }

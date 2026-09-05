@@ -4,7 +4,9 @@ import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
-import ResumePaper from '../applications/ResumePaper';
+import PdfPreview from '../applications/PdfPreview';
+import MaterialList from './MaterialList';
+import { checkReadiness } from '../../lib/readiness';
 import DownloadPdf from '../applications/DownloadPdf';
 import PolishButton from './PolishButton';
 import type { ResumeStructure } from '../../lib/types';
@@ -28,12 +30,14 @@ export default function SetupShell({
   initialContact,
   polished,
   stale,
+  savedAt,
 }: {
   initialEntries: EntryWithBullets[];
   initialFacts: ContactFact[];
   initialContact: Contact;
   polished: ResumeStructure | null;
   stale: boolean;
+  savedAt: string;
 }) {
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('contact');
@@ -64,6 +68,11 @@ export default function SetupShell({
   // Offering a download of a resume with no name and no history on it would
   // produce a page nobody wants to have sent.
   const usable = useMemo(() => isResumeUsable(entries, facts), [entries, facts]);
+
+  // Whether there is enough here to compile. The same check the download and
+  // the preview endpoint make, so the pane never shows a resume that the
+  // buttons beside it would refuse to produce.
+  const ready = useMemo(() => checkReadiness(resume).ready, [resume]);
 
   function afterSave() {
     startTransition(() => router.refresh());
@@ -175,12 +184,19 @@ export default function SetupShell({
 
         {/* the actual resume, not a thumbnail */}
         <aside className="hidden min-h-0 flex-col items-center border-l border-rule bg-ground-band px-6 py-8 lg:flex lg:overflow-y-auto">
-          <span className="mb-4 self-start text-[11px] uppercase tracking-[0.12em] text-ink-faint">
-            Your resume
-          </span>
-          <div className="w-full origin-top scale-[0.86]">
-            <ResumePaper structure={resume} />
-          </div>
+          {ready ? (
+            // The real document, once there is enough to make one. Not a
+            // drawing of it — the drawing and the download disagreed about
+            // section order, coursework and page count within one week.
+            <>
+              <span className="mb-4 self-start text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                Your resume
+              </span>
+              <PdfPreview reloadKey={savedAt} />
+            </>
+          ) : (
+            <MaterialList entries={entries} facts={facts} />
+          )}
         </aside>
       </div>
     </main>
