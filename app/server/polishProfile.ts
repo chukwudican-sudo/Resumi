@@ -1,4 +1,5 @@
-import { applyPolish, polishResume, type PolishResult } from '../lib/polish';
+import { applyPolish, polishResume, validateCorrections, type PolishResult } from '../lib/polish';
+import { proofread } from '../lib/proofread';
 import { buildResume, entryFromRow } from '../lib/buildResume';
 import { profileStrength } from '../lib/profileStrength';
 import type { ResumeStructure } from '../lib/types';
@@ -26,7 +27,22 @@ export async function runPolish(
   structure: ResumeStructure,
   locale: string | null,
 ): Promise<PolishResult> {
-  const { polish } = await polishResume(userId, structure, locale);
+  // Two calls, at the same time. They were one, and proofreading was the job
+  // that got dropped: asked to also group skills, order sections and write
+  // warnings, the model returned no corrections at all on a resume containing
+  // "Dean Listst" and "Ms Powerpoinnt". Given only the spelling to do, it found
+  // both, every time. Running them in parallel costs no extra wait.
+  const [{ polish }, rawCorrections] = await Promise.all([
+    polishResume(userId, structure, locale),
+    proofread(userId, structure, structure.name).catch((error) => {
+      // A resume with an uncorrected typo is worse than one without; a resume
+      // nobody can download is worse than both.
+      console.error('[Resumi] Proofreading failed; continuing without it.', error);
+      return [];
+    }),
+  ]);
+
+  polish.corrections = validateCorrections(rawCorrections);
 
   await Promise.all([
     applyCorrectionsToEntries(userId, polish.corrections),

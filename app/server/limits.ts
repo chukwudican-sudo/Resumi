@@ -41,6 +41,7 @@ const BURST_PER_MINUTE: Record<string, number> = {
   // Polish runs on edit rather than on demand, so a person editing quickly is
   // normal traffic, not abuse.
   polish: 20,
+  proofread: 20,
   default: 8,
 };
 

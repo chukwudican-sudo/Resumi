@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { applyPolish, overlapNote, validatePolish, type PolishResult } from './polish';
+import { applyPolish, overlapNote, validateCorrections, validatePolish, type PolishResult } from './polish';
 import type { ResumeStructure } from './types';
 
 const SOURCE_SKILLS = [
@@ -292,4 +292,28 @@ test('a year with no month still compares', () => {
 test('one role cannot overlap itself', () => {
   const note = overlapNote(withRoles([{ title: 'Engineer', org: 'A', dates: 'Jan 2024 – Dec 2025' }]));
   assert.match(note, /none that need raising/);
+});
+
+test('an apostrophe is not a spelling error', () => {
+  // "Dean Listst" -> "Dean's List" is one missing letter and a misplaced
+  // apostrophe. Counted character by character it scores four edits, because
+  // the apostrophe shifts everything after it — and the guard threw away a
+  // correction the model got right three times out of three.
+  const kept = (from: string, to: string) =>
+    validateCorrections([{ from, to, reason: 'x' }]).length === 1;
+
+  assert.ok(kept('Dean Listst', "Dean's List"));
+  assert.ok(kept('OBrien', "O'Brien"));
+  assert.ok(kept('Masters degree', "Master's degree"));
+});
+
+test('rewrites are still refused when punctuation is ignored', () => {
+  const kept = (from: string, to: string) =>
+    validateCorrections([{ from, to, reason: 'x' }]).length === 1;
+
+  assert.ok(!kept('Operations Specialist', 'Senior Operations Manager'));
+  assert.ok(!kept('Contributed to the work', 'Led the work'));
+  assert.ok(!kept('Aegon', 'Aegon Financial Services'), 'an expansion is not a spelling fix');
+  assert.ok(!kept('Managed team', 'Directed team'), 'a different verb is an edit');
+  assert.ok(!kept('ap', 'app'), 'too short to replace safely');
 });

@@ -30,7 +30,8 @@ export type UsageKind =
   | 'instruct'
   | 'interview_turn'
   | 'compose'
-  | 'polish';
+  | 'polish'
+  | 'proofread';
 
 /** Per-kind model + budget. Keeps model choice out of the handlers. */
 const CALL_CONFIG: Record<UsageKind, { model: string; maxTokens: number; effort: Effort }> = {
@@ -43,6 +44,9 @@ const CALL_CONFIG: Record<UsageKind, { model: string; maxTokens: number; effort:
   // Short input, short output, and it runs whenever a resume changes — so it is
   // budgeted as the cheap frequent call it is, not as a generation.
   polish: { model: 'claude-sonnet-4-6', maxTokens: 2000, effort: 'low' },
+  // Reads the whole resume and returns a short list, so the budget is for
+  // input rather than output.
+  proofread: { model: 'claude-sonnet-4-6', maxTokens: 1500, effort: 'low' },
 };
 
 /** The model used for the GET health check. */

@@ -14,7 +14,7 @@ import type { ResumeStructure } from './types';
  *
  * What makes this safe is that the model never sees a bullet come back out of
  * it. The tool below cannot return prose from the resume — only a regrouping of
- * skills, an ordering of sections, and a short list of proposed corrections.
+ * skills, an ordering of sections, and warnings.
  * The app applies those to the structure itself. So the failure mode of a bad
  * response is a poor grouping, not a sentence you never wrote appearing under
  * your name.
@@ -25,7 +25,7 @@ import type { ResumeStructure } from './types';
 
 export const POLISH_PROMPT = `You are preparing someone's master resume for presentation. They typed their history into a form; you decide how it reads.
 
-You are NOT rewriting their content. You never see their bullets come back to you, and you must not attempt to restate, summarise or improve them. Your job is organisation and notation only.
+You are NOT rewriting their content. You never see their bullets come back to you, and you must not attempt to restate, summarise or improve them. Your job is organisation only — the spelling is proofread separately and is not your concern.
 
 WHAT YOU DECIDE
 
@@ -47,21 +47,7 @@ WHAT YOU DECIDE
 
    Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section.
 
-3. CORRECTIONS. Misspellings, anywhere in what you were given — including inside the bullets.
-
-   A correction is ONE WORD, or a short phrase that is a name. "recieve" -> "receive". "San Fransisco" -> "San Francisco". "Manger" -> "Manager". The word you give is replaced everywhere it appears, so give the word, not the sentence around it.
-
-   You are proofreading, not editing. You cannot rewrite a bullet, reword it, shorten it, or improve it, and an attempt to do so through this field will be discarded. If a sentence is clumsy, that is not yours to fix.
-
-   Check the well-known names carefully. Universities, companies, cities, awards and honours are things you know the spelling of — "Dean Listst" is "Dean's List", "Univeristy" is "University". A misspelled award is more embarrassing than a misspelled ordinary word, because it is the part someone was proud enough to include.
-
-   Leave alone, always:
-   - technical terms, libraries, tools and product names — pytest, matplotlib, RevenueCat, PostgreSQL, MealApp, FraudWatch. A spellchecker flags all of these and every "fix" would be damage.
-   - names you do not recognise. An unfamiliar company or product is far likelier to be spelled correctly than to be a typo you can fix.
-   - numbers, dates, job titles, degrees, and people's names.
-   - British or Canadian spellings when that is the person's convention. "organisation" is not a typo.
-
-4. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
+3. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
 
    Overlapping dates are worked out for you and stated below. Say nothing about an overlap unless you are told it is unexplained.
 
@@ -74,7 +60,7 @@ Do not comment on the quality of their writing — you are not being asked to ju
 const POLISH_TOOL: Anthropic.Tool = {
   name: 'submit_polish',
   description:
-    'Submit the organisational decisions for this resume: how the skills group, what order the sections go in and what they are called, any clear factual corrections, and warnings for the person.',
+    'Submit the organisational decisions for this resume: how the skills group, what order the sections go in and what they are called, and warnings for the person.',
   input_schema: {
     type: 'object',
     properties: {
@@ -109,28 +95,13 @@ const POLISH_TOOL: Anthropic.Tool = {
           additionalProperties: false,
         },
       },
-      corrections: {
-        type: 'array',
-        description:
-          'Every misspelling you found, anywhere in the resume — bullets, titles, companies, schools, awards, skills. Read all of it before deciding there are none.',
-        items: {
-          type: 'object',
-          properties: {
-            from: { type: 'string', description: 'The exact current text, as given to you.' },
-            to: { type: 'string', description: 'What it should say.' },
-            reason: { type: 'string', description: 'One short sentence, addressed to the person.' },
-          },
-          required: ['from', 'to', 'reason'],
-          additionalProperties: false,
-        },
-      },
       warnings: {
         type: 'array',
         items: { type: 'string' },
         description: 'Plain sentences addressed to the person about what would weaken this resume.',
       },
     },
-    required: ['skillGroups', 'sections', 'corrections', 'warnings'],
+    required: ['skillGroups', 'sections', 'warnings'],
     additionalProperties: false,
   },
 };
@@ -181,6 +152,45 @@ function normalise(text: string): string {
  * dropped section would silently delete their education; a "correction" that
  * rewrites a field wholesale is an edit wearing a typo's clothes.
  */
+/**
+ * Keeps only what is a spelling fix.
+ *
+ * These are replaced throughout the person's stored entries, bullets included,
+ * so the bar is deliberately higher than "looks plausible". Too short and a
+ * replacement lands inside unrelated words; too long and it stops being a
+ * spelling fix and becomes an edit of what somebody wrote about their own work,
+ * which is not what any of this is allowed to do.
+ */
+export function validateCorrections(raw: unknown): PolishResult['corrections'] {
+  return asList<PolishResult['corrections'][number]>(raw).filter((c) => {
+    if (!c || typeof c.from !== 'string' || typeof c.to !== 'string') return false;
+    const from = c.from.trim();
+    const to = c.to.trim();
+    if (!from || !to || from === to) return false;
+    if (from.length < 3 || from.length > 40) return false;
+    // A word or a short name — never a clause.
+    if (from.split(/\s+/).length > 4) return false;
+    // Compared on letters alone. "Dean Listst" -> "Dean's List" is one missing
+    // letter and a misplaced apostrophe, but counted character by character it
+    // scores four edits, because the apostrophe shifts everything after it —
+    // and the rule rejected the correction as too large to be a typo. Spacing
+    // and punctuation are not spelling.
+    const letters = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const a = letters(from);
+    const b = letters(to);
+    if (!a || !b) return false;
+
+    // Scaled rather than stepped. A fixed allowance of two is right for one
+    // word and wrong for two: "Dean Listst" -> "Dean's List" is three edits on
+    // the letters and unmistakably a typo. What actually separates a fix from a
+    // rewrite is proportion — a third of a short phrase can change and it is
+    // still the same phrase; "Operations Specialist" into "Senior Operations
+    // Manager" is nowhere near that, whatever its length.
+    const allowed = Math.min(5, Math.max(1, Math.ceil(a.length * 0.35)));
+    return editDistance(a, b) <= allowed;
+  });
+}
+
 export function validatePolish(raw: PolishResult, sourceSkills: string): PolishResult {
   const haystack = normalise(sourceSkills);
 
@@ -217,27 +227,7 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
     ...DEFAULT_SECTIONS.filter((d) => !byKey.has(d.key)),
   ];
 
-  // A correction is a word, not a sentence.
-  //
-  // These are replaced throughout the person's stored entries, bullets
-  // included, so the bar is deliberately higher than "looks plausible". Too
-  // short and a replacement lands inside unrelated words; too long and it stops
-  // being a spelling fix and becomes an edit of what somebody wrote about their
-  // own work, which is not what this pass is allowed to do.
-  const corrections = asList<PolishResult['corrections'][number]>(raw.corrections).filter((c) => {
-    if (!c || typeof c.from !== 'string' || typeof c.to !== 'string') return false;
-    const from = c.from.trim();
-    const to = c.to.trim();
-    if (!from || !to || from === to) return false;
-    if (from.length < 3 || from.length > 40) return false;
-    // A word or a short name — never a clause.
-    if (from.split(/\s+/).length > 4) return false;
-    // Two edits for an ordinary word, because the commonest typo of all is a
-    // pair of swapped letters and plain edit distance scores that as two, not
-    // one. Three only for something long enough that two would be miserly.
-    const allowed = from.length <= 4 ? 1 : from.length <= 12 ? 2 : 3;
-    return editDistance(from.toLowerCase(), to.toLowerCase()) <= allowed;
-  });
+  const corrections = validateCorrections(raw.corrections);
 
   return {
     skillGroups,
@@ -394,7 +384,7 @@ export async function polishResume(
         '',
         overlapNote(structure),
         '',
-        'Their experience. Read the bullets for spelling only — you cannot rewrite them.',
+        'Their experience. The bullets are here for context; they are not yours to change.',
         structure.experience
           .map((x) =>
             [`- ${x.title} at ${x.org}, ${x.location}, ${x.dates}`, ...x.bullets.map((b) => `    ${b}`)].join('\n'),
@@ -411,11 +401,8 @@ export async function polishResume(
           )
           .join('\n') || '(none)',
         '',
-        'Now, in this order.',
-        '1. Proofread. Go back over every line above — skills, school, degree, awards, job titles, companies, and every bullet — and list each misspelling you find as a correction. Do this before anything else; it is the part most easily skipped.',
-        '2. Group and name the skills.',
-        '3. Decide the section order and names.',
-        '4. Write the warnings.',
+        'Group and name the skills, decide the section order and names, and write the warnings.',
+        'Spelling is somebody else\'s job — do not comment on it.',
       ].join('\n'),
     },
   ];
