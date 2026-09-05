@@ -10,6 +10,8 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
  */
 const isPublic = createRouteMatcher([
   '/',                     // the landing page
+  '/privacy',              // both have to be readable before you hand over anything
+  '/terms',
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks(.*)',     // Clerk calls this without a session, by design
