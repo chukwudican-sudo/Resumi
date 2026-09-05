@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUserId } from './auth';
 import {
   createRule as createRuleRow,
+  deleteUserData,
   deleteEntry as deleteEntryRow,
   deleteRule as deleteRuleRow,
   reorderRules as reorderRulesRow,
@@ -249,4 +250,28 @@ export async function polishMasterResume(): Promise<{
   revalidatePath('/setup');
   revalidatePath('/profile');
   return { warnings: polish.warnings, corrections: polish.corrections, sections: polish.sections };
+}
+
+
+// ── Deleting everything ────────────────────────────────────────────────────
+
+/**
+ * Removes everything Resumi holds about this person.
+ *
+ * Every table referencing users cascades, so one delete takes the profile,
+ * entries, facts, rules, applications, resumes, interview history and usage
+ * records with it. Verified against the schema rather than assumed: ten
+ * foreign keys, all cascading.
+ *
+ * The sign-in itself is not touched. That belongs to Clerk and is deleted from
+ * Clerk's own account menu — promising to remove something we do not control
+ * would be the wrong kind of reassurance.
+ *
+ * Nothing is archived, soft-deleted or retained. A delete that keeps a copy is
+ * not a delete, and this is the page where that has to be literally true.
+ */
+export async function deleteEverything() {
+  const userId = await requireUserId();
+  await deleteUserData(userId);
+  revalidatePath('/', 'layout');
 }

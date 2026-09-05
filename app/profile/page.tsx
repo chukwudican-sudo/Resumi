@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import AppNav from '../components/AppNav';
+import DeleteEverything from '../components/profile/DeleteEverything';
 import { CAREER_STAGE_LABELS, type CareerStage, type ResumeStructure } from '../lib/types';
 import { hasQuantity, unquantifiedEntries } from '../lib/profileStrength';
 import { requireUserId } from '../server/auth';
@@ -188,6 +189,10 @@ export default async function ProfilePage() {
           >
             Replace with a file
           </Link>
+
+          <div className="mt-6 border-t border-rule pt-6">
+            <DeleteEverything />
+          </div>
         </aside>
       </div>
     </main>

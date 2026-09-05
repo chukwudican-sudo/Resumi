@@ -53,8 +53,22 @@ export default function AppNav({ active, credits }: { active: NavKey; credits?: 
 
       <div className="flex items-center gap-4">
         {typeof credits === 'number' ? (
-          <span className="text-[13px] text-ink-muted">
-            {credits} of 5 free left
+          // Louder as it runs out. A count that looks the same at five and at
+          // zero is a count nobody reads until the thing stops working.
+          <span
+            className={`rounded px-2.5 py-1 text-[13px] ${
+              credits === 0
+                ? 'bg-flag-bg text-flag'
+                : credits === 1
+                  ? 'text-flag'
+                  : 'text-ink-muted'
+            }`}
+          >
+            {credits === 0
+              ? 'No applications left'
+              : credits === 1
+                ? '1 application left'
+                : `${credits} of 5 free left`}
           </span>
         ) : null}
         <UserButton

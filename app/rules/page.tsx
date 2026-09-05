@@ -1,7 +1,7 @@
 import AppNav from '../components/AppNav';
 import RulesShell, { type Rule } from '../components/rules/RulesShell';
 import { requireUserId } from '../server/auth';
-import { listRules } from '../server/db/repository';
+import { getUser, listRules } from '../server/db/repository';
 
 /**
  * The instructions someone wants applied to every resume they make.
@@ -13,7 +13,7 @@ import { listRules } from '../server/db/repository';
  */
 export default async function RulesPage() {
   const userId = await requireUserId();
-  const rows = await listRules(userId);
+  const [rows, user] = await Promise.all([listRules(userId), getUser(userId)]);
 
   const rules: Rule[] = rows.map((r) => ({
     id: r.id,
@@ -24,7 +24,7 @@ export default async function RulesPage() {
 
   return (
     <main className="min-h-screen bg-ground font-sans text-ink">
-      <AppNav active="rules" />
+      <AppNav active="rules" credits={user?.credits} />
       <RulesShell initialRules={rules} />
     </main>
   );
