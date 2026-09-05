@@ -15,7 +15,13 @@ export default async function OnboardingPage() {
     getActiveFacts(userId),
   ]);
 
-  if (profile && !profile.stale) redirect('/applications');
+  // Having a resume is the question, not whether it has been polished lately.
+  // This used to read `!profile.stale`, and stale means "needs the editorial
+  // pass" — it turns true on every save. So anybody with a finished resume and
+  // one unsaved edit was pushed back through the wizard as though they were
+  // new, which is a strange thing to do to somebody who has already finished.
+  const structure = profile?.resumeStructure as { name?: string } | null;
+  if (structure?.name) redirect('/applications');
 
   // Pre-fill from what is already known: the account supplies name and email,
   // and anything filled in on a previous pass through this screen is kept.

@@ -15,6 +15,34 @@ const isPublic = createRouteMatcher([
   '/api/webhooks(.*)',     // Clerk calls this without a session, by design
 ]);
 
+/**
+ * The paths this app actually has.
+ *
+ * Anything else is a wrong address, and a wrong address should say so. Guarding
+ * every unknown path meant a stranger following a stale link was asked to sign
+ * in to reach a page that does not exist — and after signing in they would be
+ * sent to the same missing page. The 404 never ran.
+ *
+ * Listed rather than derived because middleware cannot see the route table.
+ * A new route added without a line here is answered as missing rather than
+ * exposed, which is the safe direction to fail in.
+ */
+const isKnown = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/onboarding',
+  '/setup',
+  '/applications(.*)',
+  '/insights',
+  '/profile',
+  '/rules',
+  '/interview',
+  '/review',
+  '/workspace',
+  '/api/(.*)',
+]);
+
 export default clerkMiddleware(async (auth, request) => {
   if (isPublic(request)) return;
 
@@ -24,6 +52,11 @@ export default clerkMiddleware(async (auth, request) => {
   // sign-in — and back afterwards — is the behaviour people expect.
   const { userId, redirectToSignIn } = await auth();
   if (userId) return;
+
+  // A path the app does not have is a wrong address, not a locked door. Let it
+  // through to the 404 rather than asking somebody to sign in for a page that
+  // will not be there afterwards either.
+  if (!isKnown(request)) return;
 
   // An API call gets an answer it can read. Redirecting a fetch to the sign-in
   // page hands it 200 OK and a page of HTML, so the caller's error handling
