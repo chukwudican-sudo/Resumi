@@ -988,13 +988,32 @@ export async function createApplication(
  * a lateral join rather than a second round trip per row — a job search is
  * thirty to fifty of these and N+1 would show.
  */
+/**
+ * A raw driver value into a Date.
+ *
+ * db.execute returns exactly what postgres-js hands back, and Drizzle's column
+ * mapping only applies to schema-based selects — so a timestamp from a raw
+ * query arrives as the string "2026-09-05 16:59:06.596+00". The type on the
+ * query below used to claim Date, TypeScript believed the annotation, and the
+ * first comparison to run against a real date threw "from.getTime is not a
+ * function" on the page listing every application.
+ */
+export function toDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 export async function listApplicationsForDisplay(userId: string) {
-  return db.execute<{
+  // Declared as the driver actually returns them, then converted below. The
+  // previous annotation was a wish rather than a description.
+  const rows = await db.execute<{
     id: string;
     status: string;
-    applied_at: Date | null;
-    follow_up_due_at: Date | null;
-    closes_at: Date | null;
+    applied_at: string | null;
+    follow_up_due_at: string | null;
+    closes_at: string | null;
     company: string | null;
     role: string | null;
     location: string | null;
@@ -1018,6 +1037,13 @@ export async function listApplicationsForDisplay(userId: string) {
     where a.user_id = ${userId}
     order by a.updated_at desc
   `);
+
+  return rows.map((row) => ({
+    ...row,
+    applied_at: toDate(row.applied_at),
+    follow_up_due_at: toDate(row.follow_up_due_at),
+    closes_at: toDate(row.closes_at),
+  }));
 }
 
 /** Counts per status, for the filter chips. */
