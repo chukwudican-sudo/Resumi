@@ -116,7 +116,7 @@ export default function SetupShell({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[220px_minmax(0,1fr)_380px] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[220px_minmax(0,1fr)_minmax(560px,0.42fr)] lg:overflow-hidden">
         {/* rail */}
         <nav className="min-h-0 border-b border-rule px-5 py-6 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">

@@ -114,7 +114,7 @@ export default function PdfPreview({
 
   if (state === 'error') {
     return (
-      <div className="flex w-full max-w-[640px] flex-col items-center gap-3 rounded border border-rule-field bg-ground-surface px-8 py-16 text-center">
+      <div className="flex w-full max-w-[760px] flex-col items-center gap-3 rounded border border-rule-field bg-ground-surface px-8 py-16 text-center">
         <span className="text-[14px] text-ink">{error}</span>
         {blocking.length ? (
           <ul className="mt-1 flex flex-col gap-1.5 text-left">
@@ -130,7 +130,7 @@ export default function PdfPreview({
   }
 
   return (
-    <div className="relative w-full max-w-[640px]">
+    <div className="relative w-full max-w-[760px]">
       {/* Pages stack with a gap, the way sheets of paper do. */}
       <div ref={host} className="flex w-full flex-col gap-4" />
 
