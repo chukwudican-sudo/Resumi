@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { UserButton } from '@clerk/nextjs';
+import UserMenu from './UserMenu';
 import { creditsLabel } from '../lib/credits';
 
 export type NavKey = 'applications' | 'insights' | 'profile' | 'rules';
@@ -68,10 +68,7 @@ export default function AppNav({ active, credits }: { active: NavKey; credits?: 
             {creditsLabel(credits)}
           </span>
         ) : null}
-        <UserButton
-          appearance={{ elements: { avatarBox: 'h-7 w-7' } }}
-          afterSignOutUrl="/"
-        />
+        <UserMenu />
       </div>
     </header>
   );
