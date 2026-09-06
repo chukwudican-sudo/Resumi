@@ -150,9 +150,9 @@ export default function SetupShell({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[220px_minmax(0,1fr)_minmax(560px,0.42fr)] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[252px_minmax(0,1fr)_minmax(560px,0.42fr)] lg:overflow-hidden">
         {/* rail */}
-        <nav className="flex min-h-0 flex-col border-b border-rule px-5 py-6 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <nav className="min-h-0 border-b border-rule px-5 py-6 lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <div className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
             {status.map((s) => (
               <button
@@ -189,70 +189,62 @@ export default function SetupShell({
             listed the same entries over again. Here it sits beside the forms
             that answer it.
 
+            Inset by the same 12px as the section labels above: the buttons
+            carry their own padding, so a block flush to the rail's edge left a
+            ragged margin down the column with the text in two different places.
+
             Hidden below lg, where this same nav is a horizontal strip of
             buttons: a status card in that strip would scroll off sideways next
             to them, and on a phone the marks on each entry are the useful half.
           */}
-          <div className="mt-8 hidden border-t border-rule pt-6 lg:block">
-            <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
-              Profile strength
-            </span>
-            <div className="mt-2.5 flex items-baseline gap-2">
-              <span className="font-serif text-[34px] leading-none">{strength}</span>
-              <span className="text-[13px] text-ink-faint">/ 100</span>
-            </div>
-            <div className="mt-3 h-1 overflow-hidden rounded-sm bg-rule">
-              <div
-                className="h-full rounded-sm bg-accent transition-[width] duration-500"
-                style={{ width: `${strength}%` }}
-              />
-            </div>
-            <p className="mt-3 text-[12.5px] leading-snug text-ink-muted">
-              The stronger this is, the less you edit after every tailor.
-            </p>
-
-            {/*
-              A suggestion, not a correction. This replaced an amber banner
-              under a warning triangle reading "One entry has no numbers in it —
-              a few questions would fix it", which stated a defect about
-              somebody's career and offered twenty-five questions to mend one
-              bullet. Nothing here is flag-coloured, nothing carries an icon,
-              and once every entry has a number the block renders nothing rather
-              than turning green.
-            */}
-            {thin.length ? (
-              <div className="mt-5 flex flex-col gap-1.5">
-                <p className="text-[12.5px] leading-snug text-ink-muted">
-                  Numbers are what make a bullet land &mdash; a percentage, a count, time saved.
-                </p>
-                {thin.map((w) => (
-                  <button
-                    key={w.key}
-                    type="button"
-                    onClick={() => { setDirty(false); setSection(w.key); }}
-                    className="text-left text-[12.5px] leading-snug text-accent transition hover:text-accent-hover hover:underline hover:underline-offset-2"
-                  >
-                    {w.count} {w.noun} {w.count === 1 ? 'entry does' : 'entries do'} not have one yet &rarr;
-                  </button>
-                ))}
+          <div className="mt-7 hidden border-t border-rule pt-7 lg:block">
+            <div className="flex flex-col px-3">
+              <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                Profile strength
+              </span>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="font-serif text-[38px] leading-none">{strength}</span>
+                <span className="text-[13px] text-ink-faint">/ 100</span>
               </div>
-            ) : null}
+              <div className="mt-3.5 h-1 overflow-hidden rounded-sm bg-rule">
+                <div
+                  className="h-full rounded-sm bg-accent transition-[width] duration-500"
+                  style={{ width: `${strength}%` }}
+                />
+              </div>
+              <p className="mt-3.5 text-[12.5px] leading-relaxed text-ink-muted">
+                The stronger this is, the less you edit after every tailor.
+              </p>
+
+              {/*
+                A suggestion, not a correction. This replaced an amber banner
+                under a warning triangle reading "One entry has no numbers in
+                it — a few questions would fix it", which stated a defect about
+                somebody's career and offered twenty-five questions to mend one
+                bullet. Nothing here is flag-coloured, nothing carries an icon,
+                and once every entry has a number the block renders nothing
+                rather than turning green.
+              */}
+              {thin.length ? (
+                <div className="mt-6 flex flex-col gap-2">
+                  <p className="text-[12.5px] leading-relaxed text-ink-muted">
+                    Numbers are what make a bullet land &mdash; a percentage, a count, time saved.
+                  </p>
+                  {thin.map((w) => (
+                    <button
+                      key={w.key}
+                      type="button"
+                      onClick={() => { setDirty(false); setSection(w.key); }}
+                      className="text-left text-[12.5px] leading-relaxed text-accent transition hover:text-accent-hover hover:underline hover:underline-offset-2"
+                    >
+                      {w.count} {w.noun} {w.count === 1 ? 'entry does' : 'entries do'} not have one yet &rarr;
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          {/*
-            The only place in the app that offers the interview. It looks the
-            same whether the profile is thin or full, so it is never a reaction
-            to a gap — which is what made the old prompts feel like nagging.
-          */}
-          <div className="mt-auto hidden pt-7 lg:block">
-            <Link
-              href="/interview"
-              className="block rounded border border-rule-field bg-ground-surface px-3 py-2.5 text-[12.5px] leading-snug text-ink-prose transition hover:border-accent-line hover:text-ink"
-            >
-              Rather be asked? Answer questions about your work{' '}
-              <span className="whitespace-nowrap text-accent">&rarr;</span>
-            </Link>
-          </div>
         </nav>
 
         {/* the section being edited */}

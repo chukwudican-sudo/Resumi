@@ -1,59 +1,20 @@
-import InterviewFlow from '../components/interview/InterviewFlow';
-import { computeCoverage } from '../lib/interview/coverage';
-import type { Fact, InterviewPhase, InterviewQuestion, ProfileEntry } from '../lib/types';
-import { requireUserId } from '../server/auth';
-import { getActiveFacts, getActiveInterview, getProfileEntries } from '../server/db/repository';
+import { redirect } from 'next/navigation';
 
 /**
- * Picks the conversation back up exactly where it was.
+ * Closed until it is rebuilt around the job it actually has now.
  *
- * Everything comes from the database, so closing the tab mid-interview costs
- * nothing — the pending question was stored when it was asked, which means
- * resuming needs no model call at all.
+ * It was written to build a profile from nothing, which is why it runs to
+ * twenty-five turns — and at that length it is a wall in front of somebody who
+ * has not seen a resume yet. The job it should do is the opposite: take a
+ * resume that already exists and ask the few questions that would make it
+ * better. That is a different conversation, a different length, and different
+ * wiring, so the door is shut rather than left open on the old one.
+ *
+ * Nothing is deleted. The page is parked next to this file as
+ * page.disabled.tsx, the API routes under /api/interview still stand, and the
+ * engine, prompt, coverage and compose modules are untouched and still tested.
+ * Turning it back on means restoring that file.
  */
-export default async function InterviewPage() {
-  const userId = await requireUserId();
-  const [session, entries, facts] = await Promise.all([
-    getActiveInterview(userId),
-    getProfileEntries(userId),
-    getActiveFacts(userId),
-  ]);
-
-  const typedEntries: ProfileEntry[] = entries.map((e) => ({
-    id: e.id,
-    kind: e.kind as ProfileEntry['kind'],
-    title: e.title ?? undefined,
-    org: e.org ?? undefined,
-    location: e.location ?? undefined,
-    datesDisplay: e.datesDisplay ?? undefined,
-    orderIndex: e.orderIndex,
-    source: e.source as ProfileEntry['source'],
-  }));
-
-  const typedFacts: Fact[] = facts.map((f) => ({
-    id: f.id,
-    entryId: f.entryId,
-    category: f.category as Fact['category'],
-    text: f.text,
-    hasNumber: f.hasNumber,
-    confidence: f.confidence,
-    source: f.source as Fact['source'],
-    sourceTurnId: f.sourceTurnId,
-    status: 'active',
-  }));
-
-  const coverage = computeCoverage(typedEntries, typedFacts);
-
-  return (
-    <InterviewFlow
-      initial={{
-        question: (session?.pendingQuestion as InterviewQuestion | null) ?? null,
-        entries: typedEntries,
-        facts: typedFacts,
-        turnCount: session?.turnCount ?? 0,
-        coverage: coverage.overall,
-        phase: (session?.phase as InterviewPhase) ?? 'identity',
-      }}
-    />
-  );
+export default function InterviewPage() {
+  redirect('/setup');
 }
