@@ -46,21 +46,38 @@ export default function PolishButton({
     // Inline, they stretched a 62px toolbar to fit a paragraph and spilled
     // across the resume preview beside it.
     <div className="relative flex items-center gap-2">
-      <button
-        type="button"
-        onClick={run}
-        disabled={pending || disabled}
-        className={`flex items-center gap-2 rounded px-4 py-2 text-[13px] transition disabled:opacity-50 ${
-          stale
-            ? 'bg-accent font-medium text-ground hover:bg-accent-hover'
-            : 'border border-rule-field text-ink-prose hover:border-accent hover:text-accent'
-        }`}
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8-4.9-3.6L7.1 18l1.9-5.8L4 8.8h6.1z" />
-        </svg>
-        {pending ? 'Polishing…' : stale ? 'Polish resume' : 'Polished'}
-      </button>
+      {/*
+        One signal, not three. The button used to swap between filled and
+        outlined and rename itself "Polished", which meant the state lived in
+        how a button looked — and a filled button next to two other filled
+        buttons says nothing at a glance. A dot on the corner is the thing
+        people already read as "there is something here".
+      */}
+      <span className="relative flex">
+        <button
+          type="button"
+          onClick={run}
+          disabled={pending || disabled}
+          className="flex items-center gap-2 rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-50"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8-4.9-3.6L7.1 18l1.9-5.8L4 8.8h6.1z" />
+          </svg>
+          {pending ? 'Polishing…' : 'Polish resume'}
+          {/* The dot is a picture; this is the same fact for a screen reader. */}
+          {stale && !pending ? <span className="sr-only"> — changes since the last pass</span> : null}
+        </button>
+
+        {stale && !pending ? (
+          // Sits half outside the corner with a ring in the bar's own colour, so
+          // it reads as attached to the button rather than printed on it — and
+          // stays legible against both the green fill and the white behind.
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-flag ring-2 ring-ground-surface"
+          />
+        ) : null}
+      </span>
 
       {error ? <span className="text-[12px] text-flag">{error}</span> : null}
 
