@@ -61,6 +61,18 @@ export async function setOnboardingGoal(userId: string, stage: string, targetFie
 }
 
 /**
+ * Which English the resumes come out in.
+ *
+ * The column has been read by the prompt builder since it was added, but
+ * nothing could ever write it, so every account sat on the en-CA default and an
+ * applicant in Texas got "organise" and "licence" with no way to say otherwise.
+ * Validated against SPELLING by the action that calls this.
+ */
+export async function setUserLocale(userId: string, locale: string) {
+  await db.update(users).set({ locale }).where(eq(users.id, userId));
+}
+
+/**
  * Starts a new month if this account's is over.
  *
  * One statement, and the where clause carries the condition. Read-then-write

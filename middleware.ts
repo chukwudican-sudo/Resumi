@@ -37,7 +37,8 @@ const isKnown = createRouteMatcher([
   '/setup',
   '/applications(.*)',
   '/insights',
-  '/profile',
+  '/account',
+  '/profile',            // redirects to /account, so it must reach the page
   '/rules',
   '/interview',
   '/review',

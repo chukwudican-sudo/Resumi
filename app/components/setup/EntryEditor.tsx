@@ -262,6 +262,19 @@ export default function EntryEditor({
           >
             + Add another line
           </button>
+
+          {/*
+            Advice about writing, shown on every entry whatever state it is in
+            — never a remark about this one. The same guidance used to arrive as
+            a warning on a page that could not edit anything; here it sits above
+            the field that answers it.
+          */}
+          {kind !== 'education' ? (
+            <p className="mt-4 text-[12.5px] leading-relaxed text-ink-muted">
+              A number &mdash; a percentage, a count, time saved &mdash; tends to land harder than
+              describing the duty.
+            </p>
+          ) : null}
       </div>
 
       <div className="mt-8 flex items-center justify-between border-t border-rule pt-6">

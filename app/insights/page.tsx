@@ -86,7 +86,7 @@ export default async function InsightsPage() {
                     </div>
                   </div>
                   <Link
-                    href="/interview"
+                    href="/setup?section=skills"
                     className="shrink-0 whitespace-nowrap rounded border border-rule-field px-4 py-2 text-[13px] text-ink-prose transition hover:border-accent hover:text-accent"
                   >
                     I&rsquo;ve used this

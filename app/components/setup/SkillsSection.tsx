@@ -27,10 +27,14 @@ export default function SkillsSection({
 
   // Wrapped rather than reported at each call site: there are five ways to edit
   // this list and remembering at each of them is how one gets missed.
+  //
+  // This called itself instead of setRows, so every keystroke recursed until the
+  // stack gave out and no edit ever reached state. The skills section could not
+  // be used at all.
   const edit = (next: SkillGroup[]) => {
     setSaved(false);
     onDirty(true);
-    edit(next);
+    setRows(next);
   };
 
   function save() {

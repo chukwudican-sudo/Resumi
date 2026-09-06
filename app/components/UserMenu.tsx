@@ -30,7 +30,7 @@ export default function UserMenu() {
         then sign out.
       */}
       <UserButton.MenuItems>
-        <UserButton.Link label="Profile" href="/profile" labelIcon={<ProfileIcon />} />
+        <UserButton.Link label="Account" href="/account" labelIcon={<AccountIcon />} />
         <UserButton.Action label="manageAccount" />
         <UserButton.Action label="signOut" />
       </UserButton.MenuItems>
@@ -39,7 +39,7 @@ export default function UserMenu() {
 }
 
 /** Sized to sit with Clerk's own menu icons rather than shout over them. */
-function ProfileIcon() {
+function AccountIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />

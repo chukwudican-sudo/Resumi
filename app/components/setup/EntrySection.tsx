@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { removeEntry } from '../../server/actions';
 import { formatDates, formatPlace } from '../../lib/entryFormat';
+import { hasQuantity } from '../../lib/profileStrength';
 import type { EntryWithBullets } from '../../lib/buildResume';
 import EntryEditor, { blankEntry, type EditableEntry, type Kind } from './EntryEditor';
 
@@ -119,14 +120,33 @@ export default function EntrySection({
             entry.location,
           );
 
+          // Only the entries that carry a number are marked. An entry without
+          // one gets nothing at all — no amber, no label, no icon. Unmarked
+          // still reads as not-yet-strong at a glance, but nothing here ever
+          // tells somebody their job is deficient.
+          //
+          // Education is exempt: the score counts experience and projects only,
+          // so a mark on a degree would report on something nothing measures.
+          const quantified = kind !== 'education' && (entry.bullets ?? []).some(hasQuantity);
+
           return (
             <div key={entry.id} className="rounded-md border border-rule bg-ground-surface p-5">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-[15px] text-ink">{entry.title}</span>
-                  <span className="text-[13px] text-ink-muted">
-                    {[entry.org, dates, place].filter(Boolean).join(' · ')}
-                  </span>
+                  {/* min-w-0 and flex-wrap keep a long org · dates · place
+                      string plus the mark from pushing Edit and Remove off the
+                      right edge of the 560px column. */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-[13px] text-ink-muted">
+                      {[entry.org, dates, place].filter(Boolean).join(' · ')}
+                    </span>
+                    {quantified ? (
+                      <span className="shrink-0 whitespace-nowrap rounded-[3px] bg-accent-wash px-2 py-0.5 text-[11.5px] text-accent">
+                        quantified
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <button type="button" onClick={() => open(entry)} className="text-[13px] text-accent transition hover:text-accent-hover">

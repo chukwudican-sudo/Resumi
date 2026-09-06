@@ -18,6 +18,7 @@ import {
   saveMasterResume,
   saveSkillGroups,
   setOnboardingGoal as setGoalRow,
+  setUserLocale,
   upsertEntry as upsertEntryRow,
 } from './db/repository';
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
@@ -26,6 +27,7 @@ import { profileStrength } from '../lib/profileStrength';
 import { runPolish } from './polishProfile';
 import { getProfile, getUser } from './db/repository';
 import { RULE_MAX_LENGTH } from '../lib/rules';
+import { isKnownLocale } from '../lib/locales';
 
 /**
  * Mutations the UI can call directly.
@@ -44,7 +46,21 @@ export async function saveOnboardingGoal(stage: string, targetField: string) {
   if (!allowed.includes(stage)) throw new Error(`Unknown career stage: ${stage}`);
 
   await setGoalRow(userId, stage, targetField.trim().slice(0, 120));
-  revalidatePath('/profile');
+  revalidatePath('/account');
+}
+
+/**
+ * Which English this person's resumes are written in.
+ *
+ * The column existed and the prompt builder read it from the day it was added,
+ * but no screen could set it — so everybody got Canadian spelling regardless of
+ * where they were applying. Validated against the same list the picker offers.
+ */
+export async function saveLocale(locale: string) {
+  const userId = await requireUserId();
+  if (!isKnownLocale(locale)) throw new Error(`Unknown locale: ${locale}`);
+  await setUserLocale(userId, locale);
+  revalidatePath('/account');
 }
 
 export async function markApplicationApplied(applicationId: string) {
@@ -82,7 +98,7 @@ export async function saveContactDetails(details: {
     { label: 'Website', value: details.website },
   ]);
 
-  revalidatePath('/profile');
+  revalidatePath('/setup');
 }
 
 /**
@@ -131,7 +147,6 @@ export async function saveEntry(entry: EntryInput) {
   await upsertEntryRow(userId, entry);
   await refreshMasterResume(userId);
   revalidatePath('/setup');
-  revalidatePath('/profile');
 }
 
 export async function removeEntry(entryId: string) {
@@ -139,7 +154,6 @@ export async function removeEntry(entryId: string) {
   await deleteEntryRow(userId, entryId);
   await refreshMasterResume(userId);
   revalidatePath('/setup');
-  revalidatePath('/profile');
 }
 
 export async function saveSkills(groups: { category: string; items: string }[]) {
@@ -147,15 +161,23 @@ export async function saveSkills(groups: { category: string; items: string }[]) 
   await saveSkillGroups(userId, groups.slice(0, 8));
   await refreshMasterResume(userId);
   revalidatePath('/setup');
-  revalidatePath('/profile');
 }
 
+/**
+ * The same fields, saved from the resume editor rather than from onboarding.
+ *
+ * GitHub was missing from both the parameter list and the rows written here, so
+ * the field collected on /setup was accepted, discarded, and read back empty on
+ * the next load — silently, since nothing errors when a value simply never
+ * arrives. For a software applicant that is the one link most worth having.
+ */
 export async function saveContactAndRefresh(details: {
   name: string;
   email: string;
   phone: string;
   location: string;
   linkedin: string;
+  github: string;
   website: string;
 }) {
   const userId = await requireUserId();
@@ -165,11 +187,11 @@ export async function saveContactAndRefresh(details: {
     { label: 'Phone', value: details.phone },
     { label: 'Location', value: details.location },
     { label: 'LinkedIn', value: details.linkedin },
+    { label: 'GitHub', value: details.github },
     { label: 'Website', value: details.website },
   ]);
   await refreshMasterResume(userId);
   revalidatePath('/setup');
-  revalidatePath('/profile');
 }
 
 
@@ -250,7 +272,6 @@ export async function polishMasterResume(): Promise<{
   const polish = await runPolish(userId, structure, user?.locale ?? null);
 
   revalidatePath('/setup');
-  revalidatePath('/profile');
   return { warnings: polish.warnings, corrections: polish.corrections, sections: polish.sections };
 }
 

@@ -2,7 +2,11 @@ import Link from 'next/link';
 import UserMenu from './UserMenu';
 import { creditsLabel } from '../lib/credits';
 
-export type NavKey = 'applications' | 'insights' | 'profile' | 'rules';
+// 'account' is deliberately absent from ITEMS below: /account renders this bar
+// with nothing highlighted. It used to borrow the key belonging to the item
+// labelled "Resume", so standing on the account page underlined a tab that led
+// somewhere else entirely.
+export type NavKey = 'applications' | 'insights' | 'profile' | 'rules' | 'account';
 
 const ITEMS: { key: NavKey; href: string; label: string }[] = [
   { key: 'applications', href: '/applications', label: 'Applications' },

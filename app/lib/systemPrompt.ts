@@ -10,6 +10,8 @@
  * It used to open by naming one person and describing the tool as private to
  * them, and rule 2 said "never change Alex's name". Every user got that.
  */
+
+import { spellingFor } from './locales';
 export const TAILOR_INVARIANT = `You are the resume-tailoring engine inside Resumi. You tailor one person's resume to one job posting.
 
 You edit a Resume Structure: structured content JSON (name, contact, and the sections Education, Experience, Projects, Technical Skills, plus optional Summary, Certifications, Awards, each with their entries and bullets). You return an edited Resume Structure — never LaTeX, never a document. The app owns all layout and rendering; you only ever touch CONTENT.
@@ -54,15 +56,11 @@ Estimate the tailored resume's length in pages based on total word/character cou
  * defect the moment someone outside Canada signs up: an applicant in Texas
  * getting "organise" and "licence" on their resume looks like a typo to the
  * person reading it, and they have no way to know where it came from.
+ *
+ * The table now lives in lib/locales.ts alongside the labels the account page
+ * offers, so the choice somebody makes and the instruction the model receives
+ * are read from one list rather than two that can drift apart.
  */
-const SPELLING: Record<string, string> = {
-  'en-CA': 'Canadian English spelling (colour, programme, licence, organise) — never American spelling',
-  'en-GB': 'British English spelling (colour, programme, licence, organise) — never American spelling',
-  'en-AU': 'Australian English spelling (colour, programme, licence, organise) — never American spelling',
-  'en-US': 'American English spelling (color, program, license, organize) — never British spelling',
-};
-
-const DEFAULT_LOCALE = 'en-CA';
 
 /**
  * The part of the prompt that is about this person.
@@ -75,7 +73,7 @@ export function buildUserContext(opts: {
   locale?: string | null;
   rules?: { text: string }[];
 }): string {
-  const spelling = SPELLING[opts.locale ?? DEFAULT_LOCALE] ?? SPELLING[DEFAULT_LOCALE];
+  const spelling = spellingFor(opts.locale);
 
   const lines = [
     'ABOUT THIS REQUEST',
@@ -103,6 +101,7 @@ export function buildUserContext(opts: {
  * longer reachable from the UI — the live path is /api/applications/[id]/tailor
  * — and they carry an older document-based flow.
  */
+
 export const UNIVERSAL_RULES = TAILOR_INVARIANT;
 
 export const EXTRACTION_PROMPT = `You extract structured job posting information from screenshots and/or pasted text for Resumi, a resume-tailoring tool.

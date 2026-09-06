@@ -129,7 +129,7 @@ export default function InterviewFlow({
         setError(data?.error?.message ?? "We couldn't build your profile. Please try again.");
         return;
       }
-      router.push('/profile');
+      router.push('/setup');
     } catch {
       setError('Your internet connection dropped. Please check your connection.');
     } finally {

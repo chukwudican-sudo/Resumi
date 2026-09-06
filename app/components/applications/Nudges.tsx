@@ -23,7 +23,9 @@ export default function Nudges({
     <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
       {gap ? (
         <Link
-          href="/interview"
+          // Skills, not the interview: the line above promises one answer,
+          // and this is the screen where one answer is what it takes.
+          href="/setup?section=skills"
           className="flex items-start gap-3 rounded-md border border-accent-line bg-accent-tint px-[17px] py-[15px] transition hover:border-accent"
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="mt-px shrink-0">

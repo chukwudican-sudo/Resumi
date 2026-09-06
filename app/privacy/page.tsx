@@ -107,7 +107,7 @@ export default function PrivacyPage() {
 
         <Section title="Deleting it">
           <P>
-            There is a <B>Delete everything</B> button on your profile page. It removes your resume,
+            There is a <B>Delete everything</B> button on your account page. It removes your resume,
             every entry and bullet, your rules, every application, and every version of every resume
             you have generated. It is immediate and permanent &mdash; nothing is archived, and there
             is no copy to restore from.

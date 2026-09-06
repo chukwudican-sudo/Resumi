@@ -135,7 +135,7 @@ export default function TermsPage() {
 
         <Section title="Ending it">
           <P>
-            You can stop whenever you like. <B>Delete everything</B> on your profile page clears
+            You can stop whenever you like. <B>Delete everything</B> on your account page clears
             your data, and your sign-in is removed separately through the account menu.
           </P>
           <P>
