@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { saveEntry, type EntryInput } from '../../server/actions';
 import { isLink } from '../../lib/contactValidation';
+import { CREDENTIALS } from '../../lib/degree';
 import type { DateParts, PlaceParts } from '../../lib/entryFormat';
 import DateRange from './DateRange';
 import PlaceFields from './PlaceFields';
@@ -26,17 +27,6 @@ export function blankEntry(kind: Kind): EditableEntry {
     extra: {},
   };
 }
-
-/** The ones that cover almost everybody; anything else stays free text. */
-const CREDENTIALS = [
-  'Bachelor of Engineering',
-  'Bachelor of Science',
-  'Bachelor of Arts',
-  'Master of Science',
-  'Master of Engineering',
-  'Diploma',
-  'Certificate',
-];
 
 const COPY: Record<Kind, { titleLabel: string; orgLabel: string; titlePlaceholder: string; orgPlaceholder: string }> = {
   experience: {

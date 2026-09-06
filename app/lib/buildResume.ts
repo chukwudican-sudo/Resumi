@@ -1,5 +1,6 @@
 import { formatDates, formatPhone, formatPlace, formatWebsite, recencyKey } from './entryFormat';
 import { titleWithEmployment } from './employment';
+import { composeDegree } from './degree';
 import type { ProfileEntry, ResumeStructure } from './types';
 
 /**
@@ -169,15 +170,9 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
     education: byKind('education').map((e) => ({
       school: clean(e.org),
       location: formatPlace(placeOf(e), e.location, home),
-      // "Bachelor of Engineering in Software Engineering" — the credential and
-      // the field read as one phrase, and a field of study on its own leaves a
-      // reader guessing at the level.
-      degree: [
-        [clean(e.extra?.credential), clean(e.title)].filter(Boolean).join(' in '),
-        clean(e.extra?.honours),
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      // Composed rather than joined here, so a title that already names the
+      // degree does not get a second one bolted onto the front. See degree.ts.
+      degree: composeDegree(clean(e.extra?.credential), clean(e.title), clean(e.extra?.honours)),
       dates: formatDates(datesOf(e), 'education', e.datesDisplay),
       // Coursework, honours, a thesis. For a student this is often the most
       // relevant thing on the page, and it had nowhere to go.

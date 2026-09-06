@@ -1,5 +1,6 @@
 import { formatDates, formatPlace } from '../../lib/entryFormat';
 import { titleWithEmployment } from '../../lib/employment';
+import { composeDegree } from '../../lib/degree';
 import type { ContactFact, EntryWithBullets } from '../../lib/buildResume';
 
 /**
@@ -47,7 +48,7 @@ function describe(entry: EntryWithBullets, kind: 'experience' | 'education' | 'p
 
   if (kind === 'education') {
     return {
-      title: [entry.extra?.credential, entry.title].filter(Boolean).join(' in ') || 'Untitled',
+      title: composeDegree(entry.extra?.credential, entry.title) || 'Untitled',
       detail: [entry.org, dates, place].filter(Boolean).join(' · '),
       // Education is the one kind that reads fine without bullets, so a missing
       // date is the only thing worth flagging.
