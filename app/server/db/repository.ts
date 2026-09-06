@@ -3,6 +3,7 @@ import { db } from './client';
 import type { ResumeStructure } from '../../lib/types';
 import { MONTHLY_CREDITS, nextReset } from '../../lib/credits';
 import { splitEmployment } from '../../lib/employment';
+import { entriesFromStructure, factsFromStructure } from '../../lib/importRows';
 import {
   applications,
   documents,
@@ -276,29 +277,50 @@ export async function replaceProfileFromResume(
       and(eq(profileEntries.userId, userId), eq(profileEntries.source, 'resume_import')),
     );
 
-    const rows: (typeof profileEntries.$inferInsert)[] = [];
-    (structure.experience ?? []).forEach((e, i) => {
-      rows.push({
-        id: newId('entry'), userId, kind: 'experience',
-        title: e.title, org: e.org, location: e.location, datesDisplay: e.dates,
-        orderIndex: i, source: 'resume_import',
-      });
-    });
-    (structure.projects ?? []).forEach((p, i) => {
-      rows.push({
-        id: newId('entry'), userId, kind: 'project',
-        title: p.name, org: p.tech, datesDisplay: p.dates,
-        orderIndex: i, source: 'resume_import',
-      });
-    });
-    (structure.education ?? []).forEach((e, i) => {
-      rows.push({
-        id: newId('entry'), userId, kind: 'education',
-        title: e.degree, org: e.school, location: e.location, datesDisplay: e.dates,
-        orderIndex: i, source: 'resume_import',
-      });
-    });
+    // Bullets, skills and contact details used to be dropped on the floor here.
+    //
+    // Only headings were written — a title, an organisation, a date string —
+    // while the lines under each job, the skills and the phone number stayed in
+    // the structure blob and never became rows. Since /setup reads rows, an
+    // uploaded resume produced a setup screen listing job titles with nothing
+    // beneath them, an empty Contact and an empty Skills, which is what a new
+    // user sees as "it did not import anything".
+    //
+    // Worse than empty: the preview rendered from the blob and looked complete,
+    // so nothing seemed wrong until the first save rebuilt the resume from
+    // these rows and the bullets disappeared for good.
+    //
+    // The mapping lives in lib/importRows.ts, pure and tested, because dropping
+    // a column here is invisible until somebody's resume comes back thinner
+    // than the file they uploaded.
+    const rows = entriesFromStructure(structure).map((e) => ({
+      id: newId('entry'),
+      userId,
+      source: 'resume_import',
+      ...e,
+    }));
     if (rows.length) await tx.insert(profileEntries).values(rows);
+
+    // Skills and contact are facts, not entries, and neither was ever written.
+    // Replaced wholesale rather than scoped by source, matching what
+    // saveSkillGroups and saveContactDetails do — the imported file is the
+    // complete set, so anything left behind would render as a duplicate.
+    await tx.delete(facts).where(
+      and(eq(facts.userId, userId), inArray(facts.category, ['skill', 'identity'])),
+    );
+
+    const factRows = factsFromStructure(structure).map((f) => ({
+      id: newId('fact'),
+      userId,
+      entryId: null,
+      category: f.category,
+      text: f.text,
+      hasNumber: false,
+      confidence: 1,
+      source: 'resume_import',
+      sourceTurnId: null,
+    }));
+    if (factRows.length) await tx.insert(facts).values(factRows);
 
     await tx
       .insert(profiles)
@@ -308,7 +330,11 @@ export async function replaceProfileFromResume(
         bulletSources: [],
         strength,
         composedAt: new Date(),
-        stale: false,
+        // Stale on purpose. The rows above are now the source of truth and the
+        // resume renders from them, so claiming a finished editorial pass over
+        // a file we have just read would be a lie — and it would stop the one
+        // pass that would tidy the import from ever running.
+        stale: true,
       })
       .onConflictDoUpdate({
         target: profiles.userId,
@@ -316,7 +342,7 @@ export async function replaceProfileFromResume(
           resumeStructure: structure as object,
           strength,
           composedAt: new Date(),
-          stale: false,
+          stale: true,
           updatedAt: new Date(),
         },
       });
