@@ -82,7 +82,7 @@ export default function NewApplicationForm({ detailCount }: { detailCount: numbe
               value={sourceUrl}
               onChange={(e) => setSourceUrl(e.target.value)}
               disabled={busy}
-              placeholder="Link to the posting (optional)"
+              placeholder="Link to the posting (optional — kept for your records)"
               className="flex-grow bg-transparent text-[13.5px] text-ink outline-none placeholder:text-ink-ghost"
             />
           </div>
@@ -109,14 +109,27 @@ export default function NewApplicationForm({ detailCount }: { detailCount: numbe
               Tailoring from your profile &middot; {detailCount} {detailCount === 1 ? 'detail' : 'details'}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={busy || !text.trim()}
-            className="rounded bg-accent px-[30px] py-3.5 text-[15px] font-medium text-ground transition hover:bg-accent-hover disabled:bg-rule-field disabled:text-ink-ghost"
-          >
-            {busy ? 'Reading the posting…' : 'Tailor my resume'}
-          </button>
+          <div className="flex flex-col items-end gap-2">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={busy || !text.trim()}
+              className="rounded bg-accent px-[30px] py-3.5 text-[15px] font-medium text-ground transition hover:bg-accent-hover disabled:bg-rule-field disabled:text-ink-ghost"
+            >
+              {busy ? 'Reading the posting…' : 'Tailor my resume'}
+            </button>
+            {/*
+              A greyed-out button with no reason beside it is a dead end. The
+              link field looks like it might be enough — two other screens used
+              to say it was — so somebody who pastes only a URL sits in front of
+              a button that will not move and is told nothing.
+            */}
+            {!busy && !text.trim() ? (
+              <span className="text-[12.5px] text-ink-muted">
+                Paste the posting text above to continue
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
     </main>

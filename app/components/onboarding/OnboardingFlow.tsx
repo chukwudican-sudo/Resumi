@@ -27,6 +27,15 @@ export interface Contact {
  * arrive already filled from the account, so most people confirm rather than
  * type — which is what keeps a third step from feeling like a third step.
  */
+/**
+ * Written, never rendered — onboarding goes goal → upload-or-build.
+ *
+ * Kept because the question it asks is real: a from-scratch user is not asked
+ * for a phone or a LinkedIn here, and meets that requirement later on /setup
+ * instead. Showing this would add a screen and change what onboarding collects,
+ * which is a product decision. Delete it or wire it, but do not leave it half
+ * wired.
+ */
 function ContactStep({
   contact,
   onChange,
@@ -224,9 +233,17 @@ export default function OnboardingFlow({
           <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
         </div>
         <div className="flex items-center gap-3.5">
-          <span className="text-[13px] text-ink-faint">Step {step} of 3</span>
+          {/*
+            Two, because there are two. It counted three and the last bar never
+            filled: ContactStep below is written and never rendered, so nobody
+            is ever asked for a phone or a LinkedIn here. Wiring it in adds a
+            screen and changes what onboarding collects, which is a decision
+            rather than a correction — until then the counter should not claim
+            a step that does not happen.
+          */}
+          <span className="text-[13px] text-ink-faint">Step {step} of 2</span>
           <div className="flex gap-[5px]">
-            {[1, 2, 3].map((n) => (
+            {[1, 2].map((n) => (
               <div
                 key={n}
                 className={`h-[3px] w-[22px] rounded-sm ${step >= n ? 'bg-accent' : 'bg-rule-field'}`}
@@ -383,7 +400,9 @@ export default function OnboardingFlow({
             <div className="mt-8">
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                // Was setStep(2) while already on step 2, so it did nothing at
+                // all and there was no way back to the first question.
+                onClick={() => setStep(1)}
                 disabled={parsing}
                 className="py-3 text-[14.5px] text-ink-muted transition hover:text-ink disabled:opacity-50"
               >

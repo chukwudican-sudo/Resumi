@@ -11,7 +11,7 @@ import Link from 'next/link';
 export default function EmptyApplications({ hasProfile }: { hasProfile: boolean }) {
   const steps = [
     { title: 'Build your profile', detail: 'Answer some questions, or upload a resume', done: hasProfile },
-    { title: 'Add your first job posting', detail: 'Paste the text or drop in a link', done: false },
+    { title: 'Add your first job posting', detail: 'Paste the posting text', done: false },
     { title: 'Download a tailored resume', detail: 'Check it, then send it', done: false },
     { title: 'Mark it as applied', detail: 'So we can remind you to follow up', done: false },
   ];
@@ -60,7 +60,7 @@ export default function EmptyApplications({ hasProfile }: { hasProfile: boolean 
                 <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
               </svg>
               <span className="text-[13.5px] text-ink-muted">
-                A link works too &mdash; we&rsquo;ll read the posting from it
+                Paste the posting text &mdash; a link on its own is not enough yet
               </span>
             </div>
           ) : null}

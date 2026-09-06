@@ -191,6 +191,40 @@ export function validateCorrections(raw: unknown): PolishResult['corrections'] {
   });
 }
 
+/**
+ * The individual skill terms inside the block handed to the model.
+ *
+ * Same shape the skills form and the material list use — "Category: a, b, c"
+ * per line — so what counts as one skill is decided in the same way everywhere.
+ */
+function splitSkillTerms(sourceSkills: string): string[] {
+  return sourceSkills
+    .split('\n')
+    .flatMap((line) => {
+      const colon = line.indexOf(':');
+      return (colon > 0 ? line.slice(colon + 1) : line).split(',');
+    })
+    .map((term) => term.trim())
+    .filter(Boolean);
+}
+
+/**
+ * One correction rule, applied to a string.
+ *
+ * Whole-word, so "SQL" in a correction never rewrites the middle of
+ * "PostgreSQL". The database path (applyCorrectionsToEntries and its skill
+ * sibling) builds the same expression against rows; this is for text already in
+ * hand — the skill groups on their way to being saved, which are read from the
+ * profile before the corrections land and would otherwise carry the typo back.
+ */
+export function correctText(text: string, corrections: { from: string; to: string }[]): string {
+  return corrections.reduce(
+    (acc, c) =>
+      acc.replace(new RegExp(`\\b${c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'), c.to),
+    text,
+  );
+}
+
 export function validatePolish(raw: PolishResult, sourceSkills: string): PolishResult {
   const haystack = normalise(sourceSkills);
 
@@ -214,6 +248,41 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
         }),
     }))
     .filter((group) => group.items.length > 0);
+
+  // Nothing the person listed may disappear.
+  //
+  // The filter above stops the model inventing a skill, which is the dangerous
+  // direction — but there was no guard the other way, and it does forget. A
+  // real resume came back with "Ms PowerPoint" in the profile and absent from
+  // the document, which nobody would catch without comparing the two side by
+  // side. Losing a skill somebody claims is quieter than adding one and just as
+  // wrong.
+  //
+  // Only recovers things that already look like terms. Half the reason this
+  // pass exists is that people write prose in the skills box — "Uses Python for
+  // backend algorithm work" — and echoing that onto a resume would be worse
+  // than dropping it. So a candidate has to be short enough to be a term, and
+  // must not merely be a sentence mentioning one that was already extracted.
+  //
+  // Recovered into the last group rather than a heading of its own: the
+  // placement is a guess, but an approximately grouped skill still on the
+  // resume beats a correctly grouped one that is gone.
+  if (skillGroups.length) {
+    const emitted = Array.from(seen);
+    const missing = splitSkillTerms(sourceSkills).filter((term) => {
+      const key = normalise(term);
+      if (!key || seen.has(key)) return false;
+      // Prose, not a term.
+      if (term.split(/\s+/).length > 3 || term.length > 32) return false;
+      // A phrase wrapped around a skill already taken out of it.
+      if (emitted.some((e) => key.includes(e))) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const last = skillGroups[skillGroups.length - 1];
+    last.items.push(...missing);
+  }
 
   // Every section appears exactly once, whatever came back.
   const byKey = new Map<SectionKey, string>();

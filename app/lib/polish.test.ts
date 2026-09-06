@@ -27,7 +27,44 @@ function polish(over: Partial<PolishResult> = {}): PolishResult {
 
 test('prose becomes terms, grouped and named', () => {
   const result = validatePolish(polish(), SOURCE_SKILLS);
-  assert.deepEqual(result.skillGroups, [{ category: 'Languages', items: ['Python', 'TypeScript'] }]);
+  assert.equal(result.skillGroups.length, 1);
+  assert.equal(result.skillGroups[0].category, 'Languages');
+  // Python and TypeScript are what the pass returned. Java and SQL are listed
+  // plainly under "Core languages" and it forgot them, so they are put back —
+  // see the recovery test below.
+  assert.deepEqual(result.skillGroups[0].items, ['Python', 'TypeScript', 'Java', 'SQL']);
+});
+
+test('a term the pass forgot is put back rather than lost', () => {
+  // The bug this exists for: a real resume listed "Ms PowerPoint" and the
+  // document came back without it. Nobody notices a skill that quietly is not
+  // there.
+  const source = 'Skills: Java, SQL, Microsoft Excel, Ms PowerPoint, Team Leadership';
+  const result = validatePolish(
+    polish({
+      skillGroups: [
+        { category: 'Languages', items: ['Java', 'SQL'] },
+        { category: 'Tools', items: ['Microsoft Excel'] },
+      ],
+    }),
+    source,
+  );
+
+  const kept = result.skillGroups.flatMap((g) => g.items);
+  assert.ok(kept.includes('Ms PowerPoint'), 'a listed skill must not disappear');
+  assert.ok(kept.includes('Team Leadership'));
+});
+
+test('prose in the skills box is not echoed back as a skill', () => {
+  // Half the reason this pass exists is that people write sentences here.
+  // Recovering what the model left behind must not undo the extraction.
+  const result = validatePolish(polish(), SOURCE_SKILLS);
+  const kept = result.skillGroups.flatMap((g) => g.items);
+  for (const phrase of kept) {
+    assert.ok(phrase.split(/\s+/).length <= 3, `"${phrase}" is a sentence, not a skill`);
+  }
+  assert.equal(kept.some((k) => k.toLowerCase().startsWith('uses ')), false);
+  assert.equal(kept.some((k) => k.toLowerCase().includes('coursework')), false);
 });
 
 test('a skill nobody claimed is dropped', () => {
@@ -36,7 +73,10 @@ test('a skill nobody claimed is dropped', () => {
     polish({ skillGroups: [{ category: 'Languages', items: ['Python', 'Rust', 'Kubernetes'] }] }),
     SOURCE_SKILLS,
   );
-  assert.deepEqual(result.skillGroups[0].items, ['Python'], 'Rust and Kubernetes appear nowhere in the source');
+  const kept = result.skillGroups.flatMap((g) => g.items);
+  assert.equal(kept.includes('Rust'), false, 'Rust appears nowhere in the source');
+  assert.equal(kept.includes('Kubernetes'), false, 'Kubernetes appears nowhere in the source');
+  assert.ok(kept.includes('Python'));
 });
 
 test('the same skill cannot appear in two groups', () => {
@@ -49,7 +89,8 @@ test('the same skill cannot appear in two groups', () => {
     }),
     SOURCE_SKILLS,
   );
-  assert.deepEqual(result.skillGroups, [{ category: 'Languages', items: ['Python'] }]);
+  const python = result.skillGroups.flatMap((g) => g.items).filter((i) => i === 'Python');
+  assert.equal(python.length, 1, 'the same skill in two groups reads as padding');
 });
 
 test('matching ignores punctuation and case, so C++ survives', () => {
@@ -57,7 +98,9 @@ test('matching ignores punctuation and case, so C++ survives', () => {
     polish({ skillGroups: [{ category: 'Languages', items: ['C++', 'sql'] }] }),
     SOURCE_SKILLS,
   );
-  assert.deepEqual(result.skillGroups[0].items, ['C++', 'sql']);
+  const kept = result.skillGroups[0].items;
+  assert.ok(kept.includes('C++'), 'punctuation must not sink a real skill');
+  assert.ok(kept.includes('sql'), 'case must not sink a real skill');
 });
 
 test('a group left empty by filtering disappears rather than printing a bare heading', () => {

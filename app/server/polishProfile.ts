@@ -1,4 +1,4 @@
-import { applyPolish, polishResume, validateCorrections, type PolishResult } from '../lib/polish';
+import { applyPolish, correctText, polishResume, validateCorrections, type PolishResult } from '../lib/polish';
 import { proofread } from '../lib/proofread';
 import { buildResume, entryFromRow } from '../lib/buildResume';
 import { profileStrength } from '../lib/profileStrength';
@@ -7,6 +7,7 @@ import {
   applyCorrectionsToEntries,
   applyCorrectionsToSkillFacts,
   normaliseEmploymentTitles,
+  saveSkillGroups,
   getProfile,
   getResumeInputs,
   getUser,
@@ -19,8 +20,15 @@ import {
  * The order matters. Corrections go to the entries first, then the resume is
  * rebuilt from those corrected entries, and only then are the presentation
  * decisions laid on top — so the spelling fix lives in the data where it
- * survives every future edit, and the grouping lives on the derived resume
- * where it belongs.
+ * survives every future edit.
+ *
+ * The skill grouping used to be treated as presentation and left on the derived
+ * resume. It is not presentation, it is data: the editor reads facts, so the
+ * resume showed Languages / Tools / Concepts while the form still showed one
+ * lump called Skills. Worse, the next save marked the profile stale, the resume
+ * fell back to the build from facts, and the grouping vanished from the
+ * document too — so every polish re-derived the same answer and paid for the
+ * call again.
  */
 export async function runPolish(
   userId: string,
@@ -44,9 +52,25 @@ export async function runPolish(
 
   polish.corrections = validateCorrections(rawCorrections);
 
+  // The groups were decided from the profile as it was read, before the
+  // spelling fixes existed, so they are corrected here or they carry the typo
+  // straight back into the rows the corrections just cleaned.
+  const groups = polish.skillGroups
+    .map((g) => ({
+      category: correctText(g.category, polish.corrections),
+      items: g.items.map((item) => correctText(item, polish.corrections)).join(', '),
+    }))
+    .filter((g) => g.items.trim());
+
   await Promise.all([
     applyCorrectionsToEntries(userId, polish.corrections),
-    applyCorrectionsToSkillFacts(userId, polish.corrections),
+    // Writing the groups replaces every skill fact, so correcting them in place
+    // first would be work immediately thrown away — and both touch the same
+    // rows, which is a race rather than a saving. Only when the pass returned
+    // no usable grouping does the correction path still apply.
+    groups.length
+      ? saveSkillGroups(userId, groups)
+      : applyCorrectionsToSkillFacts(userId, polish.corrections),
     normaliseEmploymentTitles(userId),
   ]);
 

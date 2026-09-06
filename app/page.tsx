@@ -346,7 +346,7 @@ const STATS = [
 
 const STEPS = [
   { n: '1', title: 'Build your profile', body: 'Answer a few questions about your work, or upload a resume you already have. This happens once.' },
-  { n: '2', title: 'Paste a job posting', body: 'Drop in the text or a link. Resumi reads it and works out what the role actually wants.' },
+  { n: '2', title: 'Paste a job posting', body: 'Paste the posting itself. Resumi reads it and works out what the role actually wants.' },
   { n: '3', title: 'Get a resume for that job', body: 'A typeset PDF, rewritten around the posting, ready to send. Every one you make is kept.' },
 ];
 

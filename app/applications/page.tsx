@@ -32,7 +32,18 @@ export default async function ApplicationsPage() {
   ]);
 
   const list = Array.from(rows as Iterable<any>);
-  const hasProfile = Boolean(profile && !profile.stale);
+  // Whether a resume exists, not whether it has been polished lately.
+  //
+  // This read !profile.stale, and stale turns true on every save. So somebody
+  // who had just finished their resume was told "Let's build your profile",
+  // and the button sent them to onboarding, which sees a finished resume and
+  // sends them straight back here. No way forward, and the checklist showed
+  // "Build your profile" unticked for the person who had just done it.
+  //
+  // The identical mistake was found and fixed in app/onboarding/page.tsx; this
+  // copy of it survived.
+  const structure = (profile?.resumeStructure ?? null) as { name?: string } | null;
+  const hasProfile = Boolean(structure?.name);
 
   const applications: ApplicationRowData[] = list.map((r) => ({
     id: r.id,

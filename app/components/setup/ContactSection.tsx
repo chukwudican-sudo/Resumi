@@ -73,9 +73,9 @@ export default function ContactSection({
     <div>
       <h1 className="font-serif text-[34px] leading-tight">Contact</h1>
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink-prose">
-        This goes at the top of every resume you make. A name and an email are the only ones
-        required &mdash; but for a software role, a recruiter expects somewhere to see your work,
-        so a GitHub or a portfolio is worth more here than it looks.
+        This goes at the top of every resume you make. Your name, email and phone are required
+        &mdash; the rest is optional, but for a software role a recruiter expects somewhere to see
+        your work, so a GitHub or a portfolio is worth more here than it looks.
       </p>
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">

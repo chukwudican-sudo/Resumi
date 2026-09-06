@@ -50,13 +50,22 @@ export default function ApplicationView({ applicationId, status, posting, resume
         setError(data?.error?.message ?? 'Something went wrong. Please try again.');
         return;
       }
-      router.refresh();
+      // Inside the transition, so `pending` stays true until the server render
+      // actually lands. router.refresh() returns void — it does not resolve
+      // when the new page arrives — so clearing the flag straight after it put
+      // "Ready when you are." and a live button back on screen while the resume
+      // was still being written. A second click there spends a second credit.
+      startTransition(() => router.refresh());
     } catch {
       setError('Your internet connection dropped. Please check your connection.');
     } finally {
       setTailoring(false);
     }
   }
+
+  // One flag for "something is happening", covering both the request and the
+  // re-render that follows it.
+  const busy = tailoring || pending;
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
@@ -92,15 +101,15 @@ export default function ApplicationView({ applicationId, status, posting, resume
         <div className="flex flex-grow items-center justify-center px-6 py-16">
           <div className="max-w-[520px] text-center">
             <h1 className="font-serif text-[38px] leading-[1.1]">
-              {tailoring ? 'Rewriting your resume for this one.' : 'Ready when you are.'}
+              {busy ? 'Rewriting your resume for this one.' : 'Ready when you are.'}
             </h1>
             <p className="mt-4 text-[15.5px] leading-relaxed text-ink-prose">
-              {tailoring
+              {busy
                 ? 'It is reading the posting, matching it against everything you have told us, and rewriting your experience around what this role actually asks for.'
                 : 'We have the posting. Tailoring rewrites your profile around it — keeping everything true, and putting what matters for this role first.'}
             </p>
 
-            {tailoring ? (
+            {busy ? (
               <div className="mt-9 flex items-center justify-center gap-3">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-rule border-t-accent" />
                 <span className="text-[15px] text-ink-prose">Usually about a minute</span>
@@ -115,7 +124,7 @@ export default function ApplicationView({ applicationId, status, posting, resume
               </button>
             )}
 
-            {posting.requirements.length > 0 && !tailoring ? (
+            {posting.requirements.length > 0 && !busy ? (
               <div className="mt-10 text-left">
                 <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
                   What they ask for
@@ -259,10 +268,10 @@ export default function ApplicationView({ applicationId, status, posting, resume
               <button
                 type="button"
                 onClick={tailor}
-                disabled={tailoring}
+                disabled={busy}
                 className="w-full rounded border border-rule-field bg-ground-surface py-3 text-[13.5px] text-ink-prose transition hover:border-accent disabled:opacity-50"
               >
-                {tailoring ? 'Rewriting…' : 'Tailor again'}
+                {busy ? 'Rewriting…' : 'Tailor again'}
               </button>
               {error ? <p className="mt-3 text-[13px] text-flag">{error}</p> : null}
             </div>
