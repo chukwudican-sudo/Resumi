@@ -106,6 +106,219 @@ export function parsePlace(value: string | null | undefined): PlaceParts {
   };
 }
 
+// ── Reading dates back off a resume ────────────────────────────────────────
+
+/**
+ * Turning a date string back into parts.
+ *
+ * An uploaded resume gives us "Nov 2025 – May 2026" and nothing else, so the
+ * edit form — which reads month and year columns — showed empty boxes beside a
+ * card displaying the date perfectly. The card was reading the string; the form
+ * was reading the numbers; nothing converted one into the other.
+ *
+ * Split into three so the policy can be tested apart from the parsing: what the
+ * text says, whether the parts say it back, and whether that is good enough to
+ * store.
+ */
+
+/**
+ * Words that mean "still going".
+ *
+ * "Expected" sits with "Present" because they are the same state — formatDates
+ * already decides which word each kind prints, and a file saying one is
+ * describing what the other renders.
+ */
+const OPEN_ENDED = /\b(present|current|now|ongoing|expected|anticipated|graduating)\b/i;
+
+const MONTH_BY_NAME: Record<string, number> = (() => {
+  const table: Record<string, number> = { sept: 9 };
+  MONTHS.forEach((name, i) => {
+    table[name.toLowerCase()] = i + 1;
+    table[SHORT[i].toLowerCase()] = i + 1;
+  });
+  return table;
+})();
+
+function monthNumber(word: string): number | null {
+  return MONTH_BY_NAME[word.toLowerCase().replace(/\.$/, '')] ?? null;
+}
+
+/** Old enough for a career, far enough ahead for a degree in progress. */
+const plausibleYear = (n: number) => n >= 1950 && n <= new Date().getFullYear() + 15;
+
+function normaliseDateText(raw: string): string {
+  return raw
+    .trim()
+    // ISO "2023-09" would be torn in half by the range split below.
+    .replace(/\b((?:19|20)\d{2})-(\d{1,2})\b/g, '$2/$1')
+    .replace(/\bto\s+(date|present|now)\b/gi, ' present')
+    .replace(/\bcurrently\b/gi, 'present')
+    .replace(/[[\]()]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function readPoint(text: string): { month: number | null; year: number | null } | null {
+  const numeric = /(\d{1,2})\s*\/\s*((?:19|20)\d{2})/.exec(text);
+  if (numeric) {
+    const month = Number(numeric[1]);
+    const year = Number(numeric[2]);
+    if (!plausibleYear(year)) return null;
+    return { month: month >= 1 && month <= 12 ? month : null, year };
+  }
+
+  let month: number | null = null;
+  for (const word of text.split(/[^A-Za-z]+/)) {
+    const found = word ? monthNumber(word) : null;
+    if (found) { month = found; break; }
+  }
+  const matched = /\b((?:19|20)\d{2})\b/.exec(text);
+  const year = matched ? Number(matched[1]) : null;
+  if (year !== null && !plausibleYear(year)) return null;
+  if (month === null && year === null) return null;
+  return { month, year };
+}
+
+/**
+ * What a date string says, best effort.
+ *
+ * Deliberately separate from the decision to use it — see structuredDates.
+ * Anything it cannot place comes back empty rather than approximate, because a
+ * confidently wrong date on a resume is worse than a string nobody parsed.
+ */
+export function parseDates(value: string | null | undefined): DateParts {
+  const empty: DateParts = {
+    startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false,
+  };
+
+  const text = normaliseDateText(value ?? '');
+  if (!text) return empty;
+
+  const isCurrent = OPEN_ENDED.test(text);
+  // "Expected May 2028" states a finish, not a start.
+  const finishOnly = /^(expected|anticipated|graduating)\b/i.test(text);
+
+  const pieces = text
+    .replace(new RegExp(OPEN_ENDED.source, 'gi'), ' ')
+    .split(/\s*(?:[–—−]|-{1,2}|\bto\b|\bthrough\b|\buntil\b)\s*/i)
+    .map((piece) => piece.trim())
+    .filter(Boolean);
+
+  // Three pieces is not a range, it is something we do not understand.
+  if (pieces.length > 2) return empty;
+
+  const first = pieces[0] ? readPoint(pieces[0]) : null;
+  const second = pieces[1] ? readPoint(pieces[1]) : null;
+
+  let start = pieces.length === 1 && finishOnly ? null : first;
+  let end = pieces.length === 1 && finishOnly ? first : second;
+
+  // "May – Aug 2025" writes the shared year once.
+  if (start && start.year === null && end?.year) start = { ...start, year: end.year };
+  if (end && end.year === null && start?.year) end = { ...end, year: start.year };
+
+  // A month with no year cannot be placed on a page or put in an order.
+  if (start && start.year === null) start = null;
+  if (end && end.year === null) end = null;
+
+  return {
+    startMonth: start?.month ?? null,
+    startYear: start?.year ?? null,
+    endMonth: end?.month ?? null,
+    endYear: end?.year ?? null,
+    isCurrent,
+  };
+}
+
+/** "May – Aug 2025" and "May 2025 – Aug 2025" say the same thing. */
+function shareYear(text: string): string {
+  return text.replace(
+    /^([a-z]{3,9})\.?\s*-\s*([a-z]{3,9})\.?\s+((?:19|20)\d{2})$/,
+    (whole, from: string, to: string, year: string) =>
+      monthNumber(from) && monthNumber(to) ? `${from} ${year} - ${to} ${year}` : whole,
+  );
+}
+
+function dateTokens(text: string): string[] {
+  return shareYear(
+    normaliseDateText(text)
+      .toLowerCase()
+      .replace(/[–—−]/g, '-')
+      .replace(/(\d{1,2})\s*\/\s*((?:19|20)\d{2})/g, '$1 $2'),
+  )
+    .replace(/[.,:;'’]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      if (OPEN_ENDED.test(word)) return 'open';
+      const month = monthNumber(word);
+      if (month) return `m${month}`;
+      if (/^\d{1,2}$/.test(word)) return `m${Number(word)}`;
+      return word;
+    })
+    .sort();
+}
+
+/**
+ * Whether the parts say what the string said.
+ *
+ * Compared as tokens rather than characters, because formatDates is allowed to
+ * tidy — "June" becomes "Jun", "05/2025" becomes "May 2025", a degree in
+ * progress says "Expected" where the file said "Present". What it may not do is
+ * lose something ("Summer 2025" printing as "2025") or invent one, and a
+ * dropped or invented token is exactly what this catches.
+ *
+ * Not airtight: the comparison is unordered, so a start and end swapped between
+ * them would pass. Nothing in parseDates reorders, so that stays theoretical.
+ */
+export function readsTheSame(original: string, parts: DateParts, kind: string): boolean {
+  const rendered = formatDates(parts, kind);
+  if (!rendered) return false;
+  return dateTokens(original).join(' ') === dateTokens(rendered).join(' ');
+}
+
+/**
+ * The date columns an imported string earns, or nothing.
+ *
+ * Nothing is the safe answer: datesDisplay keeps the original and the resume
+ * prints exactly what it printed before. Parts are written only when they carry
+ * a year — an entry cannot be ordered without one — and only when re-rendering
+ * them restates the original. A year-only reading of "Summer 2025" would
+ * quietly rewrite somebody's resume to "2025", and the season on an internship
+ * is something a reader uses.
+ */
+export function structuredDates(value: string | null | undefined, kind: string): DateParts {
+  const empty: DateParts = {
+    startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false,
+  };
+  const raw = (value ?? '').trim();
+  if (!raw) return empty;
+
+  const parts = parseDates(raw);
+  if (!parts.startYear && !parts.endYear) return empty;
+  return readsTheSame(raw, parts, kind) ? parts : empty;
+}
+
+/**
+ * The place columns an imported string earns, or nothing.
+ *
+ * "Toronto, ON" splits cleanly; a mailing address does not, and parsePlace
+ * keeps the first three pieces of whatever it is given and drops the rest
+ * without saying so.
+ */
+export function structuredPlace(value: string | null | undefined): PlaceParts {
+  const none: PlaceParts = { city: null, region: null, country: null };
+  const raw = (value ?? '').trim();
+  if (!raw) return none;
+
+  const pieces = raw.split(',').map((piece) => piece.trim()).filter(Boolean);
+  if (pieces.length === 0 || pieces.length > 3) return none;
+  // A digit or an unusually long piece is a street or a postcode, not a city.
+  if (pieces.some((piece) => piece.length > 40 || /\d/.test(piece))) return none;
+
+  return parsePlace(raw);
+}
+
 /** Sorts most recent first, using the end date, then the start. */
 export function recencyKey(parts: DateParts): number {
   if (parts.isCurrent) return Number.MAX_SAFE_INTEGER;

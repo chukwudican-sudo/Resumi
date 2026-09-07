@@ -27,7 +27,7 @@ const SAMPLE: ResumeStructure = {
     {
       school: 'Ontario Tech University',
       location: 'Oshawa, ON',
-      degree: 'BEng Software Engineering',
+      degree: "BEng Software Engineering · Dean's List",
       dates: 'Sep 2023 – May 2028',
       bullets: ['Relevant coursework: Data Structures, Operating Systems'],
     },
@@ -55,6 +55,33 @@ const SAMPLE: ResumeStructure = {
     { category: 'Tools', items: 'Docker, Postgres' },
   ],
 };
+
+
+/** An imported row as the database would hand it back to buildResume. */
+function rowToEntry(row: ReturnType<typeof entriesFromStructure>[number], i: number): EntryWithBullets {
+  return {
+    id: `entry_${i}`,
+    kind: row.kind,
+    title: row.title ?? '',
+    org: row.org ?? '',
+    location: row.location ?? '',
+    city: row.city,
+    region: row.region,
+    country: row.country,
+    startMonth: row.startMonth,
+    startYear: row.startYear,
+    endMonth: row.endMonth,
+    endYear: row.endYear,
+    isCurrent: row.isCurrent,
+    datesDisplay: row.datesDisplay ?? '',
+    url: row.url ?? '',
+    tech: row.tech ?? '',
+    extra: row.extra,
+    orderIndex: row.orderIndex,
+    bullets: row.bullets,
+    source: 'resume_import',
+  };
+}
 
 test('every bullet in the file becomes a bullet on a row', () => {
   const rows = entriesFromStructure(SAMPLE);
@@ -103,28 +130,7 @@ test('skills and contact details are imported as facts', () => {
 });
 
 test('the resume rebuilt from imported rows still holds what was uploaded', () => {
-  const entries: EntryWithBullets[] = entriesFromStructure(SAMPLE).map((row, i) => ({
-    id: `entry_${i}`,
-    kind: row.kind,
-    title: row.title ?? '',
-    org: row.org ?? '',
-    location: row.location ?? '',
-    city: null,
-    region: null,
-    country: null,
-    startMonth: null,
-    startYear: null,
-    endMonth: null,
-    endYear: null,
-    isCurrent: false,
-    datesDisplay: row.datesDisplay ?? '',
-    url: row.url ?? '',
-    tech: row.tech ?? '',
-    extra: {},
-    orderIndex: row.orderIndex,
-    bullets: row.bullets,
-    source: 'resume_import',
-  }));
+  const entries: EntryWithBullets[] = entriesFromStructure(SAMPLE).map(rowToEntry);
 
   const factRows: ContactFact[] = factsFromStructure(SAMPLE).map((f) => ({
     category: f.category,
@@ -166,4 +172,65 @@ test('blank bullets and blank fields are not imported', () => {
   assert.equal(imported.some((f) => f.category === 'skill'), false);
   assert.equal(imported.some((f) => f.text.startsWith('Email:')), false);
   assert.ok(imported.some((f) => f.text === 'Phone: x'));
+});
+
+// ── What the edit form can actually see ────────────────────────────────────
+
+test('an imported job lands with dates and a place the form can show', () => {
+  const job = entriesFromStructure(SAMPLE).find((r) => r.kind === 'experience');
+  assert.ok(job);
+  // The card and the resume already showed these; the edit form could not,
+  // because it reads the columns and only the string was ever written.
+  assert.equal(job.startMonth, 5);
+  assert.equal(job.startYear, 2025);
+  assert.equal(job.endMonth, 8);
+  assert.equal(job.endYear, 2026);
+  assert.equal(job.city, 'Toronto');
+  assert.equal(job.region, 'ON');
+  // And the originals are still there, whatever the parsing managed.
+  assert.equal(job.datesDisplay, 'May 2025 – Aug 2026');
+  assert.equal(job.location, 'Toronto, ON');
+});
+
+test('a degree lands split into the boxes the form has', () => {
+  const school = entriesFromStructure(SAMPLE).find((r) => r.kind === 'education');
+  assert.ok(school);
+  assert.equal(school.title, 'Software Engineering');
+  assert.equal(school.extra.credential, 'Bachelor of Engineering');
+  assert.equal(school.extra.honours, "Dean's List");
+});
+
+test('clicking the credential chip cannot print it twice', () => {
+  // The live corruption, pinned end to end: split on the way in, composed on
+  // the way out, said once.
+  const rows = entriesFromStructure(SAMPLE).filter((r) => r.kind === 'education');
+  const entries: EntryWithBullets[] = rows.map((row, i) => rowToEntry(row, i));
+  const rebuilt = buildResume(entries, []);
+  assert.equal(rebuilt.education[0].degree, "Bachelor of Engineering in Software Engineering · Dean's List");
+});
+
+test('a date nobody can read is left exactly as written', () => {
+  const messy: ResumeStructure = {
+    ...SAMPLE,
+    experience: [{ title: 'Intern', org: 'Acme', location: '', dates: 'Summer 2025', bullets: ['Did a thing'] }],
+    projects: [],
+    education: [],
+  };
+  const [row] = entriesFromStructure(messy);
+  assert.equal(row.startYear, null, 'a season is not a month');
+  assert.equal(row.datesDisplay, 'Summer 2025');
+
+  // And the resume still prints it, because formatDates falls back.
+  const rebuilt = buildResume([rowToEntry(row, 0)], []);
+  assert.equal(rebuilt.experience[0].dates, 'Summer 2025');
+});
+
+test('every field an imported row carries is one the resume builder reads', () => {
+  // The boundary that has now dropped columns twice.
+  const [row] = entriesFromStructure(SAMPLE);
+  const entry = rowToEntry(row, 0) as unknown as Record<string, unknown>;
+  for (const key of Object.keys(row)) {
+    if (key === 'orderIndex') continue;
+    assert.ok(key in entry, `entryFromRow must carry "${key}"`);
+  }
 });

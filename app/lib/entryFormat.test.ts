@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { abbreviateRegion, formatDates, formatPhone, formatPlace, formatWebsite, parsePlace, recencyKey, type DateParts } from './entryFormat';
+import { abbreviateRegion, formatDates, formatPhone, formatPlace, formatWebsite, parseDates, parsePlace, readsTheSame, recencyKey, structuredDates, structuredPlace, type DateParts } from './entryFormat';
 
 function dates(over: Partial<DateParts> = {}): DateParts {
   return { startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false, ...over };
@@ -145,4 +145,77 @@ test('a website shows as its domain', () => {
   assert.equal(formatWebsite('https://meetalexius.com'), 'meetalexius.com');
   assert.equal(formatWebsite('https://www.meetalexius.com/'), 'meetalexius.com');
   assert.equal(formatWebsite('github.com/chukwudican-sudo'), 'github.com/chukwudican-sudo');
+});
+
+// ── Reading dates back off a resume ────────────────────────────────────────
+
+const ACCEPTED: [string, string, DateParts][] = [
+  ['Nov 2025 – May 2026', 'experience', { startMonth: 11, startYear: 2025, endMonth: 5, endYear: 2026, isCurrent: false }],
+  ['Jan 2024 - Dec 2024', 'experience', { startMonth: 1, startYear: 2024, endMonth: 12, endYear: 2024, isCurrent: false }],
+  ['June 2026 – Present', 'project', { startMonth: 6, startYear: 2026, endMonth: null, endYear: null, isCurrent: true }],
+  ['Aug 2026', 'project', { startMonth: 8, startYear: 2026, endMonth: null, endYear: null, isCurrent: false }],
+  ['2023 – 2028', 'education', { startMonth: null, startYear: 2023, endMonth: null, endYear: 2028, isCurrent: false }],
+  ['05/2025 – 08/2026', 'experience', { startMonth: 5, startYear: 2025, endMonth: 8, endYear: 2026, isCurrent: false }],
+  ['2023-09 – 2028-05', 'education', { startMonth: 9, startYear: 2023, endMonth: 5, endYear: 2028, isCurrent: false }],
+  ['May – Aug 2025', 'experience', { startMonth: 5, startYear: 2025, endMonth: 8, endYear: 2025, isCurrent: false }],
+  ['Sep 2023 – May 2028 (Expected)', 'education', { startMonth: 9, startYear: 2023, endMonth: 5, endYear: 2028, isCurrent: true }],
+];
+
+test('real resume date strings are read into parts', () => {
+  for (const [input, , expected] of ACCEPTED) {
+    assert.deepEqual(parseDates(input), expected, `parsing "${input}"`);
+  }
+});
+
+test('what cannot be placed comes back empty rather than approximate', () => {
+  const empty: DateParts = { startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false };
+  for (const input of ['', '   ', 'Various', 'two years', '1066', '3025', 'May-Aug-2025']) {
+    assert.deepEqual(parseDates(input), { ...empty, isCurrent: parseDates(input).isCurrent }, `"${input}"`);
+    assert.equal(parseDates(input).startYear, null, `"${input}" has no year`);
+    assert.equal(parseDates(input).endYear, null, `"${input}" has no year`);
+  }
+  assert.deepEqual(parseDates(null), empty);
+});
+
+test('the round trip is the contract, not a coincidence', () => {
+  // Every string we accept must re-render to something that says the same
+  // thing. This is what makes writing the parts safe.
+  for (const [input, kind, expected] of ACCEPTED) {
+    assert.equal(readsTheSame(input, expected, kind), true, `"${input}" must round-trip`);
+  }
+});
+
+test('a date that would lose something on the way back is not stored', () => {
+  const empty: DateParts = { startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false };
+
+  // The season is information a reader uses; rendering "2025" would drop it.
+  assert.deepEqual(structuredDates('Summer 2025', 'experience'), empty);
+  // A day is not a month, and 05/06 could be either way round.
+  assert.deepEqual(structuredDates('05/06/2025', 'project'), empty);
+  // Nothing to order by.
+  assert.deepEqual(structuredDates('Ongoing', 'experience'), { ...empty, isCurrent: false });
+  assert.deepEqual(structuredDates('', 'experience'), empty);
+  assert.deepEqual(structuredDates(null, 'experience'), empty);
+});
+
+test('the same string can be storable for one kind and not another', () => {
+  // Education renders "(Expected)" and keeps the finish date; experience would
+  // render "Sep 2023 – Present" and lose it, so it is refused there.
+  const input = 'Sep 2023 – May 2028 (Expected)';
+  assert.equal(structuredDates(input, 'education').endYear, 2028);
+  assert.equal(structuredDates(input, 'experience').startYear, null);
+});
+
+test('a place is split only when it is shaped like one', () => {
+  assert.deepEqual(structuredPlace('San Francisco, CA'), { city: 'San Francisco', region: 'CA', country: null });
+  assert.deepEqual(structuredPlace('Toronto, ON, Canada'), { city: 'Toronto', region: 'ON', country: 'Canada' });
+  assert.deepEqual(structuredPlace('Remote'), { city: 'Remote', region: null, country: null });
+
+  const none = { city: null, region: null, country: null };
+  // parsePlace keeps the first three pieces and drops the rest silently, so
+  // anything that is not a place must not reach it.
+  assert.deepEqual(structuredPlace('123 King St W, Toronto, ON M5V 2T6'), none);
+  assert.deepEqual(structuredPlace('A, B, C, D'), none);
+  assert.deepEqual(structuredPlace(''), none);
+  assert.deepEqual(structuredPlace(null), none);
 });

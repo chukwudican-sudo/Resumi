@@ -1,4 +1,6 @@
 import type { ResumeStructure } from './types';
+import { structuredDates, structuredPlace } from './entryFormat';
+import { splitDegree } from './degree';
 
 /**
  * An uploaded resume, turned into the rows the app actually reads.
@@ -20,10 +22,21 @@ export interface ImportedEntry {
   kind: 'experience' | 'education' | 'project';
   title: string | null;
   org: string | null;
+  /** What the file said, kept whatever the parsing below managed. */
   location: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
   tech: string | null;
   url: string | null;
+  /** Likewise. The resume falls back to this when the parts are empty. */
   datesDisplay: string | null;
+  startMonth: number | null;
+  startYear: number | null;
+  endMonth: number | null;
+  endYear: number | null;
+  isCurrent: boolean;
+  extra: Record<string, string>;
   bullets: string[];
   orderIndex: number;
 }
@@ -51,9 +64,12 @@ export function entriesFromStructure(structure: ResumeStructure): ImportedEntry[
       title: clean(e.title),
       org: clean(e.org),
       location: clean(e.location),
+      ...structuredPlace(e.location),
       tech: null,
       url: null,
       datesDisplay: clean(e.dates),
+      ...structuredDates(e.dates, 'experience'),
+      extra: {},
       bullets: cleanBullets(e.bullets),
       orderIndex: i,
     });
@@ -65,25 +81,39 @@ export function entriesFromStructure(structure: ResumeStructure): ImportedEntry[
       title: clean(p.name),
       org: null,
       location: null,
+      city: null,
+      region: null,
+      country: null,
       // Its own column. Written into org, the stack printed where the employer
       // goes and the project's real field stayed empty.
       tech: clean(p.tech),
       url: clean(p.url),
       datesDisplay: clean(p.dates),
+      ...structuredDates(p.dates, 'project'),
+      extra: {},
       bullets: cleanBullets(p.bullets),
       orderIndex: i,
     });
   });
 
   (structure.education ?? []).forEach((e, i) => {
+    // "Bachelor of Engineering in Software Engineering · Dean's List" is one
+    // phrase on a page and three separate boxes in the editor.
+    const degree = splitDegree(e.degree);
     rows.push({
       kind: 'education',
-      title: clean(e.degree),
+      title: clean(degree.title),
       org: clean(e.school),
       location: clean(e.location),
+      ...structuredPlace(e.location),
       tech: null,
       url: null,
       datesDisplay: clean(e.dates),
+      ...structuredDates(e.dates, 'education'),
+      extra: {
+        ...(degree.credential ? { credential: degree.credential } : {}),
+        ...(degree.honours ? { honours: degree.honours } : {}),
+      },
       // Coursework and honours. Often the most relevant thing a student has.
       bullets: cleanBullets(e.bullets),
       orderIndex: i,

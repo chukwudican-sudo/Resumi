@@ -141,16 +141,24 @@ function readSkills(facts: ContactFact[]): { category: string; items: string }[]
 
 export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): ResumeStructure {
   const contact = readContact(facts);
-  // Most recent first, by the dates people actually gave — falling back to the
-  // order they were added when an entry has none, so an undated entry does not
-  // silently jump to the top of a resume.
-  const byKind = (kind: string) =>
-    entries
-      .filter((e) => e.kind === kind)
-      .sort((a, b) => {
-        const diff = recencyKey(datesOf(b)) - recencyKey(datesOf(a));
-        return diff !== 0 ? diff : a.orderIndex - b.orderIndex;
-      });
+  // Most recent first — but only when every entry in the section can actually
+  // be placed.
+  //
+  // recencyKey scores an undated entry 0, so in a mixed section it sinks to the
+  // bottom regardless of where its owner put it. That is a real case now that
+  // imports parse dates: a resume where two jobs give months and one says
+  // "Summer 2025" would have the third pushed to the end, which is not what the
+  // file said and not what anyone asked for. One rule per section instead —
+  // dates when they are all there, the order they were given when they are not.
+  const byKind = (kind: string) => {
+    const mine = entries.filter((e) => e.kind === kind);
+    const allDated = mine.every((e) => recencyKey(datesOf(e)) > 0);
+    return [...mine].sort((a, b) => {
+      if (!allDated) return a.orderIndex - b.orderIndex;
+      const diff = recencyKey(datesOf(b)) - recencyKey(datesOf(a));
+      return diff !== 0 ? diff : a.orderIndex - b.orderIndex;
+    });
+  };
 
   const home = readContact(facts).location.split(',').pop()?.trim() || null;
 
@@ -172,7 +180,7 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
       location: formatPlace(placeOf(e), e.location, home),
       // Composed rather than joined here, so a title that already names the
       // degree does not get a second one bolted onto the front. See degree.ts.
-      degree: composeDegree(clean(e.extra?.credential), clean(e.title), clean(e.extra?.honours)),
+      degree: composeDegree(clean(e.extra?.credential), clean(e.title), clean(e.extra?.honours), clean(e.extra?.gpa)),
       dates: formatDates(datesOf(e), 'education', e.datesDisplay),
       // Coursework, honours, a thesis. For a student this is often the most
       // relevant thing on the page, and it had nowhere to go.
