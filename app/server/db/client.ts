@@ -30,7 +30,19 @@ function create(): ReturnType<typeof drizzle<typeof schema>> {
   // `prepare: false` is required by Supabase's transaction pooler: prepared
   // statements are per-connection, and the pooler hands out a different backend
   // per transaction, so a prepared statement is rarely there when reused.
-  const sql = postgres(url, { prepare: false });
+  const sql = postgres(url, {
+    prepare: false,
+    // One connection per instance. The transaction pooler already multiplexes,
+    // so a pool inside a serverless function that handles one request at a time
+    // buys nothing — and while the client was being rebuilt per query, the
+    // default of ten meant ten leaked sockets rather than one.
+    max: 1,
+    // Given back rather than held forever. An instance scaling down used to
+    // occupy its slot until the pooler evicted it, which is how a three-person
+    // test session reached a limit of two hundred.
+    idle_timeout: 20,
+    max_lifetime: 60 * 30,
+  });
 
   return drizzle(sql, { schema });
 }
@@ -45,15 +57,24 @@ function create(): ReturnType<typeof drizzle<typeof schema>> {
  * runtime dependency graph; deferring the connection keeps importing free and
  * leaves the error for whoever actually runs a query.
  *
- * The instance is still cached on globalThis in development, because without
- * that every hot reload opens another pool and the connection limit is reached
- * within a few minutes of editing.
+ * Cached on globalThis in every environment. In development that stops a hot
+ * reload opening another pool; in production it is the difference between one
+ * client per instance and one per query.
+ *
+ * The cache used to be skipped in production, and `db` below is a Proxy whose
+ * every property access lands here — so `db.select(...)` built a whole new
+ * postgres client, and so did the next call, each leaking a connection that
+ * nothing ever closed. It worked on the first day and degraded with every
+ * request until Supabase refused new clients at two hundred, which failed
+ * `syncCurrentUser` in the root layout and took every signed-in page down with
+ * it. The exception protected against nothing: there is no hot reload in
+ * production.
  */
 function resolve(): Db {
   const existing = globalThis.__resumiDb;
   if (existing) return existing;
   const created = create();
-  if (process.env.NODE_ENV !== 'production') globalThis.__resumiDb = created;
+  globalThis.__resumiDb = created;
   return created;
 }
 

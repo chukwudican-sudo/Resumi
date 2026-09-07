@@ -32,7 +32,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Makes sure a signed-in person exists in the database before any page tries
   // to write something owned by them. Costs one primary-key lookup on a normal
   // request; only a brand-new account pays for anything more. See syncCurrentUser.
-  await syncCurrentUser();
+  //
+  // Guarded, because this is the root layout: an unhandled throw here fails
+  // every page at once and takes app/error.tsx down with it, since that renders
+  // inside this. When the connection pool was exhausted the whole site went
+  // dark rather than showing anyone an error. The pages below already cope with
+  // a missing user row, so a failure here should cost the sync, not the site.
+  try {
+    await syncCurrentUser();
+  } catch (error) {
+    // Next signals "this route is dynamic" by throwing, so that one has to keep
+    // travelling or a page that reads headers gets rendered statically and
+    // serves one person's data to the next.
+    if ((error as { digest?: string })?.digest === 'DYNAMIC_SERVER_USAGE') throw error;
+    console.error('[Resumi] Could not sync the signed-in user; rendering anyway.', error);
+  }
 
   return (
     <ClerkProvider>
