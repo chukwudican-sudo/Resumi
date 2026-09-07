@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { UserButton } from '@clerk/nextjs';
 
 /**
@@ -20,8 +21,24 @@ import { UserButton } from '@clerk/nextjs';
  * by component type at render, and rather than establish whether that survives
  * the server/client boundary, this puts the whole thing on the side of the
  * boundary where Clerk's API is unambiguously supported.
+ *
+ * Held back until the browser has it, which is the price of those menu items.
+ * Clerk renders them through a portal that exists only on the client, so the
+ * server sent one shape and the first client render produced another, and React
+ * called it a hydration mismatch on every page with a nav — an overlay in
+ * development, a silent re-render in production. Both sides now agree on the
+ * placeholder and the real thing arrives a tick later, which is invisible next
+ * to the avatar image loading anyway.
  */
 export default function UserMenu() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+
+  // The same 28px the avatar occupies, so the bar does not shift when it lands.
+  if (!ready) {
+    return <span aria-hidden="true" className="block h-7 w-7 rounded-full bg-ground-panel" />;
+  }
+
   return (
     <UserButton appearance={{ elements: { avatarBox: 'h-7 w-7' } }} afterSignOutUrl="/">
       {/*
