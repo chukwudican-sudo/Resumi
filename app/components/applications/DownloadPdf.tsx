@@ -14,10 +14,13 @@ import { polishMasterResume } from '../../server/actions';
  */
 export default function DownloadPdf({
   applicationId,
+  version,
   polishFirst = false,
   disabled = false,
 }: {
   applicationId?: string;
+  /** Which version to hand over. Omitted means the latest. */
+  version?: number;
   /**
    * Polish before handing the file over.
    *
@@ -58,7 +61,10 @@ export default function DownloadPdf({
       const response = await fetch('/api/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(applicationId ? { applicationId } : {}),
+        // The version being looked at, not whatever is newest. Without it the
+      // download hands over the latest while an older one is on screen, and the
+      // filename gives no hint that they differ.
+      body: JSON.stringify(applicationId ? { applicationId, version } : {}),
       });
 
       if (!response.ok) {

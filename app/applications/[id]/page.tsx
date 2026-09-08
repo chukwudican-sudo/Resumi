@@ -3,7 +3,7 @@ import ApplicationView from '../../components/applications/ApplicationView';
 import type { ApplicationStatus } from '../../components/applications/ApplicationRow';
 import type { ResumeStructure } from '../../lib/types';
 import { requireUserId } from '../../server/auth';
-import { getApplication, getLatestResume, listResumeVersions } from '../../server/db/repository';
+import { getApplication, getLatestResume, getResumeVersion, listResumeVersions } from '../../server/db/repository';
 
 /**
  * One application: its posting, and the resume written for it.
@@ -12,20 +12,43 @@ import { getApplication, getLatestResume, listResumeVersions } from '../../serve
  * are about to send, not comparing it with what you had — comparison belongs in
  * the version history, where it is asked for rather than assumed.
  */
-export default async function ApplicationPage({ params }: { params: { id: string } }) {
+export default async function ApplicationPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { v?: string };
+}) {
   const userId = await requireUserId();
 
   const record = await getApplication(userId, params.id);
   if (!record) notFound();
 
-  const [resume, versions] = await Promise.all([
+  // Which version is being read, from the URL. Browsing history used to mean
+  // restoring — the picker's only action copied a version forward — so looking
+  // at what you had was indistinguishable from changing what you have.
+  const asked = Number(searchParams?.v);
+  const wanted = Number.isFinite(asked) && asked > 0 ? asked : null;
+
+  const [latest, versions] = await Promise.all([
     getLatestResume(userId, params.id),
     listResumeVersions(userId, params.id),
   ]);
 
+  // An unknown version falls back rather than 404s: a stale link should show
+  // the resume, not an error page.
+  const viewed =
+    wanted && wanted !== latest?.version
+      ? (await getResumeVersion(userId, params.id, wanted)) ?? latest
+      : latest;
+
+  const resume = viewed;
+  const isLatest = !resume || !latest || resume.version === latest.version;
+
   return (
     <ApplicationView
       applicationId={params.id}
+      isLatest={isLatest}
       versions={versions.map((v) => ({ ...v, createdAt: v.createdAt.toISOString() }))}
       status={record.application.status as ApplicationStatus}
       posting={{

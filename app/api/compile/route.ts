@@ -26,7 +26,7 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   const userId = await requireUserId();
 
-  let body: { applicationId?: unknown };
+  let body: { applicationId?: unknown; version?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -38,7 +38,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '"applicationId" must be a string' }, { status: 400 });
   }
 
-  const resolved = await resolveResume(userId, applicationId);
+  // The version the person is actually looking at. Without this the download
+  // silently hands over the latest while an older one is on screen, and the
+  // filename gives no hint that they differ.
+  const version = typeof body.version === 'number' && body.version > 0 ? body.version : null;
+
+  const resolved = await resolveResume(userId, applicationId, version);
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }

@@ -17,9 +17,16 @@ import { useEffect, useRef, useState } from 'react';
  */
 export default function PdfPreview({
   applicationId,
+  version,
   reloadKey,
 }: {
   applicationId?: string;
+  /**
+   * Which version to show. In the query string rather than a header, because
+   * the browser caches by URL — two versions of one application would otherwise
+   * share a single cache entry and the wrong bytes would be served.
+   */
+  version?: number;
   /** Change this to rebuild — after a tailor, or after polishing. */
   reloadKey?: string | number;
 }) {
@@ -36,7 +43,9 @@ export default function PdfPreview({
     setBlocking([]);
 
     async function draw() {
-      const query = applicationId ? `?applicationId=${encodeURIComponent(applicationId)}` : '';
+      const query = applicationId
+        ? `?applicationId=${encodeURIComponent(applicationId)}${version ? `&v=${version}` : ''}`
+        : '';
       const response = await fetch(`/api/resume/preview${query}`);
 
       if (!response.ok) {
@@ -110,7 +119,7 @@ export default function PdfPreview({
     return () => {
       cancelled = true;
     };
-  }, [applicationId, reloadKey]);
+  }, [applicationId, version, reloadKey]);
 
   if (state === 'error') {
     return (

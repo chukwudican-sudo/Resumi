@@ -1128,6 +1128,57 @@ export async function countApplicationsByStatus(userId: string) {
 // ── Resumes ────────────────────────────────────────────────────────────────
 
 /** The newest version for an application. */
+/**
+ * One named version of an application's resume.
+ *
+ * Browsing history used to mean restoring: the picker's only action copied the
+ * chosen version forward, so looking at what you had was indistinguishable from
+ * changing what you have, and the list grew every time somebody was curious.
+ */
+export async function getResumeVersion(userId: string, applicationId: string, version: number) {
+  const [row] = await db
+    .select()
+    .from(resumes)
+    .where(
+      and(
+        eq(resumes.userId, userId),
+        eq(resumes.applicationId, applicationId),
+        eq(resumes.version, version),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * How many edits have been spent since the last real tailor.
+ *
+ * The allowance is per tailor rather than per application or per version. Per
+ * application would punish tailoring again — a credit spent on a fresh resume
+ * arriving with no edits left to refine it. Per version is not a cap at all,
+ * since every edit creates a version and the counter would refill itself. Per
+ * tailor cannot run away because a refill costs a credit, so the real bound is
+ * credits, which is already what this product meters.
+ */
+export async function countInstructedSince(userId: string, applicationId: string): Promise<number> {
+  const rows = await db
+    .select({ version: resumes.version, mode: resumes.mode })
+    .from(resumes)
+    .where(and(eq(resumes.userId, userId), eq(resumes.applicationId, applicationId)))
+    .orderBy(desc(resumes.version));
+
+  let spent = 0;
+  for (const row of rows) {
+    if (row.mode === 'tailored') break;
+    if (row.mode === 'instructed') spent += 1;
+  }
+  return spent;
+}
+
+// Note for whoever adds the recovery banner: there is no status predicate here.
+// Every insert hardcodes 'complete' today, so nothing is broken — but the moment
+// a placeholder row is written before a model returns, it becomes "the latest"
+// for the preview, the download and every panel that reads this.
 export async function getLatestResume(userId: string, applicationId: string) {
   const [row] = await db
     .select()
@@ -1224,6 +1275,8 @@ export async function saveResume(
     log: string[];
     warnings: string[];
     estimatedPages: number | null;
+    /** 'instructed' when this version came from somebody's own instruction. */
+    mode?: string;
   },
 ): Promise<string> {
   const previous = await getLatestResume(userId, applicationId);
@@ -1233,7 +1286,7 @@ export async function saveResume(
     id,
     userId,
     applicationId,
-    mode: 'tailored',
+    mode: data.mode ?? 'tailored',
     structure: data.structure as object,
     matchScore: data.matchScore,
     missingRequirements: data.missingRequirements,

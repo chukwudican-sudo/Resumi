@@ -10,9 +10,12 @@ import VersionPicker, { type ResumeVersion } from './VersionPicker';
 import type { ApplicationStatus } from './ApplicationRow';
 import PdfPreview from './PdfPreview';
 import StrengthenPanel from './StrengthenPanel';
+import { restoreResumeVersion } from '../../server/actions';
 
 interface Props {
   applicationId: string;
+  /** False while an older version is being read. Then the screen is read-only. */
+  isLatest: boolean;
   status: ApplicationStatus;
   posting: {
     company: string | null;
@@ -33,12 +36,42 @@ interface Props {
   versions: ResumeVersion[];
 }
 
-export default function ApplicationView({ applicationId, status, posting, resume, versions }: Props) {
+export default function ApplicationView({ applicationId, isLatest, status, posting, resume, versions }: Props) {
   const router = useRouter();
   const [tailoring, setTailoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'review' | 'posting'>('review');
+  const [instruction, setInstruction] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [editsLeft, setEditsLeft] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
+
+  async function applyInstruction() {
+    if (!instruction.trim() || editing) return;
+    setEditing(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/applications/${applicationId}/instruct`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction: instruction.trim() }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data?.error?.message ?? 'Something went wrong. Please try again.');
+        return;
+      }
+      setEditsLeft(typeof data?.editsLeft === 'number' ? data.editsLeft : null);
+      setInstruction('');
+      // Inside the transition, so the spinner outlasts the request and a second
+      // click cannot land on a screen that has not caught up yet.
+      startTransition(() => router.refresh());
+    } catch {
+      setError('Your internet connection dropped. Please check your connection.');
+    } finally {
+      setEditing(false);
+    }
+  }
 
   async function tailor() {
     setTailoring(true);
@@ -91,7 +124,7 @@ export default function ApplicationView({ applicationId, status, posting, resume
               current={resume.version}
               versions={versions}
             />
-            <DownloadPdf applicationId={applicationId} />
+            <DownloadPdf applicationId={applicationId} version={resume.version} />
             <StatusPicker applicationId={applicationId} status={status} />
           </div>
         ) : null}
@@ -143,10 +176,48 @@ export default function ApplicationView({ applicationId, status, posting, resume
           </div>
         </div>
       ) : (
-        <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_440px] lg:overflow-hidden">
-          <div className="flex min-h-0 flex-col items-center bg-ground-band px-9 py-7 lg:overflow-y-auto">
+        <div className="grid min-h-0 flex-grow grid-cols-1 overflow-y-auto lg:grid-cols-[320px_minmax(0,1fr)_440px] lg:overflow-hidden">
+          {/*
+            What happened, at column width instead of a count behind a link.
+            This is the app's account of what it did to somebody's career
+            history, and it used to be the least readable thing on the screen —
+            collapsed, in a 440px rail, next to the controls. The band either
+            side of the centred page was three hundred pixels of empty grey.
+
+            Read left, act right: everything here describes, everything on the
+            right changes.
+          */}
+          <div className="order-3 flex min-h-0 flex-col border-t border-rule bg-ground px-5 py-5 lg:order-none lg:border-r lg:border-t-0 lg:overflow-y-auto">
+            <span className="text-[10.5px] uppercase tracking-[0.12em] text-ink-faint">
+              {resume.log.length
+                ? `What changed · ${resume.log.length} ${resume.log.length === 1 ? 'edit' : 'edits'}`
+                : 'What changed'}
+            </span>
+            {resume.log.length ? (
+              <div className="mt-4 flex flex-col gap-3">
+                {resume.log.map((line, i) => (
+                  <div key={i} className="border-l-2 border-rule pl-3">
+                    <span className="text-[12.5px] leading-relaxed text-ink-prose">{line}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 text-[12.5px] leading-relaxed text-ink-muted">
+                Nothing has been changed on this version yet.
+              </p>
+            )}
+            <p className="mt-6 border-t border-rule pt-4 text-[12.5px] leading-relaxed text-ink-muted">
+              Every date, employer and number is left exactly as your profile has it. Nothing is
+              invented to fill a gap.
+            </p>
+          </div>
+
+          <div className="order-1 flex min-h-0 flex-col items-center bg-ground-band px-8 py-7 lg:order-none lg:overflow-y-auto">
             <div className="mb-4 flex w-full max-w-[600px] items-center justify-between">
-              <span className="text-xs text-ink-muted">Version {resume.version}</span>
+              <span className="text-xs text-ink-muted">
+                Version {resume.version}
+                {!isLatest ? ' · an earlier version' : null}
+              </span>
               <span className="inline-flex items-center gap-1.5 rounded-[3px] bg-accent-wash px-2.5 py-1 text-[11.5px] text-accent">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6L9 17l-5-5" />
@@ -154,10 +225,12 @@ export default function ApplicationView({ applicationId, status, posting, resume
                 ATS-safe
               </span>
             </div>
-            <PdfPreview applicationId={applicationId} reloadKey={resume.version} />
+            {/* The compiled document, and nothing drawn on it: this is what
+                downloads, so a marked-up copy would stop it being a preview. */}
+            <PdfPreview applicationId={applicationId} version={resume.version} reloadKey={resume.version} />
           </div>
 
-          <aside className="flex min-h-0 flex-col border-t border-rule bg-ground-surface lg:border-l lg:border-t-0">
+          <aside className="order-2 flex min-h-0 flex-col border-t border-rule bg-ground-surface lg:order-none lg:border-l lg:border-t-0">
             <div className="flex shrink-0 gap-6 border-b border-rule px-6">
               {(['review', 'posting'] as const).map((t) => (
                 <button
@@ -172,6 +245,30 @@ export default function ApplicationView({ applicationId, status, posting, resume
             </div>
 
             <div className="flex min-h-0 flex-grow flex-col gap-5 overflow-y-auto px-6 py-6">
+              {tab === 'review' && !isLatest ? (
+                /*
+                  Reading an older version is reading only. Not disabled
+                  controls — a greyed-out button invites a click and explains
+                  nothing — and not silently acting on the newest either, which
+                  would apply an edit to a resume that is not on the screen.
+                */
+                <div className="rounded-md border border-rule bg-ground p-[18px]">
+                  <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                    Looking back
+                  </span>
+                  <p className="mt-2.5 text-[13.5px] leading-relaxed text-ink-prose">
+                    You are looking at version {resume.version}. Everything here &mdash; the match,
+                    the gaps, what changed &mdash; describes this version, and the download gives
+                    you this one. Restore it to work from here.
+                  </p>
+                  <RestoreVersion
+                    applicationId={applicationId}
+                    version={resume.version}
+                    id={versions.find((v) => v.version === resume.version)?.id ?? ''}
+                  />
+                </div>
+              ) : null}
+
               {tab === 'review' ? (
                 <>
                   {resume.matchScore !== null ? (
@@ -189,11 +286,13 @@ export default function ApplicationView({ applicationId, status, posting, resume
                     </div>
                   ) : null}
 
-                  <StrengthenPanel
-                    applicationId={applicationId}
-                    missingCount={resume.missingRequirements.length}
-                    onImproved={tailor}
-                  />
+                  {isLatest ? (
+                    <StrengthenPanel
+                      applicationId={applicationId}
+                      missingCount={resume.missingRequirements.length}
+                      onImproved={tailor}
+                    />
+                  ) : null}
 
                   {resume.missingRequirements.length > 0 ? (
                     <div className="rounded-md border border-flag-line bg-flag-bg p-[18px]">
@@ -230,25 +329,6 @@ export default function ApplicationView({ applicationId, status, posting, resume
                     </div>
                   ) : null}
 
-                  {resume.log.length > 0 ? (
-                    <details className="group rounded-md border border-rule bg-ground-surface">
-                      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3">
-                        <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
-                          What changed &middot; {resume.log.length} {resume.log.length === 1 ? 'edit' : 'edits'}
-                        </span>
-                        <span className="text-[12.5px] text-accent transition group-open:hidden">Show</span>
-                        <span className="hidden text-[12.5px] text-accent group-open:inline">Hide</span>
-                      </summary>
-                      <div className="flex flex-col gap-3 border-t border-rule px-4 py-3.5">
-                        {resume.log.map((line, i) => (
-                          <div key={i} className="flex items-start gap-2.5">
-                            <div className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full bg-ink-ghost" />
-                            <span className="text-[13.5px] leading-snug text-ink-prose">{line}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
                 </>
               ) : (
                 <div className="flex flex-col gap-4">
@@ -264,20 +344,116 @@ export default function ApplicationView({ applicationId, status, posting, resume
               )}
             </div>
 
-            <div className="border-t border-rule px-6 py-4">
-              <button
-                type="button"
-                onClick={tailor}
-                disabled={busy}
-                className="w-full rounded border border-rule-field bg-ground-surface py-3 text-[13.5px] text-ink-prose transition hover:border-accent disabled:opacity-50"
-              >
-                {busy ? 'Rewriting…' : 'Tailor again'}
-              </button>
-              {error ? <p className="mt-3 text-[13px] text-flag">{error}</p> : null}
-            </div>
+            {isLatest ? (
+              <div className="flex shrink-0 flex-col gap-3 border-t border-rule px-6 py-4">
+                {/*
+                  The missing half. Until now the only way to alter a tailored
+                  resume was to regenerate it, which spends a credit and rewrites
+                  the parts somebody was happy with — so a resume that was
+                  ninety-five per cent right could be replaced but not fixed.
+
+                  Free, because a credit means "one application" and charging one
+                  to shorten a bullet means nobody ever does it. The examples are
+                  there because nobody knows what to type into an empty box.
+                */}
+                <div className="flex flex-col gap-2.5 rounded-md border border-accent-line bg-accent-tint p-[15px]">
+                  <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                    Change something
+                  </span>
+                  <textarea
+                    rows={2}
+                    value={instruction}
+                    onChange={(e) => setInstruction(e.target.value)}
+                    disabled={editing || busy}
+                    placeholder="Make the FraudWatch bullets shorter…"
+                    className="w-full resize-none rounded border border-rule-field bg-ground-surface px-3 py-2.5 text-[13.5px] leading-relaxed outline-none transition placeholder:text-ink-ghost focus:border-accent disabled:opacity-60"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {['drop the second bullet', 'lead with the Python work', 'make it fit one page'].map((example) => (
+                      <button
+                        key={example}
+                        type="button"
+                        onClick={() => setInstruction(example)}
+                        disabled={editing || busy}
+                        className="rounded-full border border-accent-line bg-ground-surface px-2.5 py-1 text-[11px] text-accent transition hover:border-accent disabled:opacity-50"
+                      >
+                        {example}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11.5px] text-ink-muted">
+                      {editsLeft === null ? 'Free · 10 per tailor' : `Free · ${editsLeft} left`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={applyInstruction}
+                      disabled={editing || busy || !instruction.trim()}
+                      className="rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:bg-rule-field disabled:text-ink-ghost"
+                    >
+                      {editing ? 'Applying…' : 'Apply'}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={tailor}
+                  disabled={busy || editing}
+                  className="w-full rounded border border-rule-field bg-ground-surface py-3 text-[13.5px] text-ink-prose transition hover:border-accent disabled:opacity-50"
+                >
+                  {busy ? 'Rewriting…' : 'Tailor again · 1 credit'}
+                </button>
+                {error ? <p className="text-[13px] text-flag">{error}</p> : null}
+              </div>
+            ) : error ? (
+              <div className="shrink-0 border-t border-rule px-6 py-4">
+                <p className="text-[13px] text-flag">{error}</p>
+              </div>
+            ) : null}
           </aside>
         </div>
       )}
     </main>
+  );
+}
+
+/**
+ * Brings an older version back as the newest.
+ *
+ * Still a copy forward rather than a rewind, so restoring is itself undoable
+ * and nothing in the history is ever lost. That used to be the picker's only
+ * action, which made looking indistinguishable from changing; now that browsing
+ * is free it is a deliberate step, taken when somebody means it.
+ */
+function RestoreVersion({
+  applicationId,
+  version,
+  id,
+}: {
+  applicationId: string;
+  version: number;
+  id: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  if (!id) return null;
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        startTransition(async () => {
+          await restoreResumeVersion(applicationId, id);
+          router.push(`/applications/${applicationId}`);
+          router.refresh();
+        })
+      }
+      className="mt-4 w-full rounded bg-accent px-4 py-2.5 text-[13.5px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-50"
+    >
+      {pending ? 'Restoring…' : `Restore version ${version}`}
+    </button>
   );
 }

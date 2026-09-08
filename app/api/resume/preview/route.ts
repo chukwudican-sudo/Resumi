@@ -28,7 +28,12 @@ export async function GET(req: NextRequest) {
   const userId = await requireUserId();
   const applicationId = req.nextUrl.searchParams.get('applicationId');
 
-  const resolved = await resolveResume(userId, applicationId);
+  // In the query string rather than a header: the browser caches by URL, so two
+  // versions of one application would otherwise share a single cache entry.
+  const requested = Number(req.nextUrl.searchParams.get('v'));
+  const version = Number.isFinite(requested) && requested > 0 ? requested : null;
+
+  const resolved = await resolveResume(userId, applicationId, version);
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.error }, { status: resolved.status });
   }

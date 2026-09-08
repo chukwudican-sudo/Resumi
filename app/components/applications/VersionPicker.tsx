@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { restoreResumeVersion } from '../../server/actions';
 
 export interface ResumeVersion {
   id: string;
@@ -51,7 +50,7 @@ export default function VersionPicker({
         disabled={pending}
         className="flex items-center gap-2 rounded border border-rule-field px-3 py-2 text-[13px] text-ink-prose transition hover:border-accent disabled:opacity-50"
       >
-        {pending ? 'Restoring…' : `Version ${current}`}
+        {pending ? 'Opening…' : `Version ${current}`}
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 9l6 6 6-6" />
         </svg>
@@ -75,8 +74,13 @@ export default function VersionPicker({
                   disabled={isCurrent}
                   onClick={() => {
                     setOpen(false);
-                    startTransition(async () => {
-                      await restoreResumeVersion(applicationId, v.id);
+                    // Looking, not restoring. This used to copy the chosen
+                    // version forward as a new one, so being curious about your
+                    // own history was indistinguishable from editing it and the
+                    // list grew on every click. Restoring is now a separate,
+                    // deliberate button on the version you are reading.
+                    startTransition(() => {
+                      router.push(`/applications/${applicationId}?v=${v.version}`);
                       router.refresh();
                     });
                   }}
@@ -97,7 +101,7 @@ export default function VersionPicker({
                       {v.matchScore !== null ? ` · ${v.matchScore}/100` : ''}
                     </span>
                   </span>
-                  {!isCurrent ? <span className="text-[12.5px] text-accent">Restore</span> : null}
+                  {!isCurrent ? <span className="text-[12.5px] text-accent">View</span> : null}
                 </button>
               );
             })}
