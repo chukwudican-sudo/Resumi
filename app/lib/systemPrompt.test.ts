@@ -67,3 +67,24 @@ test('no rules means no rules section at all', () => {
   const context = buildUserContext({ displayName: 'Sam', rules: [] });
   assert.doesNotMatch(context, /OWN RULES/);
 });
+
+test('what someone is applying for reaches the prompt', () => {
+  // Stored since onboarding and read by nothing: the account page claimed it
+  // shaped every resume while the only consumer was the disabled interview.
+  const intern = buildUserContext({ displayName: 'Sam', stage: 'internship', targetField: 'data engineering' });
+  assert.match(intern, /internships and co-ops/i);
+  assert.match(intern, /data engineering/);
+  // The point of saying it: a student must not be written up as a senior hire.
+  assert.match(intern, /years of ownership they do not have/i);
+
+  assert.match(buildUserContext({ stage: 'experienced' }), /scope, ownership and outcomes/i);
+  assert.match(buildUserContext({ stage: 'new_grad' }), /built and shipped/i);
+});
+
+test('an unset or unknown stage adds nothing rather than guessing', () => {
+  for (const stage of [null, undefined, '', '   ', 'director']) {
+    const context = buildUserContext({ displayName: 'Sam', stage });
+    assert.equal(/applying for internships|experienced hire|early career/i.test(context), false, `stage: ${stage}`);
+  }
+  assert.equal(/roles they are going for/i.test(buildUserContext({ targetField: '  ' })), false);
+});

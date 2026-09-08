@@ -11,6 +11,7 @@ import {
   getUser,
   getApplication,
   getProfile,
+  getSupportingFacts,
   saveResume,
   spendCredit,
 } from '../../../../server/db/repository';
@@ -43,11 +44,15 @@ export async function POST(_request: Request, { params }: { params: { id: string
   // wastes the call it is about to make.
   const polished = await polishIfStale(userId);
 
-  const [record, profile, rules, user] = await Promise.all([
+  const [record, profile, rules, user, supporting] = await Promise.all([
     getApplication(userId, params.id),
     getProfile(userId),
     getActiveRules(userId),
     getUser(userId),
+    // What they have answered that is not on the resume. Until now these were
+    // written and never read: somebody answered three questions about their
+    // achievements, paid a credit to re-tailor, and got the same resume back.
+    getSupportingFacts(userId),
   ]);
 
   if (!record) return errorResponse({ type: 'generic', message: 'Application not found.' }, 404);
@@ -72,6 +77,17 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const posting = record.posting;
 
+  // Things they have told us that never made it onto the page. Offered as
+  // material the tailor may use, never as licence to invent: each line is
+  // something the person said in their own words, so working one in is
+  // reporting rather than embellishing.
+  const said = supporting.length
+    ? [
+        'Also true of this person, in their own words, from questions they have answered. These are NOT yet on the resume. Use any that the posting makes relevant — worked into an existing entry rather than added as a new one — and ignore the rest. They are the only other thing you may draw on, and you may not extrapolate beyond what each one says:',
+        supporting.map((f) => `- ${f.text}`).join('\n'),
+      ].join('\n')
+    : null;
+
   const content = [
     {
       type: 'text' as const,
@@ -80,8 +96,11 @@ export async function POST(_request: Request, { params }: { params: { id: string
         '```json',
         JSON.stringify(structure, null, 2),
         '```',
+        said,
         `Job posting — Company: ${posting?.company ?? '(not provided)'}, Role: ${posting?.role ?? '(not provided)'}\n${posting?.description ?? '(no description)'}`,
-        'Produce the tailored resume now via submit_tailored_resume. No About Me document was provided — the structure above is your only source for what this person has done, so tailor within it and invent nothing to fill gaps.',
+        said
+          ? 'Produce the tailored resume now via submit_tailored_resume. The structure and the lines above it are your only sources for what this person has done — tailor within them and invent nothing to fill gaps.'
+          : 'Produce the tailored resume now via submit_tailored_resume. The structure above is your only source for what this person has done, so tailor within it and invent nothing to fill gaps.',
       ]
         .filter(Boolean)
         .join('\n\n'),
@@ -97,6 +116,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
         displayName: structure.name || user?.displayName,
         locale: user?.locale,
         rules,
+        stage: user?.stage,
+        targetField: user?.targetField,
       }),
       content,
       tool: TAILOR_TOOL,

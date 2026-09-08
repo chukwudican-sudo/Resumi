@@ -68,10 +68,28 @@ Estimate the tailored resume's length in pages based on total word/character cou
  * Sent after the cached invariant block, so it can change per user and per call
  * without costing the cache.
  */
+/**
+ * How each career stage should be pitched.
+ *
+ * Written out rather than passed through raw, because "internship" on its own
+ * tells the model a category and not what to do with it.
+ */
+const STAGE_PITCH: Record<string, string> = {
+  internship:
+    'They are applying for internships and co-ops. Pitch accordingly: coursework and projects are relevant evidence, and no phrasing should imply years of ownership they do not have.',
+  new_grad:
+    'They are early career, applying for graduate and junior roles. Lead with what they have built and shipped rather than with years served.',
+  experienced:
+    'They are an experienced hire. Lead with scope, ownership and outcomes rather than with coursework.',
+};
+
 export function buildUserContext(opts: {
   displayName?: string | null;
   locale?: string | null;
   rules?: { text: string }[];
+  /** What they are applying for. Decides how senior the writing should sound. */
+  stage?: string | null;
+  targetField?: string | null;
 }): string {
   const spelling = spellingFor(opts.locale);
 
@@ -82,6 +100,21 @@ export function buildUserContext(opts: {
       : 'You are tailoring this person\'s resume.',
     `Always use ${spelling}.`,
   ];
+
+  // What they are actually applying for, which decides how the writing should
+  // sound. The model infers a lot of this from dates already, so the value is in
+  // the ambiguous case: somebody with three years of part-time work applying for
+  // an internship should not be written up as a senior hire.
+  //
+  // Stored since onboarding and read by nothing until now — the account page
+  // claimed it shaped every resume while the only consumer was the interview,
+  // which is switched off.
+  const relevance: string[] = [];
+  const pitch = STAGE_PITCH[(opts.stage ?? '').trim()];
+  if (pitch) relevance.push(pitch);
+  const field = opts.targetField?.trim();
+  if (field) relevance.push(`The roles they are going for are in ${field}.`);
+  if (relevance.length) lines.push(...relevance);
 
   const active = (opts.rules ?? []).filter((r) => r.text.trim());
   if (active.length) {

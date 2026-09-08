@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lte, notInArray, sql } from 'drizzle-orm';
 import { db } from './client';
 import type { ResumeStructure } from '../../lib/types';
 import { MONTHLY_CREDITS, nextReset } from '../../lib/credits';
@@ -217,6 +217,32 @@ export async function getActiveFacts(userId: string) {
     .select()
     .from(facts)
     .where(and(eq(facts.userId, userId), eq(facts.status, 'active')));
+}
+
+/**
+ * What somebody has told us that is not on their resume.
+ *
+ * Everything except identity and skills — those two already reach the page
+ * through buildResume, and these do not reach it at all. They are the answers
+ * to the strengthen questions: an achievement, a number, the size of a team.
+ *
+ * Handed to the tailor as extra source material rather than written into the
+ * entries. The entries are what the person typed and a model does not get to
+ * edit them; but an answer given once should keep paying out on every job after
+ * it, which is exactly what the panel that collects them promises.
+ */
+export async function getSupportingFacts(userId: string) {
+  return db
+    .select({ category: facts.category, text: facts.text, entryId: facts.entryId })
+    .from(facts)
+    .where(
+      and(
+        eq(facts.userId, userId),
+        eq(facts.status, 'active'),
+        notInArray(facts.category, ['identity', 'skill']),
+      ),
+    )
+    .limit(80);
 }
 
 /**
@@ -766,6 +792,11 @@ export async function addFactsFromAnswers(
       confidence: 1, source: 'interview' as const, sourceTurnId: null,
     })),
   );
+
+  // Every other fact writer in this file does this and this one did not, so an
+  // answer given to the strengthen questions never triggered a rebuild — the
+  // rows landed and the resume carried on as though nothing had been said.
+  await db.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
 }
 
 // ── Interview ──────────────────────────────────────────────────────────────

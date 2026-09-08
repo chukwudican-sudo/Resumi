@@ -136,7 +136,7 @@ export default function StrengthenPanel({
             ? 'Saving…'
             : answeredCount === 0
               ? 'Answer at least one'
-              : `Save ${answeredCount} ${answeredCount === 1 ? 'answer' : 'answers'} and re-tailor`}
+              : `Save ${answeredCount} ${answeredCount === 1 ? 'answer' : 'answers'} and re-tailor \u00b7 1 credit`}
         </button>
         <p className="mt-2.5 text-center text-[12px] text-accent">
           Anything you add here stays on your profile for every future job.

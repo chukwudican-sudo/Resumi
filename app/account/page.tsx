@@ -54,8 +54,8 @@ export default async function AccountPage() {
           </Block>
 
           <Block
-            title="Looking for"
-            note="Shapes how every resume is pitched, so it is worth keeping current."
+            title="Relevance"
+            note="What you are applying for, so a resume is pitched at that rather than at whatever your dates imply."
           >
             <LookingFor stage={user?.stage ?? null} targetField={user?.targetField ?? null} />
           </Block>
