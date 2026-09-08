@@ -73,7 +73,8 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
     }
   }
 
-  async function tailor() {
+  /** Resolves false when the tailor failed, so a caller can say so. */
+  async function tailor(): Promise<boolean> {
     setTailoring(true);
     setError(null);
     try {
@@ -81,7 +82,7 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
       const data = await response.json();
       if (!response.ok) {
         setError(data?.error?.message ?? 'Something went wrong. Please try again.');
-        return;
+        return false;
       }
       // Inside the transition, so `pending` stays true until the server render
       // actually lands. router.refresh() returns void — it does not resolve
@@ -89,8 +90,10 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
       // "Ready when you are." and a live button back on screen while the resume
       // was still being written. A second click there spends a second credit.
       startTransition(() => router.refresh());
+      return true;
     } catch {
       setError('Your internet connection dropped. Please check your connection.');
+      return false;
     } finally {
       setTailoring(false);
     }

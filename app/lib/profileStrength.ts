@@ -64,20 +64,3 @@ export function profileStrength(structure: ResumeStructure | null | undefined): 
 
   return Math.round(Math.min(score, 100));
 }
-
-/** Entries whose bullets carry no number — what the profile page offers to fix. */
-export function unquantifiedEntries(structure: ResumeStructure | null | undefined): string[] {
-  if (!structure) return [];
-  const weak: string[] = [];
-  for (const job of structure.experience ?? []) {
-    if ((job.bullets ?? []).length > 0 && !(job.bullets ?? []).some(hasQuantity)) {
-      weak.push([job.title, job.org].filter(Boolean).join(' at '));
-    }
-  }
-  for (const project of structure.projects ?? []) {
-    if ((project.bullets ?? []).length > 0 && !(project.bullets ?? []).some(hasQuantity)) {
-      weak.push(project.name);
-    }
-  }
-  return weak;
-}

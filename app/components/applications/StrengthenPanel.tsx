@@ -24,7 +24,8 @@ export default function StrengthenPanel({
 }: {
   applicationId: string;
   missingCount: number;
-  onImproved: () => void;
+  /** Re-tailors. Resolves false when the re-tailor itself failed. */
+  onImproved: () => Promise<boolean> | void;
 }) {
   const router = useRouter();
   const [state, setState] = useState<'closed' | 'loading' | 'open' | 'saving'>('closed');
@@ -77,7 +78,15 @@ export default function StrengthenPanel({
       setState('closed');
       setQuestions([]);
       router.refresh();
-      onImproved();
+
+      // The answers are saved by the request above; the re-tailor is a second
+      // one. When that failed there was no sign of it — the panel closed, the
+      // credit was spent, and the resume was the one you already had. Saying so
+      // is the difference between a retry and a mystery.
+      const rewritten = await onImproved();
+      if (rewritten === false) {
+        setError('Your answers are saved, but the resume did not update. Press Tailor again.');
+      }
     } catch {
       setError('Your internet connection dropped.');
       setState('open');

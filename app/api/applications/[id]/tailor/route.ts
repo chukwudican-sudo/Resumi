@@ -40,11 +40,6 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 500);
   }
 
-  // Tailoring reads the master resume, so it should read the good version of
-  // it. Feeding the model "Uses Python for backend algorithm work" as a skill
-  // wastes the call it is about to make.
-  const polished = await polishIfStale(userId);
-
   const [record, profile, rules, user, supporting] = await Promise.all([
     getApplication(userId, params.id),
     getProfile(userId),
@@ -58,8 +53,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   if (!record) return errorResponse({ type: 'generic', message: 'Application not found.' }, 404);
 
-  const structure = (profile?.resumeStructure ?? null) as ResumeStructure | null;
-  if (!structure?.name) {
+  const profileStructure = (profile?.resumeStructure ?? null) as ResumeStructure | null;
+  if (!profileStructure?.name) {
     return errorResponse({ type: 'generic', message: 'Build your profile first.' }, 400);
   }
 
@@ -75,6 +70,17 @@ export async function POST(_request: Request, { params }: { params: { id: string
       402,
     );
   }
+
+  // Polished after the gate, not before it.
+  //
+  // Tailoring reads the master resume, so it should read the good version of
+  // it — feeding the model "Uses Python for backend algorithm work" as a skill
+  // wastes the call it is about to make. But this runs the editorial pass,
+  // which is two model calls of its own, and it used to run before anybody
+  // checked whether there was a credit to spend. So somebody at zero paid
+  // about three cents for a polish on every attempt and was then refused.
+  const polished = await polishIfStale(userId);
+  const structure = ((await getProfile(userId))?.resumeStructure ?? profileStructure) as ResumeStructure;
 
   const posting = record.posting;
 

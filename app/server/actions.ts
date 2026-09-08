@@ -11,7 +11,6 @@ import {
   setRuleActive as setRuleActiveRow,
   updateRule as updateRuleRow,
   getResumeInputs,
-  markApplied as markAppliedRow,
   restoreResumeVersion as restoreResumeVersionRow,
   setApplicationStatus as setApplicationStatusRow,
   saveContactDetails as saveContactRow,
@@ -61,13 +60,6 @@ export async function saveLocale(locale: string) {
   if (!isKnownLocale(locale)) throw new Error(`Unknown locale: ${locale}`);
   await setUserLocale(userId, locale);
   revalidatePath('/account');
-}
-
-export async function markApplicationApplied(applicationId: string) {
-  const userId = await requireUserId();
-  await markAppliedRow(userId, applicationId);
-  revalidatePath('/applications');
-  revalidatePath(`/applications/${applicationId}`);
 }
 
 /**

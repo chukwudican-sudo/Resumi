@@ -63,8 +63,3 @@ export function spellingFor(locale: string | null | undefined): string {
   const match = LOCALE_OPTIONS.find((o) => o.value === locale);
   return (match ?? LOCALE_OPTIONS[0]).instruction;
 }
-
-/** How a stored locale reads on screen. Unknown values show themselves. */
-export function localeLabel(locale: string | null | undefined): string {
-  return LOCALE_OPTIONS.find((o) => o.value === locale)?.label ?? locale ?? 'Canadian English';
-}
