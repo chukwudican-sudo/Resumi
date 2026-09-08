@@ -4,21 +4,37 @@ import type { ResumeStructure } from './types';
 /**
  * What the tailoring pass is not allowed to quietly take away.
  *
- * A real resume came back from tailoring with a fifteen-month job missing. The
- * prompt already forbade it — "keep the same entries, dates, and section
- * identities" — and the model did it anyway, then wrote a sixteen-item account
- * of its changes that never mentioned the role. Its warnings came back empty.
- * Nothing in the code looked.
+ * Read the provenance before trusting the premise. This was written after a
+ * tailored resume appeared to lose a fifteen-month job, and that turned out to
+ * be wrong: the person had deleted the entry themselves while testing, and the
+ * model had tailored faithfully from a profile that no longer held it. Entry
+ * deletion is a hard delete with no audit trail, which is why it took reading
+ * timestamps to find out.
  *
- * Three self-report channels were silent about the same deletion, which is not
- * three pieces of evidence: they are one model's account of one pass. So this
- * is arithmetic rather than another instruction. Compare what came back against
- * what went in, and put back the difference.
+ * So the headline case here — a tailored resume losing a whole entry — has
+ * never been observed. It is a precaution, kept because the prompt forbids it
+ * (rules 2 and 3 in systemPrompt.ts), because a model that is merely asked will
+ * eventually not comply, and because the cost of being wrong is asymmetric: a
+ * restore that should not have happened leaves a duplicate anybody can see and
+ * delete, while a deletion nobody catches is a hole in an employment history.
+ *
+ * Two of the things it fixes ARE observed and were verified separately:
+ *
+ *   - Section names. The tailor's schema has no field for `sections` and sets
+ *     additionalProperties false, so the model cannot return the naming polish
+ *     chose however well it behaves. Every tailored resume was losing it —
+ *     visible as "WORK EXPERIENCE" on a master resume and "EXPERIENCE" on the
+ *     tailored copy of the very same resume.
+ *   - Dropped skills. A real polish run lost "Ms PowerPoint" from a skills
+ *     list; the same recovery lives in polish.ts for the same reason.
+ *
+ * Reverting a changed date or a tidied employer name is likewise precautionary,
+ * and is the half worth keeping most: a missing job is visible the moment
+ * somebody reads their own resume, while a date moved by three months looks
+ * right, reads right, and is found by a background check.
  *
  * The guard only ever moves the resume back toward the profile. It restores and
- * it reverts; it never deletes, never trims, never invents a third thing. A
- * wrong restore costs a duplicate entry somebody can see and remove. A wrong
- * deletion costs a job nobody notices is gone.
+ * it reverts; it never deletes, never trims, never invents a third thing.
  */
 
 type Experience = ResumeStructure['experience'][number];

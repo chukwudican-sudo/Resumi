@@ -47,6 +47,21 @@ export default function EntrySection({
   const [editing, setEditing] = useState<EditableEntry | null>(null);
   const [pending, startTransition] = useTransition();
 
+  /**
+   * Which entry has been asked about, before it is actually removed.
+   *
+   * Removing was one click, with no confirmation, no undo and no record — the
+   * delete is a hard delete, so afterwards there is nothing to say a job ever
+   * existed. Somebody removed one while testing and neither they nor the
+   * database could tell later that it had happened; working out where the job
+   * went took reading timestamps.
+   *
+   * Arming rather than a browser confirm(), which is a modal nobody reads and
+   * looks nothing like the rest of this page. One at a time, so the armed
+   * button is always the one being looked at.
+   */
+  const [arming, setArming] = useState<string | null>(null);
+
   function open(entry?: EntryWithBullets) {
     onDirty(true);
     if (!entry) {
@@ -149,17 +164,40 @@ export default function EntrySection({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <button type="button" onClick={() => open(entry)} className="text-[13px] text-accent transition hover:text-accent-hover">
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => remove(entry.id)}
-                    disabled={pending}
-                    className="text-[13px] text-ink-faint transition hover:text-flag disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
+                  {arming === entry.id ? (
+                    <>
+                      <span className="text-[13px] text-flag-ink">Remove for good?</span>
+                      <button
+                        type="button"
+                        onClick={() => { setArming(null); remove(entry.id); }}
+                        disabled={pending}
+                        className="text-[13px] font-medium text-flag transition hover:text-flag-ink disabled:opacity-50"
+                      >
+                        {pending ? 'Removing…' : 'Yes, remove'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setArming(null)}
+                        className="text-[13px] text-ink-muted transition hover:text-ink"
+                      >
+                        Keep
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => open(entry)} className="text-[13px] text-accent transition hover:text-accent-hover">
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setArming(entry.id)}
+                        disabled={pending}
+                        className="text-[13px] text-ink-faint transition hover:text-flag disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
