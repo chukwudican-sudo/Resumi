@@ -1,0 +1,302 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { surfaceRepairs, validateTailored } from './tailorGuard';
+import type { ResumeStructure } from './types';
+
+/**
+ * The case this exists for.
+ *
+ * A real tailored resume came back missing the Aegon role. The model's own
+ * change log had sixteen entries and mentioned Aegon in none of them; its
+ * warnings were empty. Three self-report channels, all silent, which is why the
+ * check is arithmetic rather than another instruction.
+ *
+ * Half these tests are the opposite worry: a guard that sees deletions where
+ * there were none puts duplicate jobs on somebody's resume, so the
+ * false-positive floor matters as much as the catch.
+ */
+
+const SOURCE: ResumeStructure = {
+  name: 'Chukwudi Alex',
+  contact: { email: 'a@example.com', phone: '905-555-0142' },
+  education: [
+    { school: 'Ontario Tech University', location: 'Oshawa, ON', degree: 'BEng Software Engineering', dates: 'Sep 2023 – 2028', bullets: ['Relevant coursework: Data Structures'] },
+  ],
+  experience: [
+    { title: 'AI Engineer', org: 'Droady', location: 'San Francisco, CA', dates: 'Nov 2025 – May 2026', bullets: ['Integrated an AI model', 'Worked on billing'] },
+    { title: 'Wealth Manager', org: 'Aegon', location: 'Oshawa, ON', dates: 'May 2025 – Aug 2026', bullets: ['Managed portfolios', 'Kept 95% retention'] },
+    { title: 'Operations Specialist', org: 'WesternBell', location: 'Port Harcourt, Nigeria', dates: 'Jun 2024 – Jan 2025', bullets: ['Built the website'] },
+  ],
+  projects: [
+    { name: 'MealApp', tech: 'React Native', dates: 'May 2026 – Present', bullets: ['Designed a 17 table schema'], url: 'github.com/x/meal' },
+    { name: 'FraudWatch', tech: 'Java', dates: 'Aug 2026', bullets: ['Led the backend'] },
+  ],
+  skills: [
+    { category: 'Languages', items: 'TypeScript, Java, SQL' },
+    { category: 'Tools', items: 'Microsoft Excel, Ms PowerPoint' },
+  ],
+  sections: [
+    { key: 'education', label: 'Education' },
+    { key: 'experience', label: 'Work Experience' },
+    { key: 'projects', label: 'Technical Projects' },
+    { key: 'skills', label: 'Technical Skills' },
+  ],
+};
+
+const clone = (): ResumeStructure => JSON.parse(JSON.stringify(SOURCE));
+const orgs = (r: ResumeStructure) => r.experience.map((e) => e.org);
+
+// ── the floor: none of this is a deletion ──────────────────────────────────
+
+test('rewriting every bullet is not a deletion', () => {
+  const tailored = clone();
+  for (const job of tailored.experience) job.bullets = job.bullets.map((b) => `${b}, rewritten for the posting`);
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(repairs, []);
+  assert.deepEqual(structure.experience.map((e) => e.bullets), tailored.experience.map((e) => e.bullets));
+});
+
+test('reordering the sections is not a deletion', () => {
+  const tailored = clone();
+  tailored.experience = [tailored.experience[2], tailored.experience[0], tailored.experience[1]];
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(repairs, []);
+  assert.deepEqual(orgs(structure), ['WesternBell', 'Droady', 'Aegon'], 'the reordering must survive');
+});
+
+test('a rewritten job title is not a deletion', () => {
+  // The real one. Tailoring is allowed to do this, which is exactly why the
+  // title cannot be used as identity.
+  const tailored = clone();
+  tailored.experience[1].title = 'Wealth Manager (Client Services & Financial Planning)';
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(repairs, []);
+  assert.equal(structure.experience[1].title, 'Wealth Manager (Client Services & Financial Planning)');
+});
+
+test('a reformatted date is the same date', () => {
+  const tailored = clone();
+  tailored.experience[0].dates = 'November 2025 - May 2026';
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(repairs, [], 'reformatting is not changing');
+  assert.equal(structure.experience[0].dates, 'Nov 2025 – May 2026', "the profile's spelling wins");
+});
+
+test('trimming some bullets is what tailoring is for', () => {
+  const tailored = clone();
+  tailored.experience[0].bullets = ['Integrated an AI model'];
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(repairs, []);
+  assert.equal(structure.experience[0].bullets.length, 1);
+});
+
+test('two roles at one employer both survive a reorder', () => {
+  const source = clone();
+  source.experience = [
+    { title: 'Senior Analyst', org: 'Aegon', location: 'Oshawa, ON', dates: 'Jan 2025 – Aug 2026', bullets: ['Led the desk'] },
+    { title: 'Analyst', org: 'Aegon', location: 'Oshawa, ON', dates: 'May 2023 – Dec 2024', bullets: ['Ran the reports'] },
+  ];
+  const tailored = JSON.parse(JSON.stringify(source)) as ResumeStructure;
+  tailored.experience.reverse();
+  const { repairs, structure } = validateTailored(source, tailored);
+  assert.deepEqual(repairs, []);
+  assert.equal(structure.experience.length, 2, 'a promotion is two jobs, not one');
+});
+
+// ── the catch ──────────────────────────────────────────────────────────────
+
+test('a dropped job comes back beside the neighbour it had', () => {
+  const tailored = clone();
+  tailored.experience.splice(1, 1); // Aegon
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+
+  assert.deepEqual(orgs(structure), ['Droady', 'Aegon', 'WesternBell'], 'not appended to the end');
+  const entry = repairs.filter((r) => r.kind === 'entry');
+  assert.equal(entry.length, 1);
+  assert.match(entry[0].message, /dropped your Wealth Manager at Aegon/);
+  assert.match(entry[0].message, /will not sound like the entries around it/);
+  // Verbatim: the guard never invents a third version of somebody's history.
+  assert.deepEqual(structure.experience[1].bullets, ['Managed portfolios', 'Kept 95% retention']);
+});
+
+test('a dropped first entry comes back first', () => {
+  const tailored = clone();
+  tailored.experience.shift();
+  const { structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(orgs(structure), ['Droady', 'Aegon', 'WesternBell']);
+});
+
+test('two consecutive deletions come back in their own order', () => {
+  const tailored = clone();
+  tailored.experience.splice(0, 2);
+  const { structure, repairs } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(orgs(structure), ['Droady', 'Aegon', 'WesternBell']);
+  assert.equal(repairs.filter((r) => r.kind === 'entry').length, 2);
+});
+
+test('an emptied experience section comes back whole', () => {
+  const tailored = clone();
+  tailored.experience = [];
+  const { structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(orgs(structure), ['Droady', 'Aegon', 'WesternBell']);
+});
+
+test('the right one of two roles at one employer is restored', () => {
+  // Without consuming matches these collapse onto each other and the deletion
+  // is never seen — the shape of a promotion, and the shape of the bug.
+  const source = clone();
+  source.experience = [
+    { title: 'Senior Analyst', org: 'Aegon', location: 'Oshawa, ON', dates: 'Jan 2025 – Aug 2026', bullets: ['Led the desk'] },
+    { title: 'Analyst', org: 'Aegon', location: 'Oshawa, ON', dates: 'May 2023 – Dec 2024', bullets: ['Ran the reports'] },
+  ];
+  const tailored = JSON.parse(JSON.stringify(source)) as ResumeStructure;
+  tailored.experience.splice(1, 1);
+  const { structure, repairs } = validateTailored(source, tailored);
+  assert.equal(structure.experience.length, 2);
+  assert.deepEqual(structure.experience.map((e) => e.title), ['Senior Analyst', 'Analyst']);
+  assert.equal(repairs.filter((r) => r.kind === 'entry').length, 1);
+});
+
+test('a dropped project comes back, a renamed one does not duplicate', () => {
+  const dropped = clone();
+  dropped.projects.splice(0, 1);
+  assert.deepEqual(validateTailored(SOURCE, dropped).structure.projects.map((p) => p.name), ['MealApp', 'FraudWatch']);
+
+  const renamed = clone();
+  renamed.projects[0].name = 'MealApp — offline-first nutrition tracker';
+  const out = validateTailored(SOURCE, renamed);
+  assert.deepEqual(out.repairs, []);
+  assert.equal(out.structure.projects.length, 2);
+});
+
+// ── reversion ──────────────────────────────────────────────────────────────
+
+test('a changed date is put back, and said out loud', () => {
+  const tailored = clone();
+  tailored.experience[1].dates = 'May 2024 – Aug 2026';
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.equal(structure.experience.length, 3, 'reverted, not duplicated');
+  assert.equal(structure.experience[1].dates, 'May 2025 – Aug 2026');
+  const field = repairs.filter((r) => r.kind === 'field');
+  assert.equal(field.length, 1);
+  assert.match(field[0].message, /May 2025 – Aug 2026/);
+});
+
+test('a tidied employer name is put back', () => {
+  const tailored = clone();
+  tailored.experience[1].org = 'Aegon Asset Management';
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.equal(structure.experience.length, 3);
+  assert.equal(structure.experience[1].org, 'Aegon');
+  assert.ok(repairs.some((r) => /employer name/.test(r.message)));
+});
+
+test('an internship cannot be promoted into a job', () => {
+  const source = clone();
+  source.experience[0].title = 'Software Engineering Intern';
+  const tailored = JSON.parse(JSON.stringify(source)) as ResumeStructure;
+  tailored.experience[0].title = 'Software Engineer';
+  const { repairs, structure } = validateTailored(source, tailored);
+  assert.equal(structure.experience[0].title, 'Software Engineering Intern');
+  assert.ok(repairs.some((r) => /reads more senior/.test(r.message)));
+});
+
+test('the name and contact details are never the tailoring to decide', () => {
+  const tailored = clone();
+  tailored.name = 'Alex C.';
+  tailored.contact = { email: 'different@example.com' };
+  const { structure, repairs } = validateTailored(SOURCE, tailored);
+  assert.equal(structure.name, 'Chukwudi Alex');
+  assert.equal(structure.contact.email, 'a@example.com');
+  // Silent: there is nothing here for the person to check.
+  assert.deepEqual(repairs, []);
+});
+
+// ── contents ───────────────────────────────────────────────────────────────
+
+test('an entry stripped of every bullet keeps the ones it had', () => {
+  const tailored = clone();
+  tailored.experience[2].bullets = [];
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(structure.experience[2].bullets, ['Built the website']);
+  assert.ok(repairs.some((r) => r.kind === 'bullets'));
+});
+
+test('dropped skills come back, appended to the last group', () => {
+  const tailored = clone();
+  tailored.skills = [{ category: 'Languages', items: 'TypeScript, Java, SQL' }];
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  const all = structure.skills.flatMap((g) => g.items.split(',').map((t) => t.trim()));
+  assert.ok(all.includes('Microsoft Excel'));
+  assert.ok(all.includes('Ms PowerPoint'));
+  const skill = repairs.filter((r) => r.kind === 'skill');
+  assert.equal(skill.length, 1);
+  // Worth recording, not worth stopping over.
+  const surfaced = surfaceRepairs(repairs);
+  assert.equal(surfaced.warnings.length, 0);
+  assert.equal(surfaced.log.length, 1);
+});
+
+test('the section names polish chose survive tailoring', () => {
+  // The tailor's schema has no field for these and forbids extra ones, so the
+  // model cannot return them however well it behaves. Every tailored resume was
+  // losing them: "WORK EXPERIENCE" on the master, "EXPERIENCE" on the copy.
+  const tailored = clone();
+  delete tailored.sections;
+  const { structure, repairs } = validateTailored(SOURCE, tailored);
+  assert.deepEqual(structure.sections, SOURCE.sections);
+  assert.deepEqual(repairs, [], 'carried across quietly — the model was never able to send them');
+});
+
+test('a dropped summary comes back', () => {
+  const source = clone();
+  source.summary = 'Software engineering student building AI products.';
+  const tailored = JSON.parse(JSON.stringify(source)) as ResumeStructure;
+  delete tailored.summary;
+  const { structure, repairs } = validateTailored(source, tailored);
+  assert.equal(structure.summary, source.summary);
+  assert.ok(repairs.some((r) => /summary/i.test(r.message)));
+});
+
+// ── hostile input ──────────────────────────────────────────────────────────
+
+test('nothing back at all returns the profile rather than throwing', () => {
+  for (const bad of [null, undefined, {}, 'nope', 42]) {
+    const { structure } = validateTailored(SOURCE, bad);
+    assert.deepEqual(orgs(structure), ['Droady', 'Aegon', 'WesternBell'], `input: ${String(bad)}`);
+    assert.equal(structure.name, 'Chukwudi Alex');
+  }
+});
+
+test('malformed sections do not throw', () => {
+  const { structure } = validateTailored(SOURCE, {
+    experience: 'none',
+    projects: { name: 'not an array' },
+    education: [null],
+    skills: [{ category: 1, items: null }],
+  });
+  assert.equal(structure.experience.length, 3);
+  assert.equal(structure.projects.length, 2);
+});
+
+test('an entry the profile has never heard of is reported and kept', () => {
+  // Restoring only ever adds something removable; deleting on a bad match
+  // destroys real work. So the guard never deletes.
+  const tailored = clone();
+  tailored.experience.push({ title: 'Product Lead', org: 'Nowhere Inc', location: '', dates: '2021 – 2022', bullets: ['Invented'] });
+  const { repairs, structure } = validateTailored(SOURCE, tailored);
+  assert.equal(structure.experience.length, 4, 'kept');
+  const extra = repairs.filter((r) => r.kind === 'extra');
+  assert.equal(extra.length, 1);
+  assert.match(extra[0].message, /not in your profile/);
+});
+
+test('a warning leads the log rather than trailing it', () => {
+  const tailored = clone();
+  tailored.experience.splice(1, 1);
+  const { repairs } = validateTailored(SOURCE, tailored);
+  const { warnings, log } = surfaceRepairs(repairs);
+  assert.ok(warnings.length >= 1);
+  assert.ok(log.length >= 1);
+  for (const line of warnings) assert.ok(line.trim().endsWith('.'), `not a sentence: ${line}`);
+});

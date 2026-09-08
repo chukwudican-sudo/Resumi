@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NoToolUseError, callClaude } from '../../../../lib/anthropic';
 import { TAILOR_INVARIANT, buildUserContext } from '../../../../lib/systemPrompt';
 import type { ResumeStructure } from '../../../../lib/types';
+import { surfaceRepairs, validateTailored } from '../../../../lib/tailorGuard';
 import { requireUserId } from '../../../../server/auth';
 import { MONTHLY_CREDITS } from '../../../../lib/credits';
 import { polishIfStale } from '../../../../server/polishProfile';
@@ -123,12 +124,38 @@ export async function POST(_request: Request, { params }: { params: { id: string
       tool: TAILOR_TOOL,
     });
 
+    // Checked before it is stored, because a tailored resume came back missing
+    // a fifteen-month job and nothing noticed. The model's own change log had
+    // sixteen entries and mentioned that role in none of them, and its warnings
+    // were empty — three self-reports from one pass, all silent, which is why
+    // this is arithmetic rather than another line of prompt.
+    const guarded = validateTailored(structure, toolInput.structure);
+    const surfaced = surfaceRepairs(guarded.repairs);
+
+    const restored = guarded.repairs.filter((r) => r.kind === 'entry').length;
+    if (restored) {
+      // Countable without a database query. An entry going missing is the
+      // model breaking a rule it was given, and it should be visible that it
+      // happens rather than only that it was caught.
+      console.error(`[Resumi] Tailoring dropped ${restored} entr${restored === 1 ? 'y' : 'ies'}; restored from the profile.`);
+    }
+
+    // The model reports its own structural decisions and this was thrown away.
+    // Shown alongside the guard and never instead of it: a bullet moved from
+    // one job to another is a claim moved between employers, and until now
+    // nobody ever saw that happen.
+    const structural = (toolInput.structuralChanges ?? [])
+      .filter((c) => c && typeof c.description === 'string')
+      .map((c) => `Structural: ${c.description}${c.reason ? ` — ${c.reason}` : ''}`);
+
     const resumeId = await saveResume(userId, params.id, {
-      structure: toolInput.structure,
+      structure: guarded.structure,
       matchScore: toolInput.matchScore ?? null,
       missingRequirements: toolInput.missingRequirements ?? [],
-      log: toolInput.log ?? [],
-      warnings: toolInput.warnings ?? [],
+      // Guard lines lead. The point of a restore notice is lost at item
+      // fourteen of sixteen.
+      log: [...surfaced.log, ...structural, ...(toolInput.log ?? [])],
+      warnings: [...surfaced.warnings, ...(toolInput.warnings ?? [])],
       estimatedPages: toolInput.estimatedPages ?? null,
     });
 
