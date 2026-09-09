@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { callClaude } from './anthropic';
 import type { ResumeSection, ResumeStructure } from './types';
-import { CONVENTIONAL_ORDER, contentFor, hasContent, planSections } from './sections';
+import { CONVENTIONAL_ORDER, STORED_ELSEWHERE, contentFor, hasContent, planSections } from './sections';
 
 /**
  * The editorial pass over a resume nobody has a job posting for yet.
@@ -49,7 +49,7 @@ WHAT YOU DECIDE
 
    Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section. A section they named themselves keeps that name unless it is plainly a mistake — "Extracurricular & Community Activities" is what they call it, and shortening it to "Activities" is your preference, not an improvement.
 
-3. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
+3. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake, an award or certificate with no issuer or no date, a certificate that has expired.
 
    Overlapping dates are worked out for you and stated below. Say nothing about an overlap unless you are told it is unexplained.
 
@@ -451,6 +451,57 @@ export function overlapNote(structure: ResumeStructure): string {
   ].join('\n');
 }
 
+/**
+ * The sections the four blocks below do not spell out, as text.
+ *
+ * The pass was handed skills, education, experience and projects, and then a
+ * bare list of section keys — so it was asked to decide where "Awards & Honors"
+ * belongs on the page while having never seen a single award. It could not
+ * judge whether they were strong, and it could not raise one that was missing
+ * an issuer, because rule 3 asks for warnings about a resume it was shown half
+ * of.
+ *
+ * Content only, and stated as not-yours-to-change: this pass returns an
+ * ordering and a grouping, never prose. What it reads it cannot rewrite.
+ */
+export function otherSections(structure: ResumeStructure): string {
+  const blocks: string[] = [];
+
+  for (const section of planSections(structure)) {
+    if (STORED_ELSEWHERE.has(section.key)) continue;
+    const content = contentFor(structure, section);
+    if (!hasContent(content)) continue;
+
+    const lines: string[] = [`${section.label} (key: ${section.key}):`];
+    switch (content.shape) {
+      case 'entries':
+        for (const e of content.entries) {
+          lines.push(`- ${[e.heading, e.sub, e.headingRight, e.subRight].filter(Boolean).join(', ')}`);
+          lines.push(...e.bullets.map((b) => `    ${b}`));
+        }
+        break;
+      case 'inline':
+        for (const e of content.entries) {
+          lines.push(`- ${[e.name, e.tech, e.dates].filter(Boolean).join(', ')}`);
+          lines.push(...e.bullets.map((b) => `    ${b}`));
+        }
+        break;
+      case 'groups':
+        for (const g of content.groups) lines.push(`- ${g.items ? `${g.category}: ${g.items}` : g.category}`);
+        break;
+      case 'list':
+        for (const item of content.items) lines.push(`- ${item}`);
+        break;
+      case 'prose':
+        lines.push(content.text);
+        break;
+    }
+    blocks.push(lines.join('\n'));
+  }
+
+  return blocks.length ? blocks.join('\n\n') : '(none)';
+}
+
 /** One call. Cheap and short — this runs whenever a resume changes. */
 export async function polishResume(
   userId: string,
@@ -517,6 +568,9 @@ export async function polishResume(
             ].join('\n'),
           )
           .join('\n') || '(none)',
+        '',
+        'Their other sections \u2014 a summary, certifications, awards, anything their resume has. The content is here so you can judge where each belongs and what is weak about it; it is not yours to change:',
+        otherSections(structure),
         '',
         'Their sections, in the order they currently print. Return every one of these keys exactly once and no others — you are deciding the order and the names, not which sections exist:',
         known.map((k) => `- ${k.key} (currently "${k.label}")`).join('\n'),

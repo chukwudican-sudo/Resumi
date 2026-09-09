@@ -1,7 +1,8 @@
 import type { ResumeSection, ResumeStructure } from './types';
-import { CONVENTIONAL_ORDER, KNOWN_SHAPES, entryKindFor, inferShape, keyFor } from './sections';
+import { CONVENTIONAL_ORDER, KNOWN_SHAPES, STORED_ELSEWHERE, entryKindFor, inferShape, keyFor } from './sections';
 import { structuredDates, structuredPlace } from './entryFormat';
 import { splitDegree } from './degree';
+import { splitFlatEntries, splitFlatEntry } from './flatEntry';
 
 /**
  * An uploaded resume, turned into the rows the app actually reads.
@@ -150,9 +151,10 @@ export function entriesFromStructure(
   });
 
   for (const section of sections) {
-    // The four the app has named fields for are already above; anything else
-    // that holds entries stores them under its own key.
-    if (KNOWN_SHAPES[section.key]) continue;
+    // The four whose entries are already above. Everything else that holds
+    // entries stores them under its own key — including a Certifications
+    // section somebody laid out with an issuer and a year.
+    if (STORED_ELSEWHERE.has(section.key)) continue;
     if (section.shape !== 'entries' && section.shape !== 'inline') continue;
 
     (section.entries ?? []).forEach((e, i) => {
@@ -165,9 +167,10 @@ export function entriesFromStructure(
         tech: clean(e.tech),
         url: clean(e.url),
         datesDisplay: clean(e.dates),
-        // The experience rule: a volunteering stint reads like a job, not like
-        // a degree with an expected completion date.
-        ...structuredDates(e.dates, 'experience'),
+        // Parsed under the section's own key, so what is written back matches
+        // what the file said — a certificate reads "Expected", a volunteering
+        // stint reads "Present".
+        ...structuredDates(e.dates, entryKindFor(section.key)),
         extra: {},
         bullets: cleanBullets(e.bullets),
         orderIndex: i,
@@ -201,10 +204,16 @@ export function sectionsFromStructure(
   for (const extra of extras) {
     if (!extra?.label?.trim()) continue;
     const key = keyFor(extra.label, taken);
-    // An extra whose heading names one of the seven belongs in the named field,
-    // not beside it — otherwise "Work Experience" arrives twice, once as rows
-    // and once as an inline copy that renders underneath.
-    if (KNOWN_SHAPES[key]) continue;
+    // An extra naming a section whose content is rows or facts is a second copy
+    // of something already stored — "Work Experience" arriving twice would
+    // print the same jobs twice, once from rows and once inline.
+    //
+    // An extra naming Summary, Certifications or Awards is NOT that. Their
+    // content has nowhere else to live, and dropping it here deleted the whole
+    // section: certifications with an issuer and a year do not fit the flat
+    // list the named field holds, so that is exactly the resume that came as an
+    // extra and exactly the one that vanished.
+    if (STORED_ELSEWHERE.has(key)) continue;
     taken.add(key);
     byKey.set(key, extra);
   }
@@ -220,17 +229,7 @@ export function sectionsFromStructure(
     // so the section fell out of the order and got appended at the end.
     const key = keyFor(heading);
     if (placed.has(key)) continue;
-
-    if (KNOWN_SHAPES[key]) {
-      if (!hasNamedContent(structure, key)) continue;
-      placed.add(key);
-      sections.push(knownSection(structure, key, heading.trim()));
-      continue;
-    }
-
-    const extra = byKey.get(key);
-    if (!extra) continue;
-    const section = asSection(key, heading.trim(), extra);
+    const section = sectionFor(structure, key, heading.trim(), byKey.get(key));
     if (!section) continue;
     placed.add(key);
     sections.push(section);
@@ -241,13 +240,14 @@ export function sectionsFromStructure(
   // still be kept, at its conventional place rather than nowhere.
   for (const conventional of CONVENTIONAL_ORDER) {
     if (placed.has(conventional.key)) continue;
-    if (!hasNamedContent(structure, conventional.key)) continue;
+    const section = sectionFor(structure, conventional.key, conventional.label, byKey.get(conventional.key));
+    if (!section) continue;
     placed.add(conventional.key);
-    sections.push(knownSection(structure, conventional.key, conventional.label));
+    sections.push(section);
   }
   for (const [key, extra] of byKey) {
     if (placed.has(key)) continue;
-    const section = asSection(key, extra.label.trim(), extra);
+    const section = sectionFor(structure, key, extra.label.trim(), extra);
     if (section) sections.push(section);
   }
 
@@ -284,17 +284,133 @@ function asSection(key: string, label: string, extra: ExtractedSection): ResumeS
         key,
         label,
         shape,
-        groups: lines.map((line) => {
-          const colon = line.indexOf(':');
-          return { category: line.slice(0, colon).trim(), items: line.slice(colon + 1).trim() };
-        }),
+        // Either form: lines already written "Label: items", or rows where the
+        // title is the label and its one line is the value — a Languages
+        // section reaches us the second way.
+        groups: entries.length
+          ? entries.map((e) => ({ category: clean(e.title) ?? '', items: cleanBullets(e.bullets).join(', ') }))
+          : lines.map((line) => {
+              const colon = line.indexOf(':');
+              return { category: line.slice(0, colon).trim(), items: line.slice(colon + 1).trim() };
+            }),
       };
     case 'list':
-      return { key, label, shape, items: lines };
+      return {
+        key,
+        label,
+        shape,
+        items: lines.length ? lines : entries.map((e) => clean(e.title)).filter((t): t is string => Boolean(t)),
+      };
     case 'prose':
       return { key, label, shape, text };
   }
 }
+
+/**
+ * What one heading becomes, wherever its content turned up.
+ *
+ * Three places can hold it: the named field on the structure, an extracted
+ * section beside it, or both. Before this the answer was "the named field, and
+ * discard the rest", which deleted a Certifications section whose entries were
+ * too structured to fit `string[]` — the shape it could not be was the shape it
+ * had.
+ */
+function sectionFor(
+  structure: ResumeStructure,
+  key: string,
+  label: string,
+  extra: ExtractedSection | undefined,
+): ResumeSection | null {
+  // Rows and facts already hold these. An extra here is a duplicate.
+  if (STORED_ELSEWHERE.has(key)) {
+    return hasNamedContent(structure, key) ? { key, label } : null;
+  }
+
+  if (!KNOWN_SHAPES[key]) return extra ? asSection(key, label, extra) : null;
+
+  const laidOut = extra ? asSection(key, label, extra) : null;
+  const named = knownSection(structure, key, label);
+
+  // A summary is one block of prose either way; the named field is where the
+  // extractor was told to put it, so it wins and there is nothing to merge.
+  if (key === 'summary') {
+    if (named.text?.trim()) return named;
+    return laidOut?.shape === 'prose' && laidOut.text?.trim() ? laidOut : null;
+  }
+
+  if (!laidOut) return hasNamedContent(structure, key) ? named : null;
+  // The extra is how the page was actually laid out, so it leads. Anything the
+  // flat field carries that it does not already cover is added rather than
+  // dropped — a model that answers in both places must not cost somebody half
+  // their certifications.
+  //
+  // Read from the structure rather than off `named`: knownSection may have
+  // turned the flat field into entries already, and then `named.items` is
+  // empty and the merge silently has nothing to merge.
+  const flat = written(key === 'certifications' ? structure.certifications : structure.awards);
+  return withMissing(laidOut, flat);
+}
+
+/** Items from the flat field that the laid-out section does not already say. */
+function withMissing(section: ResumeSection, named: string[]): ResumeSection {
+  if (!named.length) return section;
+
+  const bare = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Compared loosely on purpose: the same certificate reaches us as
+  // "AWS Certified Cloud Practitioner" in one place and with ", Amazon Web
+  // Services, 2027" bolted on in the other, and appending it twice is as wrong
+  // as dropping it.
+  const covered = (existing: string[]) => (item: string) =>
+    !existing.some((e) => {
+      const [a, b] = [bare(e), bare(item)];
+      return Boolean(a) && Boolean(b) && (a.includes(b) || b.includes(a));
+    });
+
+  switch (section.shape) {
+    case 'entries':
+    case 'inline': {
+      const have = (section.entries ?? []).map((e) => e.title ?? '');
+      const add = named.filter(covered(have));
+      // Split on the way in, so an appended item gets the same fields as the
+      // ones already there rather than arriving as one long title.
+      return add.length
+        ? {
+            ...section,
+            entries: [
+              ...(section.entries ?? []),
+              ...add.map((line) => {
+                const parts = splitFlatEntry(line);
+                return parts
+                  ? {
+                      title: parts.title,
+                      ...(parts.org ? { org: parts.org } : {}),
+                      ...(parts.dates ? { dates: parts.dates } : {}),
+                      bullets: [],
+                    }
+                  : { title: line, bullets: [] };
+              }),
+            ],
+          }
+        : section;
+    }
+    case 'groups': {
+      const have = (section.groups ?? []).map((g) => g.category);
+      const add = named.filter(covered(have));
+      return add.length
+        ? { ...section, groups: [...(section.groups ?? []), ...add.map((category) => ({ category, items: '' }))] }
+        : section;
+    }
+    case 'list': {
+      const add = named.filter(covered(section.items ?? []));
+      return add.length ? { ...section, items: [...(section.items ?? []), ...add] } : section;
+    }
+    default:
+      return section;
+  }
+}
+
+const written = (values: string[] | undefined): string[] =>
+  (values ?? []).map((v) => (v ?? '').trim()).filter(Boolean);
 
 /**
  * One of the seven, as a section.
@@ -309,9 +425,30 @@ function knownSection(structure: ResumeStructure, key: string, label: string): R
     case 'summary':
       return { key, label, shape: 'prose', text: structure.summary?.trim() ?? '' };
     case 'certifications':
-      return { key, label, shape: 'list', items: cleanBullets(structure.certifications) };
-    case 'awards':
-      return { key, label, shape: 'list', items: cleanBullets(structure.awards) };
+    case 'awards': {
+      const items = cleanBullets(key === 'certifications' ? structure.certifications : structure.awards);
+      // The flat field can only hold one string per item, so an extractor that
+      // ignores the instruction to send the section whole glues the issuer and
+      // the year onto the name: "Dean's Honour List — Ontario Tech University,
+      // 2025". Nothing is lost that way, but the year ends up mid-line while
+      // every other section right-aligns its dates. Taken apart when the pieces
+      // are unmistakable, left exactly as written when they are not.
+      const structured = splitFlatEntries(items);
+      if (structured) {
+        return {
+          key,
+          label,
+          shape: 'entries',
+          entries: structured.map((e) => ({
+            title: e.title,
+            ...(e.org ? { org: e.org } : {}),
+            ...(e.dates ? { dates: e.dates } : {}),
+            bullets: [],
+          })),
+        };
+      }
+      return { key, label, shape: 'list', items };
+    }
     default:
       return { key, label };
   }

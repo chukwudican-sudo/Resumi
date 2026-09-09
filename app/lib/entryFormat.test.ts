@@ -219,3 +219,32 @@ test('a place is split only when it is shaped like one', () => {
   assert.deepEqual(structuredPlace(''), none);
   assert.deepEqual(structuredPlace(null), none);
 });
+
+// ── Sorting ────────────────────────────────────────────────────────────────
+
+test('a bare year does not tie with the December before it', () => {
+  // year * 12 + month, with an unknown month scored as 0, made "2026" score
+  // exactly what "Dec 2025" scores. The tie fell through to whichever entry was
+  // typed first, so a resume's volunteering came out in an order matching
+  // neither the file nor the dates.
+  const dec2025 = recencyKey({ startMonth: 11, startYear: 2025, endMonth: 12, endYear: 2025, isCurrent: false });
+  const y2026 = recencyKey({ startMonth: null, startYear: 2026, endMonth: null, endYear: null, isCurrent: false });
+  const jan2026 = recencyKey({ startMonth: 1, startYear: 2026, endMonth: null, endYear: null, isCurrent: false });
+
+  assert.ok(y2026 > dec2025, '2026 is more recent than December 2025');
+  assert.ok(jan2026 > dec2025, 'January 2026 is more recent than December 2025');
+  assert.ok(y2026 > jan2026, 'a bare year reads as the whole of it, so it outranks its own January');
+});
+
+test('undated stays exactly zero, because callers read it as a signal', () => {
+  // buildResume sorts a section by date only when every entry in it is dated.
+  // A non-zero score for an undated entry would silently turn that off.
+  assert.equal(recencyKey({ startMonth: null, startYear: null, endMonth: null, endYear: null, isCurrent: false }), 0);
+  assert.equal(recencyKey({ startMonth: 6, startYear: null, endMonth: null, endYear: null, isCurrent: false }), 0);
+});
+
+test('still running beats every finished date', () => {
+  const current = recencyKey({ startMonth: 3, startYear: 2020, endMonth: null, endYear: null, isCurrent: true });
+  const recent = recencyKey({ startMonth: null, startYear: 2030, endMonth: 12, endYear: 2030, isCurrent: false });
+  assert.ok(current > recent);
+});

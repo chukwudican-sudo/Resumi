@@ -5,6 +5,7 @@ import { profileStrength } from '../lib/profileStrength';
 import type { ResumeStructure } from '../lib/types';
 import {
   applyCorrectionsToEntries,
+  applyCorrectionsToSections,
   applyCorrectionsToSkillFacts,
   normaliseEmploymentTitles,
   saveSkillGroups,
@@ -66,6 +67,9 @@ export async function runPolish(
 
   await Promise.all([
     applyCorrectionsToEntries(userId, polish.corrections),
+    // Everything the proofreader can now read, it can now also fix. Entries are
+    // rows; a summary, a certifications list and a language's level are not.
+    applyCorrectionsToSections(userId, polish.corrections),
     // Writing the groups replaces every skill fact, so correcting them in place
     // first would be work immediately thrown away — and both touch the same
     // rows, which is a race rather than a saving. Only when the pass returned

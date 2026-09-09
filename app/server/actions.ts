@@ -191,7 +191,7 @@ export async function saveSkills(groups: { category: string; items: string }[]) 
  */
 export async function saveSectionContent(
   key: string,
-  content: { text?: string; items?: string[] },
+  content: { text?: string; items?: string[]; groups?: { category: string; items: string }[] },
 ) {
   const userId = await requireUserId();
 
@@ -202,7 +202,16 @@ export async function saveSectionContent(
   const cleaned =
     section.shape === 'prose'
       ? { text: (content.text ?? '').trim() }
-      : { items: (content.items ?? []).map((i) => i.trim()).filter(Boolean).slice(0, 30) };
+      : section.shape === 'groups'
+        ? {
+            // Kept when either box has something. A language with no level
+            // listed is a real line; requiring both would delete it on save.
+            groups: (content.groups ?? [])
+              .map((g) => ({ category: (g.category ?? '').trim(), items: (g.items ?? '').trim() }))
+              .filter((g) => g.category || g.items)
+              .slice(0, 30),
+          }
+        : { items: (content.items ?? []).map((i) => i.trim()).filter(Boolean).slice(0, 30) };
 
   await updateSectionContent(userId, key, cleaned);
   await refreshMasterResume(userId);

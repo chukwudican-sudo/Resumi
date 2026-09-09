@@ -241,38 +241,50 @@ export function buildResume(
   const named = new Map(sections.map((s) => [s.key, s]));
   const text = named.get('summary')?.text?.trim();
   if (text) structure.summary = text;
-  const certifications = written(named.get('certifications')?.items);
+  // Only when they are a flat list. Laid out with an issuer and a year they are
+  // entries in rows, and flattening them into `string[]` here would put a
+  // second, thinner copy of the same section on the page.
+  const flat = (key: 'certifications' | 'awards') => {
+    const section = named.get(key);
+    return (section?.shape ?? KNOWN_SHAPES[key]) === 'list' ? written(section?.items) : [];
+  };
+  const certifications = flat('certifications');
   if (certifications.length) structure.certifications = certifications;
-  const awards = written(named.get('awards')?.items);
+  const awards = flat('awards');
   if (awards.length) structure.awards = awards;
 
   structure.sections = sections.map((section) => {
-    const shape = section.shape ?? KNOWN_SHAPES[section.key];
     // The four whose content is rows and facts carry order and label only — it
     // stays in the named field above, where every scorer, guard and importer
     // already reads it.
     if (STORED_ELSEWHERE.has(section.key)) return { key: section.key, label: section.label };
-    // The other three keep theirs. Stripping it here read as an empty summary
-    // to everything downstream, and polish wrote that emptiness back to the row
-    // — deleting the paragraph on the next pass, which is the very failure this
-    // feature exists to fix, arriving through a different door.
-    if (KNOWN_SHAPES[section.key]) return section;
-    if (shape !== 'entries' && shape !== 'inline') return section;
-    // A custom section's entries are rows like anybody else's, filed under the
-    // section's own key.
-    return { ...section, entries: byKind(entryKindFor(section.key)).map(asSectionEntry) };
+
+    const shape = section.shape ?? KNOWN_SHAPES[section.key];
+    // Anything holding entries reads them back from rows, under its own key.
+    // Certifications reaches this when somebody's resume lays each one out with
+    // an issuer and a year rather than as a flat line.
+    if (shape === 'entries' || shape === 'inline') {
+      const kind = entryKindFor(section.key);
+      return { ...section, entries: byKind(kind).map((e) => asSectionEntry(e, kind)) };
+    }
+    // Everything else keeps its content on the section. Stripping it here read
+    // as an empty summary to everything downstream, and polish wrote that
+    // emptiness back to the row — deleting the paragraph on the next pass,
+    // which is the very failure this feature exists to fix arriving through a
+    // different door.
+    return section;
   });
 
   return structure;
 
-  function asSectionEntry(e: EntryWithBullets): SectionEntry {
+  function asSectionEntry(e: EntryWithBullets, kind: string): SectionEntry {
     return {
       title: titleWithEmployment(clean(e.title), e.extra?.employment),
       org: clean(e.org),
       location: formatPlace(placeOf(e), e.location, home),
-      // Formatted with the experience rule: a volunteering stint reads like a
-      // job, not like a degree with an expected completion date.
-      dates: formatDates(datesOf(e), 'experience', e.datesDisplay),
+      // Formatted under the section's own key, so a certificate in progress
+      // reads "Expected" and a volunteering stint reads "Present".
+      dates: formatDates(datesOf(e), kind, e.datesDisplay),
       tech: clean(e.tech),
       url: clean(e.url) || undefined,
       bullets: e.bullets ?? [],
@@ -305,14 +317,27 @@ export interface SectionStatus {
   detail: string;
 }
 
-export function sectionStatus(structure: ResumeStructure): SectionStatus[] {
+/**
+ * @param contactSaved Whether the contact form has been saved on this visit.
+ * Until it has, Contact is not shown as finished — because Polish and Download
+ * are held shut until it is, and a green tick beside "Name and email set" on
+ * the one section the app is waiting for tells somebody the opposite of what is
+ * happening. There was nothing else on the screen saying which section to go
+ * to, so the answer was "ask whoever built it".
+ */
+export function sectionStatus(structure: ResumeStructure, contactSaved = true): SectionStatus[] {
+  const reachable = Boolean(structure.name && structure.contact?.email);
   const rail: SectionStatus[] = [
     {
       key: 'contact',
       label: 'Contact',
       shape: 'contact',
-      done: Boolean(structure.name && structure.contact?.email),
-      detail: structure.name && structure.contact?.email ? 'Name and email set' : 'Name and email needed',
+      done: reachable && contactSaved,
+      detail: !reachable
+        ? 'Name and email needed'
+        : contactSaved
+          ? 'Name and email set'
+          : 'Not saved yet',
     },
   ];
 

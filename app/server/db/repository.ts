@@ -469,6 +469,58 @@ export async function ensureSections(userId: string): Promise<ResumeSection[]> {
 }
 
 /**
+ * The same spelling fixes, applied to content that lives on the section itself.
+ *
+ * Entries are rows and `applyCorrectionsToEntries` already reaches every one of
+ * them. A summary's paragraph, a certifications list and a language's level are
+ * not rows — they are jsonb on the section — so a correction found in them had
+ * nowhere to land. Proofreading text that cannot then be corrected is worse
+ * than not reading it: the pass reports a fix on screen that never happened.
+ */
+export async function applyCorrectionsToSections(
+  userId: string,
+  corrections: { from: string; to: string }[],
+): Promise<number> {
+  if (!corrections.length) return 0;
+
+  const rows = await db.select().from(profileSections).where(eq(profileSections.userId, userId));
+
+  // Escaped because a correction is text somebody typed, not a pattern we
+  // wrote, and whole-word so "SQL" never rewrites the middle of "PostgreSQL".
+  const patterns = corrections.map((c) => ({
+    pattern: new RegExp(`\\b${c.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g'),
+    to: c.to,
+  }));
+  const fix = (text: string) => patterns.reduce((acc, p) => acc.replace(p.pattern, p.to), text);
+
+  let changed = 0;
+  for (const row of rows) {
+    const content = (row.content ?? {}) as {
+      text?: string;
+      items?: string[];
+      groups?: { category: string; items: string }[];
+    };
+    const next: typeof content = {};
+    if (typeof content.text === 'string') next.text = fix(content.text);
+    if (Array.isArray(content.items)) next.items = content.items.map((i) => (typeof i === 'string' ? fix(i) : i));
+    if (Array.isArray(content.groups)) {
+      next.groups = content.groups.map((g) => ({ category: fix(g?.category ?? ''), items: fix(g?.items ?? '') }));
+    }
+
+    // The label too: it is on the page in capitals at the top of the section.
+    const label = fix(row.label);
+
+    if (JSON.stringify(next) === JSON.stringify(content) && label === row.label) continue;
+    await db
+      .update(profileSections)
+      .set({ content: next, label, updatedAt: new Date() })
+      .where(and(eq(profileSections.userId, userId), eq(profileSections.id, row.id)));
+    changed += 1;
+  }
+  return changed;
+}
+
+/**
  * Rewrites one section's content, leaving its name and position alone.
  *
  * Merged into whatever is there rather than replacing the row, so editing a

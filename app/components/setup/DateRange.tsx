@@ -1,6 +1,6 @@
 'use client';
 
-import { MONTHS, formatDates, type DateParts } from '../../lib/entryFormat';
+import { MONTHS, formatDates, worksTowards, type DateParts } from '../../lib/entryFormat';
 
 const THIS_YEAR = new Date().getFullYear();
 // Far enough back for a career, far enough forward for a degree in progress.
@@ -22,7 +22,11 @@ export default function DateRange({
   kind: string;
   onChange: (next: DateParts) => void;
 }) {
-  const currentLabel = kind === 'education' ? 'Still studying' : 'I still work here';
+  // A certificate you are studying for is not a job you still hold, and its
+  // finish date is a date to enter rather than one to grey out.
+  const towards = worksTowards(kind);
+  const currentLabel =
+    kind === 'education' ? 'Still studying' : towards ? 'Still working towards it' : 'I still work here';
   const preview = formatDates(value, kind);
 
   return (
@@ -55,7 +59,7 @@ export default function DateRange({
 
         {value.isCurrent ? (
           <span className="rounded border border-rule-field bg-ground-band px-3.5 py-3 text-[14.5px] text-ink-muted">
-            {kind === 'education' ? 'Expected' : 'Present'}
+            {towards ? 'Expected' : 'Present'}
           </span>
         ) : null}
 
@@ -64,7 +68,7 @@ export default function DateRange({
           onChange={(v) => onChange({ ...value, endMonth: v })}
           placeholder="Month"
           options={MONTHS.map((m, i) => ({ value: i + 1, label: m }))}
-          disabled={value.isCurrent && kind !== 'education'}
+          disabled={value.isCurrent && !towards}
         />
         <Select
           value={value.endYear}
@@ -72,7 +76,7 @@ export default function DateRange({
           placeholder="Year"
           options={YEARS.map((y) => ({ value: y, label: String(y) }))}
           width="w-[96px]"
-          disabled={value.isCurrent && kind !== 'education'}
+          disabled={value.isCurrent && !towards}
         />
       </div>
 

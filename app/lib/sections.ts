@@ -32,6 +32,14 @@ export interface DrawnEntry {
   sub: string;
   /** Line two, right. */
   subRight: string;
+  /**
+   * Where to see it, printed beside the second line.
+   *
+   * The editor has always had a link box for every entry and only projects ever
+   * printed one — so a certificate's Verify link, which every guide recommends
+   * carrying, went into the database and never onto the page.
+   */
+  url: string;
   bullets: string[];
 }
 
@@ -143,12 +151,18 @@ export function planSections(structure: ResumeStructure): PlannedSection[] {
 /** One stored section, resolved against what the app knows. */
 function resolve(section: ResumeSection): PlannedSection | null {
   const key = section.key.trim();
-  const known = KNOWN_SHAPES[key];
   const conventional = CONVENTIONAL_ORDER.find((c) => c.key === key);
 
   // A known key keeps its shape whatever the row claims. Nothing should be able
   // to make Education render as a paragraph.
-  const shape = known ?? (SHAPES.includes(section.shape!) ? section.shape! : inferShape(section));
+  //
+  // Certifications and Awards are the exception, and a real resume is why: one
+  // lists them flat, the next lays each out with an issuer underneath and the
+  // year on the right. Both are correct, and forcing the flat one on somebody
+  // throws away the issuer and the year they wrote down.
+  const fixed = FLEXIBLE.has(key) ? undefined : KNOWN_SHAPES[key];
+  const declared = SHAPES.includes(section.shape!) ? section.shape! : undefined;
+  const shape = fixed ?? declared ?? KNOWN_SHAPES[key] ?? inferShape(section);
   if (!shape) return null;
 
   return {
@@ -175,10 +189,15 @@ export function inferShape(section: {
   lines?: string[];
   text?: string;
 }): SectionShape | null {
-  const entries = (section.entries ?? []) as { org?: string; sub?: string; tech?: string }[];
+  const entries = (section.entries ?? []) as ShapeProbe[];
   if (entries.length) {
     // A second line under the title is what separates a job from a project.
-    return entries.some((e) => clean(e.org) || clean(e.sub)) ? 'entries' : 'inline';
+    if (entries.some((e) => clean(e.org) || clean(e.sub))) return 'entries';
+    // Neither, when they are labels rather than things somebody did.
+    if (readsAsPairs(entries)) {
+      return entries.some((e) => (e.bullets ?? []).some((b) => clean(b))) ? 'groups' : 'list';
+    }
+    return 'inline';
   }
 
   if ((section.groups ?? []).length) return 'groups';
@@ -190,6 +209,40 @@ export function inferShape(section: {
 
   if (clean(section.text)) return 'prose';
   return null;
+}
+
+interface ShapeProbe {
+  title?: string;
+  org?: string;
+  sub?: string;
+  tech?: string;
+  url?: string;
+  dates?: string;
+  bullets?: string[];
+}
+
+/**
+ * Whether these are labels with values, not things somebody did.
+ *
+ * A Languages section written as a name with its level underneath extracts as
+ * rows with a title and one short line — structurally identical to a project
+ * with one bullet. Read as a project it printed "English" with a date column
+ * beside it, which is not a thing a language has.
+ *
+ * So the test is what a label/value pair cannot have: a date, a stack, a link,
+ * a second bullet, or a title long enough to be a project name. Two or more,
+ * because one pair is not a pattern.
+ */
+function readsAsPairs(entries: ShapeProbe[]): boolean {
+  if (entries.length < 2) return false;
+  return entries.every((e) => {
+    const title = clean(e.title);
+    if (!title || title.length > 40 || title.split(/\s+/).length > 4) return false;
+    if (clean(e.dates) || clean(e.tech) || clean(e.url)) return false;
+    const written = (e.bullets ?? []).map(clean).filter(Boolean);
+    // One value, and a value rather than a sentence about work.
+    return written.length <= 1 && written.every((b) => b.length <= 60);
+  });
 }
 
 /**
@@ -230,6 +283,7 @@ export function contentFor(structure: ResumeStructure, section: PlannedSection):
           headingRight: clean(e.location),
           sub: clean(e.degree),
           subRight: clean(e.dates),
+          url: '',
           bullets: written(e.bullets),
         })),
       };
@@ -242,6 +296,7 @@ export function contentFor(structure: ResumeStructure, section: PlannedSection):
           headingRight: clean(x.dates),
           sub: clean(x.org),
           subRight: clean(x.location),
+          url: '',
           bullets: written(x.bullets),
         })),
       };
@@ -267,10 +322,16 @@ export function contentFor(structure: ResumeStructure, section: PlannedSection):
       };
 
     case 'certifications':
-      return { shape: 'list', items: written(structure.certifications) };
-
-    case 'awards':
-      return { shape: 'list', items: written(structure.awards) };
+    case 'awards': {
+      // Flat, when that is what the resume had: the named field holds it and
+      // every scorer and guard already reads it there. Anything else is laid
+      // out on the section itself, like a section the app has no name for.
+      if (section.shape === 'list') {
+        const named = written(section.key === 'certifications' ? structure.certifications : structure.awards);
+        if (named.length) return { shape: 'list', items: named };
+      }
+      return fromInline(section.shape, inline);
+    }
 
     default:
       return fromInline(section.shape, inline);
@@ -291,6 +352,7 @@ function fromInline(shape: SectionShape, section: ResumeSection | undefined): Se
           headingRight: clean(e.dates),
           sub: clean(e.org),
           subRight: clean(e.location),
+          url: clean(e.url),
           bullets: written(e.bullets),
         })),
       };
@@ -308,8 +370,12 @@ function fromInline(shape: SectionShape, section: ResumeSection | undefined): Se
     case 'groups':
       return {
         shape: 'groups',
+        // A label with nothing beside it is kept. "English" on its own is a
+        // real line on a real resume — plenty of people list a language and
+        // stop — and dropping it because the second box is empty would delete
+        // something somebody typed. Skills is stricter, and guards that itself.
         groups: (section?.groups ?? [])
-          .filter((g) => clean(g?.items))
+          .filter((g) => clean(g?.category) || clean(g?.items))
           .map((g) => ({ category: clean(g.category), items: clean(g.items) })),
       };
     case 'list':
@@ -385,6 +451,32 @@ const SYNONYMS: Record<string, string> = {
  */
 const RESERVED = new Set(['contact']);
 
+/**
+ * Words that belong to a section, for headings the synonym table cannot list.
+ *
+ * "Awards & Honors" is one heading out of a hundred spellings of the same
+ * section — "Honors & Awards", "Awards and Recognition", "Scholarships &
+ * Awards" — and an exact-match table will always be one spelling behind. So a
+ * heading matches a section when EVERY word in it belongs to that section.
+ *
+ * EXPERIENCE IS DELIBERATELY ABSENT. A qualifier changes what that section is:
+ * "Volunteer Experience" and "Research Experience" are their own sections, not
+ * the person's job history, and folding them in would merge somebody's
+ * volunteering into their employment. Compound experience headings stay in the
+ * exact table above, where each one is a decision rather than a rule.
+ */
+const VOCABULARY: [string, Set<string>][] = [
+  ['summary', new Set(['summary', 'objective', 'profile', 'about', 'me', 'qualifications', 'professional', 'career', 'personal', 'statement'])],
+  ['education', new Set(['education', 'academic', 'academics', 'background', 'training', 'schooling'])],
+  ['projects', new Set(['projects', 'project', 'technical', 'personal', 'selected', 'portfolio', 'side'])],
+  ['skills', new Set(['skills', 'skill', 'abilities', 'competencies', 'proficiencies', 'technical', 'core', 'expertise'])],
+  ['certifications', new Set(['certifications', 'certification', 'certificates', 'certificate', 'licenses', 'license', 'licences', 'licence', 'credentials'])],
+  ['awards', new Set(['awards', 'award', 'honors', 'honours', 'honor', 'honour', 'achievements', 'achievement', 'recognition', 'scholarships', 'distinctions'])],
+];
+
+/** Words that carry no meaning of their own in a heading. */
+const JOINERS = new Set(['and', 'or', 'of', 'the', 'my', 'a', 'in']);
+
 export function keyFor(label: string, taken: Iterable<string> = []): string {
   const slug = clean(label)
     .toLowerCase()
@@ -396,6 +488,16 @@ export function keyFor(label: string, taken: Iterable<string> = []): string {
   const canonical = KNOWN_SHAPES[slug] ? slug : SYNONYMS[slug];
   if (canonical) return canonical;
   if (!slug) return 'section';
+
+  // Every word in the heading belonging to one section means it IS that
+  // section, however it is spelled. One word outside means it is not: that is
+  // what keeps "Volunteer Experience" out of somebody's job history.
+  const words = slug.split('_').filter((w) => w && !JOINERS.has(w));
+  if (words.length) {
+    for (const [key, vocabulary] of VOCABULARY) {
+      if (words.every((w) => vocabulary.has(w))) return key;
+    }
+  }
 
   // Two sections that slug the same would otherwise share a kind, and their
   // entries would pool into whichever one rendered first.
@@ -459,6 +561,15 @@ export function sectionFromRow(row: {
  * the failure this whole module exists to stop.
  */
 export const STORED_ELSEWHERE = new Set(['education', 'experience', 'projects', 'skills']);
+
+/**
+ * Known keys whose shape the resume decides rather than the app.
+ *
+ * A Certifications section is a flat list on one resume and a list of things
+ * with an issuer and a year on the next. Both belong on a page; only one fits
+ * `string[]`.
+ */
+export const FLEXIBLE = new Set(['certifications', 'awards']);
 
 /** The other direction: what belongs in the row's `content` column. */
 export function contentOf(section: ResumeSection): Record<string, unknown> {

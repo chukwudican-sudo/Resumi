@@ -349,8 +349,12 @@ test('the round trip: everything uploaded comes back out of the rows', () => {
 
   const activities = rebuilt.sections?.find((s) => s.key === 'extracurricular_community_activities');
   assert.equal(activities?.entries?.length, 2, 'both entries came back');
-  assert.equal(activities?.entries?.[0].title, 'Team Lead');
-  assert.deepEqual(activities?.entries?.[0].bullets, ['Led a team of four']);
+  // Checked by content rather than by position: entries within a section are
+  // sorted by date, and this test is about nothing being lost.
+  const lead = activities?.entries?.find((e) => e.title === 'Team Lead');
+  assert.ok(lead, 'the dated entry survived');
+  assert.deepEqual(lead.bullets, ['Led a team of four']);
+  assert.ok(activities?.entries?.some((e) => e.title === 'Volunteer'), 'and the other one');
 
   const interests = rebuilt.sections?.find((s) => s.key === 'interests');
   assert.deepEqual(interests?.items, ['Chess', 'Long-distance running']);
@@ -374,4 +378,215 @@ test('both sections print on the page, in the resume own order', () => {
   ]);
   assert.ok(latex.includes('\\resumeItem{Led a team of four}'));
   assert.ok(latex.includes('\\resumeItem{Long-distance running}'));
+});
+
+// ── Certifications, which a resume lays out two different ways ─────────────
+//
+// A flat list on one resume; a name with the issuer underneath and the year on
+// the right on the next. The named field is `string[]` and can only hold the
+// first, and an extracted section naming one of the seven used to be dropped —
+// so the resume that could not be flat was the resume that vanished.
+
+const CERT_ENTRIES = [
+  {
+    label: 'Certifications',
+    entries: [
+      { title: 'Microsoft Certified: Azure Fundamentals (AZ-900)', org: 'Microsoft', dates: '2027' },
+      { title: 'AWS Certified Cloud Practitioner', org: 'Amazon Web Services', dates: '2027' },
+    ],
+  },
+];
+
+test('certifications laid out with an issuer and a year keep both', () => {
+  const sections = sectionsFromStructure(SAMPLE, CERT_ENTRIES, ['Education', 'Certifications']);
+  const certs = sections.find((s) => s.key === 'certifications');
+
+  assert.ok(certs, 'the section survived');
+  assert.equal(certs.shape, 'entries', 'not flattened into a bullet list');
+  assert.equal(certs.entries?.length, 2);
+  assert.equal(certs.entries?.[0].org, 'Microsoft');
+  assert.equal(certs.entries?.[0].dates, '2027');
+});
+
+test('a flat certifications list is still a flat list', () => {
+  const flat: ResumeStructure = { ...SAMPLE, certifications: ['AWS Certified Cloud Practitioner'] };
+  const sections = sectionsFromStructure(flat, [], ['Education', 'Certifications']);
+  const certs = sections.find((s) => s.key === 'certifications');
+  assert.equal(certs?.shape, 'list');
+  assert.deepEqual(certs?.items, ['AWS Certified Cloud Practitioner']);
+});
+
+test('certifications answered in both places lose nothing', () => {
+  // A model that fills the flat field AND returns the section must not cost
+  // somebody half their certificates.
+  const both: ResumeStructure = {
+    ...SAMPLE,
+    certifications: ['Google Data Analytics Professional Certificate, Google, 2026'],
+  };
+  const sections = sectionsFromStructure(both, CERT_ENTRIES, ['Education', 'Certifications']);
+  const certs = sections.find((s) => s.key === 'certifications');
+
+  assert.equal(certs?.entries?.length, 3, 'both laid-out ones plus the flat one');
+  const titles = certs!.entries!.map((e) => e.title);
+  assert.ok(titles.some((t) => t?.includes('Azure')));
+  assert.ok(titles.some((t) => t?.includes('AWS')));
+  assert.ok(titles.some((t) => t?.includes('Google')));
+});
+
+test('the same certificate written two ways is not printed twice', () => {
+  const both: ResumeStructure = {
+    ...SAMPLE,
+    // The flat field carries the issuer and year bolted on; it is the same one.
+    certifications: ['AWS Certified Cloud Practitioner, Amazon Web Services, 2027'],
+  };
+  const sections = sectionsFromStructure(both, CERT_ENTRIES, ['Certifications']);
+  assert.equal(sections.find((s) => s.key === 'certifications')?.entries?.length, 2);
+});
+
+test("an Objective section is the summary, under the resume's own heading", () => {
+  const withObjective: ResumeStructure = { ...SAMPLE, summary: 'Seeking a co-op where I can ship.' };
+  const sections = sectionsFromStructure(withObjective, [], ['Objective', 'Education']);
+  const summary = sections.find((s) => s.key === 'summary');
+  assert.equal(summary?.label, 'Objective', 'not renamed to Summary');
+  assert.equal(summary?.text, 'Seeking a co-op where I can ship.');
+  assert.equal(sections[0].key, 'summary', 'and it stays at the top, where the resume had it');
+});
+
+test('an entry-shaped certifications section round trips through rows', () => {
+  const sections = sectionsFromStructure(SAMPLE, CERT_ENTRIES, ['Education', 'Certifications']);
+  const rows = entriesFromStructure(SAMPLE, sections);
+  assert.equal(rows.filter((r) => r.kind === 'certifications').length, 2, 'stored as rows like any entry');
+
+  const rebuilt = buildResume(rows.map(rowToEntry), [], sections);
+  const certs = rebuilt.sections?.find((s) => s.key === 'certifications');
+  assert.equal(certs?.entries?.length, 2, 'and come back out of them');
+  assert.equal(certs?.entries?.[0].org, 'Microsoft');
+  assert.ok(!rebuilt.certifications?.length, 'not also flattened into the named field, which would print twice');
+});
+
+test('a duplicate Experience section is still dropped', () => {
+  // The guard that was too broad must not now be too narrow: experience lives
+  // in rows, so an extra naming it is a second copy that would print twice.
+  const sections = sectionsFromStructure(SAMPLE, [{ label: 'Work Experience', lines: ['nope'] }], ['Experience']);
+  assert.equal(sections.filter((s) => s.key === 'experience').length, 1);
+  assert.equal(sections.find((s) => s.key === 'experience')?.shape, undefined);
+});
+
+test('an Awards & Honors section is the awards section, under its own name', () => {
+  const AWARDS = [{
+    label: 'Awards & Honors',
+    entries: [
+      { title: "Dean's Honour List", org: 'Ontario Tech University', dates: '2025' },
+      { title: 'Faculty of Engineering Entrance Scholarship', org: 'Ontario Tech University', dates: '2023' },
+    ],
+  }];
+  const sections = sectionsFromStructure(SAMPLE, AWARDS, ['Education', 'Awards & Honors']);
+
+  assert.equal(sections.filter((s) => s.key === 'awards').length, 1, 'one section, not two');
+  const awards = sections.find((s) => s.key === 'awards');
+  assert.equal(awards?.label, 'Awards & Honors', 'named as the resume named it');
+  assert.equal(awards?.shape, 'entries', 'issuer and year kept');
+  assert.equal(awards?.entries?.length, 2);
+});
+
+test('awards answered in both places print once, not twice', () => {
+  // The flat field says the same award with the issuer and year bolted on.
+  const both: ResumeStructure = {
+    ...SAMPLE,
+    awards: ["Dean's Honour List, Ontario Tech University, 2025"],
+  };
+  const AWARDS = [{
+    label: 'Awards & Honors',
+    entries: [{ title: "Dean's Honour List", org: 'Ontario Tech University', dates: '2025' }],
+  }];
+  const sections = sectionsFromStructure(both, AWARDS, ['Awards & Honors']);
+  assert.equal(sections.filter((s) => s.key.includes('award')).length, 1);
+  assert.equal(sections[0].entries?.length, 1, 'the same award is not listed twice');
+});
+
+test('a flat awards field with issuers and years becomes real entries', () => {
+  // The exact three strings a real upload produced. The extractor was told to
+  // send the section whole and glued each award into one string instead, which
+  // put the year mid-line while every other section right-aligns its dates.
+  const flat: ResumeStructure = {
+    ...SAMPLE,
+    awards: [
+      "Dean's Honour List — Ontario Tech University, 2025",
+      'Faculty of Engineering Entrance Scholarship — Ontario Tech University, 2023',
+      'Hackathon Top Placement (test entry) — Sample Hackathon Organizer, 2026',
+    ],
+  };
+  const sections = sectionsFromStructure(flat, [], ['Education', 'Awards & Honors']);
+  const awards = sections.find((s) => s.key === 'awards');
+
+  assert.equal(awards?.shape, 'entries');
+  assert.equal(awards?.label, 'Awards & Honors');
+  assert.deepEqual(
+    awards?.entries?.map((e) => [e.title, e.org, e.dates]),
+    [
+      ["Dean's Honour List", 'Ontario Tech University', '2025'],
+      ['Faculty of Engineering Entrance Scholarship', 'Ontario Tech University', '2023'],
+      ['Hackathon Top Placement (test entry)', 'Sample Hackathon Organizer', '2026'],
+    ],
+  );
+});
+
+test('awards written as sentences stay a plain list', () => {
+  // Indeed's own example style. Three fields would be an invention.
+  const prose: ResumeStructure = {
+    ...SAMPLE,
+    awards: [
+      'Named in the "Top 50 Health Blogs and Websites of 2022" by Health and Wellness Magazine',
+      'Awarded Website of the Year by Web Professionals for exceptional user experience design',
+    ],
+  };
+  const awards = sectionsFromStructure(prose, [], ['Awards']).find((s) => s.key === 'awards');
+  assert.equal(awards?.shape, 'list');
+  assert.equal(awards?.items?.length, 2);
+});
+
+test('two sections of a person own kind live side by side', () => {
+  // A resume with both Volunteer Experience and Extracurricular Activities.
+  // Their entries must be filed apart, or one section prints the other's rows.
+  const EXTRAS = [
+    { label: 'Volunteer Experience', entries: [
+      { title: 'Community Website Developer', org: 'African Family Connect', location: 'Oshawa, ON', dates: 'Nov 2025 – Dec 2025', bullets: ['Built a community website'] },
+      { title: 'Peer Mentor', org: 'Ontario Tech University', location: 'Oshawa, ON', dates: '2025 – Present', bullets: ['Mentored'] },
+    ]},
+    { label: 'Extracurricular & Community Activities', entries: [
+      { title: 'Content Creator', org: 'Kudi Kitchen', location: 'Oshawa, ON', dates: 'Mar 2025 – Present', bullets: ['Published content'] },
+    ]},
+  ];
+  const order = ['Education', 'Experience', 'Volunteer Experience', 'Extracurricular & Community Activities'];
+  const sections = sectionsFromStructure(SAMPLE, EXTRAS, order);
+
+  assert.deepEqual(sections.map((s) => s.key), [
+    'education',
+    'experience',
+    'volunteer_experience',
+    'extracurricular_community_activities',
+    'projects',
+    'skills',
+  ]);
+
+  const rows = entriesFromStructure(SAMPLE, sections);
+  assert.equal(rows.filter((r) => r.kind === 'volunteer_experience').length, 2);
+  assert.equal(rows.filter((r) => r.kind === 'extracurricular_community_activities').length, 1);
+  assert.equal(rows.filter((r) => r.kind === 'experience').length, 1, "the person's actual job, untouched");
+});
+
+test('volunteering never lands in the job history', () => {
+  // The failure this guards is silent: merged into experience, the heading is
+  // gone and unpaid work reads as employment.
+  const EXTRAS = [{ label: 'Volunteer Experience', entries: [{ title: 'Coach', org: 'Local Club', bullets: ['Coached'] }] }];
+  const sections = sectionsFromStructure(SAMPLE, EXTRAS, ['Experience', 'Volunteer Experience']);
+  const experience = sections.find((s) => s.key === 'experience');
+
+  assert.equal(experience?.shape, undefined, 'still just order and label');
+  assert.ok(sections.some((s) => s.key === 'volunteer_experience'));
+  assert.equal(
+    entriesFromStructure(SAMPLE, sections).filter((r) => r.kind === 'experience').length,
+    1,
+    'one real job, not two',
+  );
 });

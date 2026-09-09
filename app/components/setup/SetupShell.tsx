@@ -99,7 +99,7 @@ export default function SetupShell({
   const built = useMemo(() => buildResume(entries, facts, sections), [entries, facts, sections]);
   // The rail and the page are read off the same plan, so they cannot disagree
   // about the order — which they did, visibly, until this.
-  const status = useMemo(() => sectionStatus(built), [built]);
+  const status = useMemo(() => sectionStatus(built, contactSaved), [built, contactSaved]);
   const open = useMemo(() => status.find((s) => s.key === section) ?? status[0], [status, section]);
   const resume = polished ?? built;
   const doneCount = status.filter((s) => s.done).length;
@@ -160,6 +160,11 @@ export default function SetupShell({
   function proseOf(key: string): string {
     const content = contentFor(built, { key, label: '', shape: 'prose', optional: true });
     return content.shape === 'prose' ? content.text : '';
+  }
+
+  function groupsOf(key: string): SkillGroup[] {
+    const content = contentFor(built, { key, label: '', shape: 'groups', optional: true });
+    return content.shape === 'groups' ? content.groups : [];
   }
 
   function itemsOf(key: string): string[] {
@@ -316,7 +321,9 @@ export default function SetupShell({
             ) : open.shape === 'groups' ? (
               <SkillsSection
                 key={open.key}
-                groups={skillGroups}
+                sectionKey={open.key}
+                label={open.label}
+                groups={open.key === 'skills' ? skillGroups : groupsOf(open.key)}
                 onSaved={afterSave}
                 onDirty={setDirty}
               />
@@ -359,9 +366,25 @@ export default function SetupShell({
             // drawing of it — the drawing and the download disagreed about
             // section order, coursework and page count within one week.
             <>
-              <span className="mb-4 self-start text-[11px] uppercase tracking-[0.12em] text-ink-faint">
-                Your resume
-              </span>
+              {/*
+                Says what this document IS. Without it the preview reads as the
+                finished article, and somebody polishes and re-polishes trying
+                to get the page they want to send — when the page they send is
+                built per job, from this one.
+
+                Deliberately does not promise that section order is editable
+                per job. It is not: polish decides the order, and the tailoring
+                cannot return sections at all.
+              */}
+              <div className="mb-4 flex w-full flex-col gap-1.5 self-start">
+                <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                  Your resume
+                </span>
+                <p className="max-w-[46ch] text-[12px] leading-relaxed text-ink-muted">
+                  Your base resume. Every job you apply to gets its own tailored copy of this
+                  &mdash; you edit that copy per job.
+                </p>
+              </div>
               <PdfPreview reloadKey={savedAt} />
             </>
           ) : (

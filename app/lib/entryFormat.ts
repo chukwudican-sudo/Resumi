@@ -28,19 +28,34 @@ function point(month: number | null, year: number | null): string {
 }
 
 /**
+ * Sections where something unfinished is a date you are working TOWARDS.
+ *
+ * A degree and a certificate both are; a job is not. "Started Jan 2026 –
+ * Present" is right for a role and wrong for a certificate you are studying
+ * for, which every guide writes as "Expected May 2026".
+ */
+const TOWARDS = new Set(['education', 'certifications']);
+
+/** Whether something unfinished here is a date being worked towards. */
+export function worksTowards(kind: string): boolean {
+  return TOWARDS.has(kind);
+}
+
+/**
  * Renders a range.
  *
- * `education` says "Expected" rather than "Present" for something unfinished,
- * because a degree in progress is a date you are working towards while a job in
- * progress is one you are in.
+ * Unfinished reads as "Expected" rather than "Present" for the sections above,
+ * because a degree or a certificate in progress is a date you are working
+ * towards while a job in progress is one you are in.
  */
 export function formatDates(parts: DateParts, kind: string, fallback?: string | null): string {
   const start = point(parts.startMonth, parts.startYear);
 
   if (parts.isCurrent) {
-    const word = kind === 'education' ? 'Expected' : 'Present';
-    if (kind === 'education' && parts.endYear) {
-      // A degree in progress states both ends. The range says how long they
+    const towards = TOWARDS.has(kind);
+    const word = towards ? 'Expected' : 'Present';
+    if (towards && parts.endYear) {
+      // Something in progress states both ends. The range says how long they
       // have been at it, which is the part a reader is actually judging when
       // they see an unfinished degree, and it is what a written resume shows:
       // "Sep 2023 – May 2028 (Expected)".
@@ -323,7 +338,18 @@ export function structuredPlace(value: string | null | undefined): PlaceParts {
 export function recencyKey(parts: DateParts): number {
   if (parts.isCurrent) return Number.MAX_SAFE_INTEGER;
   const year = parts.endYear ?? parts.startYear ?? 0;
-  const month = parts.endMonth ?? parts.startMonth ?? 0;
+  // Zero means undated, and callers read it as "do not sort this section by
+  // date at all" — so it has to stay zero rather than becoming a month.
+  if (!year) return 0;
+
+  // A month is 1-12, and an unknown one is the END of the year rather than the
+  // start. Both halves of that were wrong: defaulting to 0 put "2026" at
+  // January, which scored 2026*12+0 — exactly what December 2025 scores — so an
+  // entry dated 2026 tied with one that finished the year before, and the tie
+  // fell through to whichever happened to be entered first. A resume came back
+  // with its volunteering in an order that matched neither the file nor the
+  // dates.
+  const month = parts.endMonth ?? parts.startMonth ?? 12;
   return year * 12 + month;
 }
 

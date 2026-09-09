@@ -234,8 +234,15 @@ export function renderResumeLatex(r: ResumeStructure): string {
       case 'entries':
         lines.push('  \\resumeSubHeadingListStart');
         for (const e of content.entries) {
+          // The link rides on the second line beside the organisation, which is
+          // where a certificate's issuer and its Verify link belong together.
+          // The heading cell is already carrying a date and does not wrap.
+          const link = e.url
+            ? `\\href{${escapeLatex(withScheme(e.url))}}{\\underline{${escapeLatex(linkLabel(e.url))}}}`
+            : '';
+          const sub = [escapeLatex(e.sub), link].filter(Boolean).join(' $|$ ');
           lines.push(
-            `    \\resumeSubheading{${escapeLatex(e.heading)}}{${escapeLatex(e.headingRight)}}{${escapeLatex(e.sub)}}{${escapeLatex(e.subRight)}}`,
+            `    \\resumeSubheading{${escapeLatex(e.heading)}}{${escapeLatex(e.headingRight)}}{${sub}}{${escapeLatex(e.subRight)}}`,
           );
           pushBullets(e.bullets);
         }
@@ -260,8 +267,18 @@ export function renderResumeLatex(r: ResumeStructure): string {
 
       case 'groups': {
         lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
+        // A dangling colon is the tell that a form let something through
+        // half-filled. "English" with no level prints as itself; a value with
+        // no label prints as itself. Only both together take the separator.
         const groupLines = content.groups
-          .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
+          .map((s) => {
+            const body = s.category && s.items
+              ? `\\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}}`
+              : s.category
+                ? `\\textbf{${escapeLatex(s.category)}}`
+                : escapeLatex(s.items);
+            return `     ${body} \\\\`;
+          })
           .join('\n');
         lines.push(`    \\small{\\item{\n${groupLines}\n    }}`);
         lines.push(' \\end{itemize}');

@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { applyPolish, overlapNote, validateCorrections, validatePolish, type PolishResult } from './polish';
+import { applyPolish, otherSections, overlapNote, validateCorrections, validatePolish, type PolishResult } from './polish';
 import { contentFor, contentOf, hasContent, planSections, shapeOf } from './sections';
 import { buildResume } from './buildResume';
 import type { ResumeSection, ResumeStructure } from './types';
@@ -521,4 +521,62 @@ test('polishing repeatedly does not empty the summary row', () => {
     assert.equal(shapeOf(plan.find((s) => s.key === 'projects')!), 'inline');
     assert.equal(shapeOf(plan.find((s) => s.key === 'skills')!), 'groups');
   }
+});
+
+test('the pass is shown every section it is asked to order', () => {
+  // It used to be handed skills, education, experience and projects, then a
+  // bare list of section keys — so it decided where "Awards & Honors" belonged
+  // on the page without having seen a single award, and could not raise one
+  // missing an issuer while being asked for warnings about the resume.
+  const structure = {
+    name: 'Ada',
+    contact: { email: 'a@b.com' },
+    summary: 'Ships software.',
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    sections: [
+      { key: 'summary', label: 'Objective', shape: 'prose' as const, text: 'Ships software.' },
+      {
+        key: 'awards',
+        label: 'Awards & Honors',
+        shape: 'entries' as const,
+        entries: [{ title: "Dean's Honour List", org: 'Ontario Tech University', dates: '2025' }],
+      },
+      {
+        key: 'languages',
+        label: 'Languages',
+        shape: 'groups' as const,
+        groups: [{ category: 'English', items: 'Native' }],
+      },
+      { key: 'interests', label: 'Interests', shape: 'list' as const, items: ['Chess'] },
+    ],
+  } satisfies ResumeStructure;
+
+  const seen = otherSections(structure);
+  assert.ok(seen.includes('Awards & Honors'), 'named as the person named it');
+  assert.ok(seen.includes("Dean's Honour List"), 'and its content');
+  assert.ok(seen.includes('Ontario Tech University'), 'including the issuer it might be missing');
+  assert.ok(seen.includes('2025'));
+  assert.ok(seen.includes('English: Native'));
+  assert.ok(seen.includes('Chess'));
+  assert.ok(seen.includes('Ships software.'));
+});
+
+test('the four spelled out elsewhere are not sent twice', () => {
+  const structure = {
+    name: 'Ada',
+    contact: { email: 'a@b.com' },
+    education: [{ school: 'MIT', location: 'MA', degree: 'BS', dates: '2022' }],
+    experience: [{ title: 'Engineer', org: 'Acme', location: 'Remote', dates: '2025', bullets: ['Shipped'] }],
+    projects: [],
+    skills: [{ category: 'Tools', items: 'Git' }],
+  } satisfies ResumeStructure;
+
+  const seen = otherSections(structure);
+  assert.ok(!seen.includes('MIT'), 'education has its own block');
+  assert.ok(!seen.includes('Acme'), 'so does experience');
+  assert.ok(!seen.includes('Git'), 'and skills');
+  assert.equal(seen, '(none)');
 });

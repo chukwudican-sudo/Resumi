@@ -12,6 +12,8 @@ import {
   shapeOf,
 } from './sections';
 import { sectionStatus } from './buildResume';
+import { renderResumeLatex } from './latexEngine';
+import { formatDates } from './entryFormat';
 import type { ResumeStructure } from './types';
 
 const base: ResumeStructure = {
@@ -170,8 +172,17 @@ test('rows with an organisation under the title are entries', () => {
   );
 });
 
-test('rows with only a title are inline, like projects', () => {
-  assert.strictEqual(inferShape({ entries: [{ title: 'A Paper' }, { title: 'Another' }] }), 'inline');
+test('rows with a title and dates are inline, like projects', () => {
+  assert.strictEqual(
+    inferShape({ entries: [{ title: 'A Paper', dates: '2025', bullets: ['On something'] }] }),
+    'inline',
+  );
+});
+
+test('bare titles with nothing under them are a list', () => {
+  // They used to be drawn as project headings, which gave each one an empty
+  // date column on the right of the page.
+  assert.strictEqual(inferShape({ entries: [{ title: 'A Paper' }, { title: 'Another' }] }), 'list');
 });
 
 test('lines that all read Label: items are groups', () => {
@@ -211,6 +222,7 @@ test('education fills the slots the template has always given it', () => {
     headingRight: 'Cambridge, MA',
     sub: 'BS',
     subRight: '2018 - 2022',
+    url: '',
     bullets: [],
   });
 });
@@ -223,6 +235,7 @@ test('experience fills them the other way round, as it always has', () => {
     headingRight: '2022 - Present',
     sub: 'Acme',
     subRight: 'Remote',
+    url: '',
     bullets: ['Shipped'],
   });
 });
@@ -246,6 +259,7 @@ test('a custom entries section reads like experience, not like education', () =>
     headingRight: '2024',
     sub: 'Robotics Club',
     subRight: 'Oshawa, ON',
+    url: '',
     bullets: ['Ran it'],
   });
 });
@@ -401,4 +415,243 @@ test('a section cannot claim the rail slot Contact sits in', () => {
   // unreachable because the pinned Contact matches first.
   assert.notStrictEqual(keyFor('Contact'), 'contact');
   assert.notStrictEqual(keyFor('CONTACT'), 'contact');
+});
+
+// ── Labels, not things you did ─────────────────────────────────────────────
+
+const LANGUAGES = [
+  { title: 'English', bullets: ['Native / Fluent'] },
+  { title: 'Igbo', bullets: ['Conversational'] },
+  { title: 'French', bullets: ['Basic'] },
+];
+
+test('a Languages section is label and value, not a list of jobs', () => {
+  // It extracts as rows with a title and one short line — structurally the
+  // same as a project with one bullet. Read as a project it printed "English"
+  // with a date column beside it, which is not a thing a language has.
+  assert.strictEqual(inferShape({ entries: LANGUAGES }), 'groups');
+});
+
+test('names with nothing under them are a plain list', () => {
+  assert.strictEqual(
+    inferShape({ entries: [{ title: 'English' }, { title: 'Igbo' }, { title: 'French' }] }),
+    'list',
+  );
+});
+
+test('a project with one bullet is still a project', () => {
+  // The guard rails: a date, a stack, a link, or a second line all say this is
+  // something somebody did rather than a label.
+  assert.strictEqual(
+    inferShape({ entries: [{ title: 'Portfolio', dates: '2025', bullets: ['Built it'] }, { title: 'Other', bullets: ['x'] }] }),
+    'inline',
+  );
+  assert.strictEqual(
+    inferShape({ entries: [{ title: 'Portfolio', tech: 'Next.js', bullets: ['Built it'] }, { title: 'Other', bullets: ['x'] }] }),
+    'inline',
+  );
+  assert.strictEqual(
+    inferShape({ entries: [{ title: 'Portfolio', bullets: ['Built it', 'Shipped it'] }, { title: 'Other', bullets: ['x'] }] }),
+    'inline',
+  );
+});
+
+test('a sentence about work is not a value', () => {
+  assert.strictEqual(
+    inferShape({
+      entries: [
+        { title: 'Resumi', bullets: ['Built a full-stack AI-powered web application with a React frontend and four endpoints'] },
+        { title: 'MealApp', bullets: ['Built a cross-platform mobile app targeting Android and iOS from one codebase'] },
+      ],
+    }),
+    'inline',
+  );
+});
+
+test('one pair on its own is not a pattern', () => {
+  assert.strictEqual(inferShape({ entries: [{ title: 'English', bullets: ['Native'] }] }), 'inline');
+});
+
+test('two label-and-value sections do not share their content', () => {
+  // Once Languages started arriving as label-and-value it opened the same
+  // editor as Skills — which was hardwired to skills, so the rail had two rows
+  // showing and saving one thing.
+  const structure: ResumeStructure = {
+    ...base,
+    skills: [{ category: 'Languages & Frameworks', items: 'TypeScript, React' }],
+    sections: [
+      { key: 'skills', label: 'Technical Skills' },
+      {
+        key: 'languages',
+        label: 'Languages',
+        shape: 'groups',
+        groups: [
+          { category: 'English', items: 'Native' },
+          { category: 'Igbo', items: 'Conversational' },
+        ],
+      },
+    ],
+  };
+  const plan = planSections(structure);
+
+  const skills = contentFor(structure, plan.find((s) => s.key === 'skills')!);
+  const languages = contentFor(structure, plan.find((s) => s.key === 'languages')!);
+
+  assert.deepStrictEqual(skills.shape === 'groups' ? skills.groups : null, [
+    { category: 'Languages & Frameworks', items: 'TypeScript, React' },
+  ]);
+  assert.deepStrictEqual(languages.shape === 'groups' ? languages.groups : null, [
+    { category: 'English', items: 'Native' },
+    { category: 'Igbo', items: 'Conversational' },
+  ]);
+});
+
+test('a language listed with no level is kept, not dropped', () => {
+  // The three-box editor makes this reachable: pick a language, leave the
+  // level alone. Requiring both boxes would delete the row on save.
+  const structure: ResumeStructure = {
+    ...base,
+    sections: [
+      {
+        key: 'languages',
+        label: 'Languages',
+        shape: 'groups',
+        groups: [
+          { category: 'English', items: 'Native' },
+          { category: 'Yoruba', items: '' },
+          { category: '', items: '' },
+        ],
+      },
+    ],
+  };
+  const plan = planSections(structure);
+  const content = contentFor(structure, plan.find((s) => s.key === 'languages')!);
+  assert.deepStrictEqual(content.shape === 'groups' ? content.groups : null, [
+    { category: 'English', items: 'Native' },
+    { category: 'Yoruba', items: '' },
+  ], 'the empty row goes, the label-only row stays');
+});
+
+test('a label with no value prints without a dangling colon', () => {
+  const structure: ResumeStructure = {
+    ...base,
+    sections: [
+      { key: 'experience', label: 'Experience' },
+      {
+        key: 'languages',
+        label: 'Languages',
+        shape: 'groups',
+        groups: [{ category: 'English', items: 'Native' }, { category: 'Yoruba', items: '' }],
+      },
+    ],
+  };
+  const latex = renderResumeLatex(structure);
+  assert.ok(latex.includes('\\textbf{English}{: Native}'));
+  assert.ok(latex.includes('\\textbf{Yoruba} \\\\'), 'no colon after a label with nothing beside it');
+  assert.ok(!latex.includes('\\textbf{Yoruba}{: }'));
+});
+
+test('an entry-shaped section prints the link it was given', () => {
+  // Every entry editor has had a link box and only projects ever printed one,
+  // so a certificate's Verify link went into the database and never onto the
+  // page. Every guide on certifications recommends carrying it.
+  const structure: ResumeStructure = {
+    ...base,
+    sections: [
+      { key: 'experience', label: 'Experience' },
+      {
+        key: 'certifications',
+        label: 'Certifications',
+        shape: 'entries',
+        entries: [
+          { title: 'AWS Certified Cloud Practitioner', org: 'Amazon Web Services', dates: 'Jun 2025 – Jun 2028', url: 'credly.com/badges/abc' },
+        ],
+      },
+    ],
+  };
+  const latex = renderResumeLatex(structure);
+  assert.ok(latex.includes('credly.com/badges/abc'), 'the address is on the page');
+  assert.ok(latex.includes('Amazon Web Services $|$ \\href'), 'beside the issuer, not instead of it');
+});
+
+test('an entry with no link prints exactly as it did before', () => {
+  const structure: ResumeStructure = { ...base, sections: undefined };
+  const latex = renderResumeLatex(structure);
+  assert.ok(latex.includes('\\resumeSubheading{Engineer}{2022 - Present}{Acme}{Remote}'));
+  assert.ok(!latex.includes('$|$ \\href'), 'no dangling separator');
+});
+
+test('a certificate in progress is Expected, not Present', () => {
+  // "Started Jan 2026 – Present" is right for a role and wrong for something
+  // you are studying towards.
+  assert.strictEqual(
+    formatDates({ startMonth: 1, startYear: 2026, endMonth: 5, endYear: 2026, isCurrent: true }, 'certifications'),
+    'Jan 2026 – May 2026 (Expected)',
+  );
+  assert.strictEqual(
+    formatDates({ startMonth: 1, startYear: 2026, endMonth: null, endYear: null, isCurrent: true }, 'experience'),
+    'Jan 2026 – Present',
+  );
+  assert.strictEqual(
+    formatDates({ startMonth: 1, startYear: 2026, endMonth: null, endYear: null, isCurrent: true }, 'extracurricular'),
+    'Jan 2026 – Present',
+  );
+});
+
+test('Contact is not ticked while it is the thing holding everything up', () => {
+  // Polish and Download stay shut until the contact form has been saved, and
+  // the rail was showing a green tick and "Name and email set" on that exact
+  // section — so there was nothing on screen saying where to go, and the answer
+  // was to ask whoever built it.
+  const before = sectionStatus(base, false).find((s) => s.key === 'contact')!;
+  assert.strictEqual(before.done, false);
+  assert.strictEqual(before.detail, 'Not saved yet');
+
+  const after = sectionStatus(base, true).find((s) => s.key === 'contact')!;
+  assert.strictEqual(after.done, true);
+  assert.strictEqual(after.detail, 'Name and email set');
+});
+
+test('a contact with no email says what is missing, saved or not', () => {
+  const empty: ResumeStructure = { ...base, name: '', contact: {} };
+  for (const saved of [true, false]) {
+    const row = sectionStatus(empty, saved).find((s) => s.key === 'contact')!;
+    assert.strictEqual(row.done, false);
+    assert.strictEqual(row.detail, 'Name and email needed');
+  }
+});
+
+// ── Headings, however they are spelled ─────────────────────────────────────
+
+test('a compound heading still names the section it is', () => {
+  // "Awards & Honors" is one spelling of the same section out of a hundred, and
+  // an exact-match table is always one spelling behind. Left as its own key it
+  // printed twice: once as "Awards & Honors" from the section, once as "Awards"
+  // from the flat field the extractor also filled.
+  for (const heading of ['Awards & Honors', 'Honors & Awards', 'Awards and Honours', 'Scholarships & Awards']) {
+    assert.strictEqual(keyFor(heading), 'awards', heading);
+  }
+  for (const heading of ['Certifications & Licenses', 'Licenses & Certifications', 'Credentials']) {
+    assert.strictEqual(keyFor(heading), 'certifications', heading);
+  }
+  assert.strictEqual(keyFor('Skills & Abilities'), 'skills');
+  assert.strictEqual(keyFor('Summary of Qualifications'), 'summary');
+  assert.strictEqual(keyFor('Education & Training'), 'education');
+});
+
+test('a qualifier that changes the section is left alone', () => {
+  // This is the reason experience has no word list. "Volunteer Experience" is
+  // not somebody's job history, and folding it in would merge their
+  // volunteering into their employment.
+  assert.strictEqual(keyFor('Volunteer Experience'), 'volunteer_experience');
+  assert.strictEqual(keyFor('Research Experience'), 'research_experience');
+  assert.strictEqual(keyFor('Leadership Experience'), 'leadership_experience');
+  assert.strictEqual(keyFor('Extracurricular & Community Activities'), 'extracurricular_community_activities');
+});
+
+test('the compound headings that were already decided still hold', () => {
+  assert.strictEqual(keyFor('Work Experience'), 'experience');
+  assert.strictEqual(keyFor('Professional Experience'), 'experience');
+  assert.strictEqual(keyFor('Technical Projects'), 'projects');
+  assert.strictEqual(keyFor('Technical Skills'), 'skills');
 });

@@ -36,20 +36,80 @@ export function blankEntry(kind: Kind): EditableEntry {
   };
 }
 
-interface Copy { titleLabel: string; orgLabel: string; titlePlaceholder: string; orgPlaceholder: string }
+/**
+ * The wording for one section's form.
+ *
+ * The fields are the same everywhere on purpose — five shapes, no bespoke
+ * sections — but the WORDS are not, and using one section's words on another
+ * makes the form read as nonsense. A certification asked "What you did" under a
+ * placeholder about payment pipelines, and offered a Location box with no hint
+ * that it is there for a licence's issuing state.
+ */
+interface Copy {
+  /** The form's heading when adding a new one. */
+  addLabel: string;
+  titleLabel: string;
+  orgLabel: string;
+  titlePlaceholder: string;
+  orgPlaceholder: string;
+  placeLabel: string;
+  linesLabel: string;
+  linesBlurb: string;
+  linesPlaceholder: string;
+}
+
+const LINES_BLURB =
+  'One line each, in your own words. Write them plainly \u2014 tailoring rewrites them for each job, and the questions push for numbers once you have a posting.';
 
 const COPY: Record<string, Copy> = {
   experience: {
+    addLabel: 'Add a job',
     titleLabel: 'Job title', orgLabel: 'Company',
     titlePlaceholder: 'Backend Engineering Intern', orgPlaceholder: 'Northbound',
+    placeLabel: 'Location',
+    linesLabel: 'What you did',
+    linesBlurb: LINES_BLURB,
+    linesPlaceholder: 'Rebuilt the payment retry pipeline so failed charges were retried automatically',
   },
   education: {
+    addLabel: 'Add education',
     titleLabel: 'Field of study', orgLabel: 'School',
     titlePlaceholder: 'Software Engineering', orgPlaceholder: 'Ontario Tech University',
+    placeLabel: 'Location',
+    linesLabel: 'Coursework, honours, anything worth naming',
+    linesBlurb:
+      'Relevant coursework is worth listing while you are still studying \u2014 it is often the most relevant thing you have.',
+    linesPlaceholder: 'Relevant Coursework: Data Structures, Algorithms, Operating Systems',
   },
   project: {
+    addLabel: 'Add a project',
     titleLabel: 'Project name', orgLabel: 'Context',
     titlePlaceholder: 'Resumi', orgPlaceholder: 'Personal project',
+    placeLabel: 'Location',
+    linesLabel: 'What you did',
+    linesBlurb: LINES_BLURB,
+    linesPlaceholder: 'Rebuilt the payment retry pipeline so failed charges were retried automatically',
+  },
+  awards: {
+    addLabel: 'Add an award',
+    titleLabel: 'Award', orgLabel: 'Awarded by',
+    titlePlaceholder: "Dean's Honour List", orgPlaceholder: 'Ontario Tech University',
+    placeLabel: 'Where it was awarded',
+    linesLabel: 'Details',
+    linesBlurb: 'What it was for, if the name does not already say. Most awards need none.',
+    linesPlaceholder: 'Top 5% of the faculty, awarded each term',
+  },
+  certifications: {
+    addLabel: 'Add a certification',
+    titleLabel: 'Certification', orgLabel: 'Issuer',
+    titlePlaceholder: 'AWS Certified Cloud Practitioner', orgPlaceholder: 'Amazon Web Services',
+    // Kept, and named for the one case it serves: a nursing, teaching or trades
+    // licence is expected to carry the state that issued it. A certificate
+    // needs none of this, which is what "optional" is for.
+    placeLabel: 'Where it was issued',
+    linesLabel: 'Details',
+    linesBlurb: 'A credential ID, a score, anything worth adding. Most certificates need none of this.',
+    linesPlaceholder: 'Credential ID 0000000',
   },
 };
 
@@ -66,10 +126,15 @@ const COPY: Record<string, Copy> = {
 function copyFor(kind: Kind): Copy {
   return (
     COPY[kind] ?? {
+      addLabel: 'Add an entry',
       titleLabel: 'Title',
       orgLabel: 'Organisation',
       titlePlaceholder: 'Team Lead',
       orgPlaceholder: 'Hack the North',
+      placeLabel: 'Location',
+      linesLabel: 'What you did',
+      linesBlurb: LINES_BLURB,
+      linesPlaceholder: 'Led a team of four through a two-week build',
     }
   );
 }
@@ -119,7 +184,7 @@ export default function EntryEditor({
   return (
     <div>
       <h1 className="font-serif text-[34px] leading-tight">
-        {draft.id ? 'Edit' : kind === 'experience' ? 'Add a job' : kind === 'education' ? 'Add education' : kind === 'project' ? 'Add a project' : 'Add an entry'}
+        {draft.id ? 'Edit' : copy.addLabel}
       </h1>
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -143,7 +208,7 @@ export default function EntryEditor({
       </div>
 
       <div className="mt-6">
-        <PlaceFields value={draft.place} onChange={(place) => setDraft({ ...draft, place })} />
+        <PlaceFields label={copy.placeLabel} value={draft.place} onChange={(place) => setDraft({ ...draft, place })} />
       </div>
 
       {/* Fields that only make sense for one kind. */}
@@ -234,14 +299,8 @@ export default function EntryEditor({
       ) : null}
 
       <div className="mt-7">
-          <span className="text-[13.5px] text-ink-prose">
-            {kind === 'education' ? 'Coursework, honours, anything worth naming' : 'What you did'}
-          </span>
-          <p className="mt-1 text-[13px] leading-snug text-ink-faint">
-            {kind === 'education'
-              ? 'Relevant coursework is worth listing while you are still studying \u2014 it is often the most relevant thing you have.'
-              : 'One line each, in your own words. Write them plainly \u2014 tailoring rewrites them for each job, and the questions push for numbers once you have a posting.'}
-          </p>
+          <span className="text-[13.5px] text-ink-prose">{copy.linesLabel}</span>
+          <p className="mt-1 text-[13px] leading-snug text-ink-faint">{copy.linesBlurb}</p>
           <div className="mt-3 flex flex-col gap-2.5">
             {draft.bullets.map((b, i) => (
               <div key={i} className="flex items-start gap-2">
@@ -254,11 +313,7 @@ export default function EntryEditor({
                     next[i] = e.target.value;
                     setDraft({ ...draft, bullets: next });
                   }}
-                  placeholder={
-                    kind === 'education'
-                      ? 'Relevant Coursework: Data Structures, Algorithms, Operating Systems'
-                      : 'Rebuilt the payment retry pipeline so failed charges were retried automatically'
-                  }
+                  placeholder={copy.linesPlaceholder}
                   className="w-full resize-none rounded border border-rule-field bg-ground-surface px-3.5 py-2.5 text-[14.5px] leading-relaxed outline-none transition placeholder:text-ink-ghost focus:border-accent"
                 />
                 {draft.bullets.length > 1 ? (
