@@ -1,4 +1,4 @@
-import type { EntryKind, FactCategory } from '../types';
+import type { FactCategory } from '../types';
 
 /**
  * The fact taxonomy, shared by the coverage calculator and the interview
@@ -59,8 +59,13 @@ export const DEEP_ENTRY_LIMIT: Record<string, number> = {
 /** Kept for callers that only need the full list. */
 export const ENTRY_REQUIRED_CATEGORIES = DEEP_REQUIRED_CATEGORIES;
 
-/** Entry kinds that are scored against ENTRY_REQUIRED_CATEGORIES. */
-export const SCORED_ENTRY_KINDS: EntryKind[] = ['experience', 'project'];
+/**
+ * Entry kinds that are scored against ENTRY_REQUIRED_CATEGORIES.
+ *
+ * Typed as strings because an entry's kind can now be a custom section's key —
+ * a Volunteering entry is not scored, and `includes` needs to be able to ask.
+ */
+export const SCORED_ENTRY_KINDS: string[] = ['experience', 'project'];
 
 /**
  * Relative worth of closing a gap in each category. Metrics and scope are what

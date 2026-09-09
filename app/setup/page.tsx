@@ -8,7 +8,7 @@ import { getProfile, getResumeInputs, getUser } from '../server/db/repository';
 /** Where a resume gets built and edited. Everything here is typed by hand. */
 export default async function SetupPage() {
   const userId = await requireUserId();
-  const [{ entryRows, factRows }, user, profile] = await Promise.all([
+  const [{ entryRows, factRows, sections }, user, profile] = await Promise.all([
     getResumeInputs(userId),
     getUser(userId),
     getProfile(userId),
@@ -40,6 +40,7 @@ export default async function SetupPage() {
       initialEntries={entries}
       initialFacts={factRows}
       initialContact={contact}
+      initialSections={sections}
       polished={polished}
       stale={profile?.stale ?? true}
       // Changes on every save, which is what the preview keys its rebuild off.

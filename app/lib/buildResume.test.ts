@@ -94,7 +94,7 @@ test('empty contact fields are omitted rather than rendered blank', () => {
 });
 
 test('section status says what is missing, not a percentage', () => {
-  const status = sectionStatus([entry({ kind: 'experience', title: 'Engineer' })], contactFacts);
+  const status = sectionStatus(buildResume([entry({ kind: 'experience', title: 'Engineer' })], contactFacts));
 
   const byKey = Object.fromEntries(status.map((s) => [s.key, s]));
   assert.equal(byKey.contact.done, true);

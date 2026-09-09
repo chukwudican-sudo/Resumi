@@ -10,14 +10,20 @@ import MaterialList from './MaterialList';
 import { checkReadiness } from '../../lib/readiness';
 import DownloadPdf from '../applications/DownloadPdf';
 import PolishButton from './PolishButton';
-import type { ResumeStructure } from '../../lib/types';
+import type { ResumeSection, ResumeStructure } from '../../lib/types';
+import { contentFor, entryKindFor, planSections } from '../../lib/sections';
 import ContactSection, { type Contact } from './ContactSection';
 import EntrySection from './EntrySection';
 import SkillsSection, { type SkillGroup } from './SkillsSection';
+import ProseSection from './ProseSection';
+import ListSection from './ListSection';
 
-export type SectionKey = 'contact' | 'experience' | 'education' | 'projects' | 'skills';
-
-const SECTION_KEYS: SectionKey[] = ['contact', 'experience', 'education', 'projects', 'skills'];
+/**
+ * Which section is open. Any key this person's resume actually has, plus
+ * 'contact' — which is authored here and printed as the header rather than as a
+ * section of its own.
+ */
+export type SectionKey = string;
 
 /**
  * Where a resume gets built.
@@ -31,6 +37,7 @@ export default function SetupShell({
   initialEntries,
   initialFacts,
   initialContact,
+  initialSections,
   polished,
   stale,
   savedAt,
@@ -38,6 +45,8 @@ export default function SetupShell({
   initialEntries: EntryWithBullets[];
   initialFacts: ContactFact[];
   initialContact: Contact;
+  /** This person's own sections. Empty means the conventional set. */
+  initialSections: ResumeSection[];
   polished: ResumeStructure | null;
   stale: boolean;
   savedAt: string;
@@ -49,10 +58,7 @@ export default function SetupShell({
   // on Skills rather than on Contact, and a link is a great deal simpler than
   // teaching them to drive this component.
   const searchParams = useSearchParams();
-  const [section, setSection] = useState<SectionKey>(() => {
-    const asked = searchParams.get('section');
-    return SECTION_KEYS.includes(asked as SectionKey) ? (asked as SectionKey) : 'contact';
-  });
+  const [section, setSection] = useState<SectionKey>(() => searchParams.get('section') || 'contact');
   const [contact, setContact] = useState(initialContact);
 
   // Polishing reads the database and writes corrections back to it, while an
@@ -60,6 +66,22 @@ export default function SetupShell({
   // the old text back and the correction disappears — so the two are not
   // allowed to happen at once.
   const [dirty, setDirty] = useState(false);
+
+  /**
+   * Whether the contact details have been saved on this visit.
+   *
+   * Polish and Download stay shut until they have. The form already refuses to
+   * save a link that is not a link — it lights up the field and stops — so
+   * requiring the save is what makes that check unavoidable. Before this, an
+   * imported value nobody had typed was never put to it: a resume arrived with
+   * the word "LinkedIn" in the LinkedIn box, polished, downloaded, and went out
+   * carrying a link that pointed at nothing.
+   *
+   * Per visit rather than remembered. Saving is one click and it is the first
+   * thing on the page, while a rule that only checked new accounts would let
+   * every returning one straight past it.
+   */
+  const [contactSaved, setContactSaved] = useState(false);
   const [, startTransition] = useTransition();
 
   // Entries and facts come straight from props rather than being copied into
@@ -69,17 +91,25 @@ export default function SetupShell({
   // just added would not appear until a full reload.
   const entries = initialEntries;
   const facts = initialFacts;
+  const sections = initialSections;
 
-  const status = useMemo(() => sectionStatus(entries, facts), [entries, facts]);
   // Once the editorial pass has run, that is the resume — showing the raw
   // build beside a Download button that produces the polished one would be a
   // preview of something the person never receives.
-  const built = useMemo(() => buildResume(entries, facts), [entries, facts]);
+  const built = useMemo(() => buildResume(entries, facts, sections), [entries, facts, sections]);
+  // The rail and the page are read off the same plan, so they cannot disagree
+  // about the order — which they did, visibly, until this.
+  const status = useMemo(() => sectionStatus(built), [built]);
+  const open = useMemo(() => status.find((s) => s.key === section) ?? status[0], [status, section]);
   const resume = polished ?? built;
   const doneCount = status.filter((s) => s.done).length;
   // Offering a download of a resume with no name and no history on it would
   // produce a page nobody wants to have sent.
   const usable = useMemo(() => isResumeUsable(entries, facts), [entries, facts]);
+  // Where 'Save and continue' goes: the next section in the rail, wrapping to
+  // the first. Hardcoding the successor per section is how a new one ends up
+  // being a dead end nothing leads out of.
+  const nextKey = status[(status.findIndex((s) => s.key === open?.key) + 1) % status.length]?.key ?? 'contact';
 
   // Whether there is enough here to compile. The same check the download and
   // the preview endpoint make, so the pane never shows a resume that the
@@ -104,7 +134,7 @@ export default function SetupShell({
       [
         { key: 'experience' as const, noun: 'experience', count: count(built.experience ?? []) },
         { key: 'projects' as const, noun: 'project', count: count(built.projects ?? []) },
-      ] satisfies { key: SectionKey; noun: string; count: number }[]
+      ] satisfies { key: string; noun: string; count: number }[]
     ).filter((w) => w.count > 0);
   }, [built]);
 
@@ -125,6 +155,18 @@ export default function SetupShell({
     [facts],
   );
 
+  // Read off the built resume rather than the rows, so the editor is filled
+  // with exactly what the page beside it is printing.
+  function proseOf(key: string): string {
+    const content = contentFor(built, { key, label: '', shape: 'prose', optional: true });
+    return content.shape === 'prose' ? content.text : '';
+  }
+
+  function itemsOf(key: string): string[] {
+    const content = contentFor(built, { key, label: '', shape: 'list', optional: true });
+    return content.shape === 'list' ? content.items : [];
+  }
+
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
@@ -135,12 +177,12 @@ export default function SetupShell({
           <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[13px] text-ink-muted">{doneCount} of 5 sections</span>
+          <span className="text-[13px] text-ink-muted">{doneCount} of {status.length} sections</span>
           {dirty ? (
             <span className="text-[12.5px] text-ink-faint">Save or cancel first</span>
           ) : null}
-          {usable ? <PolishButton stale={stale} disabled={dirty} /> : null}
-          {usable ? <DownloadPdf polishFirst={stale} disabled={dirty} /> : null}
+          {usable ? <PolishButton stale={stale} disabled={dirty || !contactSaved} /> : null}
+          {usable ? <DownloadPdf polishFirst={stale} disabled={dirty || !contactSaved} /> : null}
           <Link
             href="/applications"
             className="rounded bg-accent px-5 py-2.5 text-sm font-medium text-ground transition hover:bg-accent-hover"
@@ -250,34 +292,60 @@ export default function SetupShell({
         {/* the section being edited */}
         <div className="min-h-0 px-6 py-8 sm:px-10 lg:overflow-y-auto">
           <div className="mx-auto max-w-[560px]">
-            {section === 'contact' ? (
+            {/*
+              Dispatched on SHAPE, not on name — the same decision the renderer
+              makes two columns over. There are five ways to edit a section and
+              three of them already existed, which is what made an unfamiliar
+              section affordable: Extracurriculars is Experience with a
+              different heading, not a new editor.
+
+              Keyed on the section throughout. Without that, React sees the same
+              element type in the same position and keeps the instance — so an
+              entry left open for editing stayed open when you moved to another
+              section, and its form re-rendered under the new kind holding the
+              old entry's data.
+            */}
+            {!open || open.shape === 'contact' ? (
               <ContactSection
                 contact={contact}
                 onChange={setContact}
-                onSaved={afterSave}
-                onNext={() => setSection('experience')}
+                onSaved={() => { setContactSaved(true); afterSave(); }}
+                onNext={() => setSection(nextKey)}
                 onDirty={setDirty}
               />
-            ) : section === 'skills' ? (
+            ) : open.shape === 'groups' ? (
               <SkillsSection
+                key={open.key}
                 groups={skillGroups}
                 onSaved={afterSave}
                 onDirty={setDirty}
               />
+            ) : open.shape === 'prose' ? (
+              <ProseSection
+                key={open.key}
+                sectionKey={open.key}
+                label={open.label}
+                text={proseOf(open.key)}
+                onSaved={afterSave}
+                onDirty={setDirty}
+              />
+            ) : open.shape === 'list' ? (
+              <ListSection
+                key={open.key}
+                sectionKey={open.key}
+                label={open.label}
+                items={itemsOf(open.key)}
+                onSaved={afterSave}
+                onDirty={setDirty}
+              />
             ) : (
-              // Keyed so a section change makes a new one. Without this, React
-              // sees the same element type in the same position and keeps the
-              // instance — so an entry left open for editing stayed open when
-              // you moved to another section, and its form re-rendered under
-              // the new kind holding the old entry's data.
               <EntrySection
-                key={section}
-                kind={section === 'experience' ? 'experience' : section === 'education' ? 'education' : 'project'}
+                key={open.key}
+                kind={entryKindFor(open.key)}
+                label={open.label}
                 entries={entries}
                 onChange={afterSave}
-                onNext={() =>
-                  setSection(section === 'experience' ? 'education' : section === 'education' ? 'projects' : 'skills')
-                }
+                onNext={() => setSection(nextKey)}
                 onDirty={setDirty}
               />
             )}
@@ -297,7 +365,7 @@ export default function SetupShell({
               <PdfPreview reloadKey={savedAt} />
             </>
           ) : (
-            <MaterialList entries={entries} facts={facts} />
+            <MaterialList entries={entries} facts={facts} sections={sections} />
           )}
         </aside>
       </div>

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entriesFromStructure, factsFromStructure } from './importRows';
+import { entriesFromStructure, factsFromStructure, sectionsFromStructure } from './importRows';
+import { renderResumeLatex } from './latexEngine';
 import { buildResume, type ContactFact, type EntryWithBullets } from './buildResume';
 import type { ResumeStructure } from './types';
 
@@ -233,4 +234,144 @@ test('every field an imported row carries is one the resume builder reads', () =
     if (key === 'orderIndex') continue;
     assert.ok(key in entry, `entryFromRow must carry "${key}"`);
   }
+});
+
+// ── Sections the app has no name for ───────────────────────────────────────
+//
+// A real upload on 2026-09-08 carried a Summary and an "Extracurricular &
+// Community Activities" section with two entries. The database afterwards held
+// education=1, experience=4, project=6 and nothing else: the extractor was
+// told "content that does not fit the canonical set is simply omitted", and the
+// summary that did survive sat in a derived blob until the next Polish
+// overwrote it. These cover both halves.
+
+const EXTRAS = [
+  {
+    label: 'Extracurricular & Community Activities',
+    entries: [
+      { title: 'Team Lead', org: 'Hack the North', location: 'Waterloo, ON', dates: 'Sep 2025', bullets: ['Led a team of four'] },
+      { title: 'Volunteer', org: 'Local Food Bank', dates: '2024 – 2025', bullets: [] },
+    ],
+  },
+  { label: 'Interests', lines: ['Chess', 'Long-distance running'] },
+];
+
+const ORDER = [
+  'Summary',
+  'Education',
+  'Projects',
+  'Work Experience',
+  'Extracurricular & Community Activities',
+  'Technical Skills',
+  'Interests',
+];
+
+const WITH_EXTRAS: ResumeStructure = { ...SAMPLE, summary: 'Software engineer who ships.' };
+
+test('an uploaded section the app has never heard of is kept, under its own name', () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, EXTRAS, ORDER);
+  const activities = sections.find((s) => s.key === 'extracurricular_community_activities');
+
+  assert.ok(activities, 'the section survived the import');
+  assert.equal(activities.label, 'Extracurricular & Community Activities', 'named as the resume named it');
+  assert.equal(activities.shape, 'entries', 'shape read off the content, not self-reported');
+  assert.equal(activities.entries?.length, 2);
+});
+
+test('the resume keeps its own arrangement, not the conventional one', () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, EXTRAS, ORDER);
+  assert.deepEqual(sections.map((s) => s.key), [
+    'summary',
+    'education',
+    'projects',
+    'experience',
+    'extracurricular_community_activities',
+    'skills',
+    'interests',
+  ]);
+  assert.equal(
+    sections.find((s) => s.key === 'experience')!.label,
+    'Work Experience',
+    'the heading the resume used, not the app default',
+  );
+});
+
+test('a heading naming one of the seven does not create a second section', () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, [{ label: 'Work Experience', lines: ['nope'] }], ORDER);
+  assert.equal(sections.filter((s) => s.key === 'experience').length, 1);
+  assert.equal(sections.find((s) => s.key === 'experience')!.shape, undefined, 'content stays in the named field');
+});
+
+test('a heading with nothing under it is dropped rather than stored empty', () => {
+  // An empty section renders an itemize with no \item, which aborts the compile.
+  const sections = sectionsFromStructure(WITH_EXTRAS, [{ label: 'References', lines: [] }], [...ORDER, 'References']);
+  assert.ok(!sections.some((s) => s.key === 'references'));
+});
+
+test('a section missing from the order list is still kept', () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, EXTRAS, ['Education']);
+  const keys = sections.map((s) => s.key);
+  assert.ok(keys.includes('experience'), 'the model forgetting a heading must not delete the section');
+  assert.ok(keys.includes('extracurricular_community_activities'));
+});
+
+test("a custom section's entries become rows under its own key", () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, EXTRAS, ORDER);
+  const rows = entriesFromStructure(WITH_EXTRAS, sections);
+  const mine = rows.filter((r) => r.kind === 'extracurricular_community_activities');
+
+  assert.equal(mine.length, 2);
+  assert.equal(mine[0].title, 'Team Lead');
+  assert.equal(mine[0].org, 'Hack the North');
+  assert.deepEqual(mine[0].bullets, ['Led a team of four']);
+  assert.equal(mine[0].startYear, 2025, 'dates parse on the experience rule');
+});
+
+test('the round trip: everything uploaded comes back out of the rows', () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, EXTRAS, ORDER);
+  const entries = entriesFromStructure(WITH_EXTRAS, sections).map(rowToEntry);
+  const facts = factsFromStructure(WITH_EXTRAS).map((f) => ({ category: f.category, text: f.text }));
+
+  // This is the step that used to destroy things: the rebuild that runs after
+  // every save, reading rows and a plan rather than the uploaded structure.
+  const rebuilt = buildResume(entries, facts as ContactFact[], sections);
+
+  assert.equal(rebuilt.summary, 'Software engineer who ships.', 'the summary survived the rebuild');
+  assert.deepEqual(rebuilt.sections?.map((s) => s.key), [
+    'summary',
+    'education',
+    'projects',
+    'experience',
+    'extracurricular_community_activities',
+    'skills',
+    'interests',
+  ]);
+
+  const activities = rebuilt.sections?.find((s) => s.key === 'extracurricular_community_activities');
+  assert.equal(activities?.entries?.length, 2, 'both entries came back');
+  assert.equal(activities?.entries?.[0].title, 'Team Lead');
+  assert.deepEqual(activities?.entries?.[0].bullets, ['Led a team of four']);
+
+  const interests = rebuilt.sections?.find((s) => s.key === 'interests');
+  assert.deepEqual(interests?.items, ['Chess', 'Long-distance running']);
+});
+
+test('both sections print on the page, in the resume own order', () => {
+  const sections = sectionsFromStructure(WITH_EXTRAS, EXTRAS, ORDER);
+  const entries = entriesFromStructure(WITH_EXTRAS, sections).map(rowToEntry);
+  const facts = factsFromStructure(WITH_EXTRAS).map((f) => ({ category: f.category, text: f.text }));
+  const latex = renderResumeLatex(buildResume(entries, facts as ContactFact[], sections));
+
+  const headings = [...latex.matchAll(/\\section\{([^}]*)\}/g)].map((m) => m[1]);
+  assert.deepEqual(headings, [
+    'Summary',
+    'Education',
+    'Projects',
+    'Work Experience',
+    'Extracurricular \\& Community Activities',
+    'Technical Skills',
+    'Interests',
+  ]);
+  assert.ok(latex.includes('\\resumeItem{Led a team of four}'));
+  assert.ok(latex.includes('\\resumeItem{Long-distance running}'));
 });

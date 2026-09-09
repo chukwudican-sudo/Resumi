@@ -7,7 +7,9 @@ import { hasQuantity } from '../../lib/profileStrength';
 import type { EntryWithBullets } from '../../lib/buildResume';
 import EntryEditor, { blankEntry, type EditableEntry, type Kind } from './EntryEditor';
 
-const COPY: Record<Kind, { title: string; blurb: string; add: string; empty: string }> = {
+interface Copy { title: string; blurb: string; add: string; empty: string }
+
+const COPY: Record<string, Copy> = {
   experience: {
     title: 'Experience',
     blurb: 'Jobs, internships, anything you were paid to do.',
@@ -28,21 +30,43 @@ const COPY: Record<Kind, { title: string; blurb: string; add: string; empty: str
   },
 };
 
+/**
+ * Wording for a section the app has no copy written for.
+ *
+ * A Volunteering section is Experience with a different heading, so it needs no
+ * new editor — only a name. Taking that from the section's own label is what
+ * keeps a section imported from somebody's resume usable without a code change.
+ */
+function copyFor(kind: Kind, label?: string): Copy {
+  const known = COPY[kind];
+  if (known) return known;
+  const title = label?.trim() || 'Entries';
+  return {
+    title,
+    blurb: 'From your resume. Add, edit or reorder these the same way as anything else.',
+    add: 'Add an entry',
+    empty: 'Nothing here yet.',
+  };
+}
+
 export default function EntrySection({
   kind,
+  label,
   entries,
   onChange,
   onNext,
   onDirty,
 }: {
   kind: Kind;
+  /** What this section is called. Only needed for one the app has no copy for. */
+  label?: string;
   entries: EntryWithBullets[];
   onChange: () => void;
   onNext: () => void;
   /** True while an entry is open for editing and its changes are unsaved. */
   onDirty: (dirty: boolean) => void;
 }) {
-  const copy = COPY[kind];
+  const copy = copyFor(kind, label);
   const mine = entries.filter((e) => e.kind === kind).sort((a, b) => a.orderIndex - b.orderIndex);
   const [editing, setEditing] = useState<EditableEntry | null>(null);
   const [pending, startTransition] = useTransition();
@@ -143,6 +167,7 @@ export default function EntrySection({
           // Education is exempt: the score counts experience and projects only,
           // so a mark on a degree would report on something nothing measures.
           const quantified = kind !== 'education' && (entry.bullets ?? []).some(hasQuantity);
+
 
           return (
             <div key={entry.id} className="rounded-md border border-rule bg-ground-surface p-5">

@@ -2,6 +2,8 @@ import { formatDates, formatPlace } from '../../lib/entryFormat';
 import { titleWithEmployment } from '../../lib/employment';
 import { composeDegree } from '../../lib/degree';
 import type { ContactFact, EntryWithBullets } from '../../lib/buildResume';
+import { KNOWN_SHAPES as DEFAULT_SHAPES, entryKindFor } from '../../lib/sections';
+import type { ResumeSection } from '../../lib/types';
 
 /**
  * What you have collected, while you are still collecting it.
@@ -27,7 +29,7 @@ function bulletCount(bullets: string[]): number {
   return bullets.filter((b) => b.trim()).length;
 }
 
-function describe(entry: EntryWithBullets, kind: 'experience' | 'education' | 'project'): Item {
+function describe(entry: EntryWithBullets, kind: string): Item {
   const dates = formatDates(
     {
       startMonth: entry.startMonth ?? null,
@@ -100,20 +102,36 @@ function Group({ label, items }: { label: string; items: Item[] }) {
 export default function MaterialList({
   entries,
   facts,
+  sections = [],
 }: {
   entries: EntryWithBullets[];
   facts: ContactFact[];
+  /** This person's own sections. Empty means the conventional three. */
+  sections?: ResumeSection[];
 }) {
-  const byKind = (kind: 'experience' | 'education' | 'project') =>
+  const byKind = (kind: string) =>
     entries
       .filter((e) => e.kind === kind)
       .sort((a, b) => a.orderIndex - b.orderIndex)
       .map((e) => describe(e, kind));
 
-  const education = byKind('education');
-  const experience = byKind('experience');
-  const projects = byKind('project');
-  const total = education.length + experience.length + projects.length;
+  // Grouped by the sections this person has, not by a fixed three. This pane is
+  // what somebody sees before their resume has enough on it to compile, so a
+  // section missing from here reads as "it did not import my activities" at
+  // exactly the moment they are checking whether it did.
+  const groups = (
+    sections.length
+      ? sections
+          .filter((s) => (s.shape ?? DEFAULT_SHAPES[s.key]) === 'entries' || (s.shape ?? DEFAULT_SHAPES[s.key]) === 'inline')
+          .map((s) => ({ label: s.label, items: byKind(entryKindFor(s.key)) }))
+      : [
+          { label: 'Education', items: byKind('education') },
+          { label: 'Experience', items: byKind('experience') },
+          { label: 'Projects', items: byKind('project') },
+        ]
+  ).filter((g) => g.items.length);
+
+  const total = groups.reduce((sum, g) => sum + g.items.length, 0);
 
   // Split on commas so a group typed as "Python, Java" shows as two, which is
   // how they will be read.
@@ -143,9 +161,9 @@ export default function MaterialList({
       ) : null}
 
       <div className="flex flex-col gap-3.5">
-        <Group label="Education" items={education} />
-        <Group label="Experience" items={experience} />
-        <Group label="Projects" items={projects} />
+        {groups.map((g) => (
+          <Group key={g.label} label={g.label} items={g.items} />
+        ))}
 
         {skills.length ? (
           <div className="flex flex-col gap-1.5">

@@ -141,6 +141,45 @@ export const profileEntries = pgTable('profile_entries', {
 }));
 
 /**
+ * The sections this person's resume has, what they are called, and their order.
+ *
+ * A real table rather than a field on `profiles`, and the reason is the bug
+ * this exists to fix: `profiles.resume_structure` is DERIVED — rebuilt from
+ * rows on every save — so anything that lives only there is destroyed by the
+ * next edit. That is not a hypothetical. Polish decided section names, wrote
+ * them into that blob, and the next saveEntry wiped them; an uploaded Summary
+ * showed up in the preview and vanished the first time somebody pressed Polish,
+ * because no row anywhere held one.
+ *
+ * `content` carries the shapes that have nowhere else to live — a summary's
+ * paragraph, a certifications list, a custom section's groups. Entry-shaped
+ * sections keep their entries in `profile_entries` with `kind` set to this
+ * row's `key`, which that column already allows: it is bare text with no
+ * constraint, and the (user, kind, order) index already covers it.
+ *
+ * No rows means the conventional set, which is what the renderer has always
+ * done — so nothing needed backfilling and an untouched profile is unaffected.
+ */
+export const profileSections = pgTable('profile_sections', {
+  id: id(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Matches profile_entries.kind for entry-shaped sections. */
+  key: text('key').notNull(),
+  /** What it is called on the page. The resume's own word for it. */
+  label: text('label').notNull(),
+  /** One of entries | inline | groups | list | prose. See lib/sections.ts. */
+  shape: text('shape').notNull(),
+  content: jsonb('content').notNull().default({}),
+  /** Position on the page, 0 first. */
+  orderIndex: integer('order_index').notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => ({
+  userKeyIdx: uniqueIndex('profile_sections_user_key_idx').on(t.userId, t.key),
+  userOrderIdx: index('profile_sections_user_order_idx').on(t.userId, t.orderIndex),
+}));
+
+/**
  * One atomic thing the person told us, in their words.
  *
  * A real table rather than a jsonb array: appending to an array means

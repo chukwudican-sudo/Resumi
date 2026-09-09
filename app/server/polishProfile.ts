@@ -11,7 +11,9 @@ import {
   getProfile,
   getResumeInputs,
   getUser,
+  ensureSections,
   saveMasterResume,
+  saveSections,
 } from './db/repository';
 
 /**
@@ -74,10 +76,21 @@ export async function runPolish(
     normaliseEmploymentTitles(userId),
   ]);
 
-  const { entryRows, factRows } = await getResumeInputs(userId);
-  const corrected = buildResume(entryRows.map(entryFromRow), factRows);
+  const { entryRows, factRows, sections } = await getResumeInputs(userId);
+  const plan = sections.length ? sections : await ensureSections(userId);
+  const corrected = buildResume(entryRows.map(entryFromRow), factRows, plan);
   const applied = applyPolish(corrected, polish);
 
+  // The order goes to rows, not only to the derived resume.
+  //
+  // This is the bug, in one line. Polish decided the section order, wrote it
+  // into profiles.resume_structure, and the next saveEntry rebuilt that blob
+  // from rows and threw the decision away — which is why the pass kept
+  // re-deciding the same thing and paying for the call again, and why
+  // tailorGuard had to re-attach section names by hand. A summary had it worse:
+  // it lived only in the blob, so a rebuild did not just forget where it went,
+  // it deleted the paragraph.
+  await saveSections(userId, applied.sections ?? []);
   await saveMasterResume(userId, applied, profileStrength(applied), false);
   return polish;
 }

@@ -1,7 +1,9 @@
 import assert from 'node:assert';
 import test from 'node:test';
 import { applyPolish, overlapNote, validateCorrections, validatePolish, type PolishResult } from './polish';
-import type { ResumeStructure } from './types';
+import { contentFor, contentOf, hasContent, planSections, shapeOf } from './sections';
+import { buildResume } from './buildResume';
+import type { ResumeSection, ResumeStructure } from './types';
 
 const SOURCE_SKILLS = [
   'Skills: Uses TypeScript/JavaScript most, across full-stack web and mobile projects',
@@ -359,4 +361,164 @@ test('rewrites are still refused when punctuation is ignored', () => {
   assert.ok(!kept('Aegon', 'Aegon Financial Services'), 'an expansion is not a spelling fix');
   assert.ok(!kept('Managed team', 'Directed team'), 'a different verb is an edit');
   assert.ok(!kept('ap', 'app'), 'too short to replace safely');
+});
+
+// ── The trap ───────────────────────────────────────────────────────────────
+//
+// polishIfStale runs before every tailor. While the whitelist here was a
+// hardcoded four, a section imported from somebody's own resume survived the
+// upload, sat in the database, and was deleted the first time they tailored —
+// the feature appearing to work right up until it mattered.
+
+const OWN_SECTIONS = [
+  { key: 'summary', label: 'Summary' },
+  { key: 'education', label: 'Education' },
+  { key: 'experience', label: 'Work Experience' },
+  { key: 'extracurricular', label: 'Extracurricular & Community Activities' },
+  { key: 'skills', label: 'Technical Skills' },
+];
+
+test('a section the person actually has survives the pass', () => {
+  const result = validatePolish(
+    polish({
+      sections: [
+        { key: 'education', label: 'Education' },
+        { key: 'summary', label: 'Summary' },
+        { key: 'extracurricular', label: 'Extracurricular & Community Activities' },
+      ],
+    }),
+    SOURCE_SKILLS,
+    OWN_SECTIONS,
+  );
+  assert.equal(result.sections.length, OWN_SECTIONS.length, 'nothing was deleted for being unfamiliar');
+  assert.ok(result.sections.some((s) => s.key === 'extracurricular'));
+  assert.ok(result.sections.some((s) => s.key === 'summary'));
+});
+
+test('the pass may reorder a custom section but not drop it', () => {
+  const result = validatePolish(
+    polish({ sections: [{ key: 'skills', label: 'Technical Skills' }] }),
+    SOURCE_SKILLS,
+    OWN_SECTIONS,
+  );
+  assert.equal(result.sections[0].key, 'skills', 'what it did say is honoured');
+  assert.ok(result.sections.some((s) => s.key === 'extracurricular'), 'the rest is restored, not lost');
+});
+
+test('a section this person does not have cannot be invented', () => {
+  const result = validatePolish(
+    polish({ sections: [{ key: 'publications', label: 'Publications' }] }),
+    SOURCE_SKILLS,
+    OWN_SECTIONS,
+  );
+  assert.ok(!result.sections.some((s) => s.key === 'publications'));
+  assert.equal(result.sections.length, OWN_SECTIONS.length);
+});
+
+test('applying the pass keeps a custom section drawable', () => {
+  // The pass returns a key and a label. Assigning that wholesale would strip
+  // the shape that says how to draw the section and the content that IS the
+  // section — deleting it by way of the thing asked only to order it.
+  const structure = {
+    name: 'Ada',
+    contact: {},
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    sections: [
+      { key: 'summary', label: 'Summary', shape: 'prose' as const, text: 'Ships software.' },
+      {
+        key: 'extracurricular',
+        label: 'Extracurricular & Community Activities',
+        shape: 'entries' as const,
+        entries: [{ title: 'Team Lead', org: 'Hack the North', bullets: ['Led four'] }],
+      },
+    ],
+  } satisfies ResumeStructure;
+
+  const applied = applyPolish(structure, polish({
+    sections: [
+      { key: 'summary', label: 'Summary' },
+      { key: 'extracurricular', label: 'Activities' },
+    ],
+  }));
+
+  const activities = applied.sections?.find((s) => s.key === 'extracurricular');
+  assert.equal(activities?.label, 'Activities', 'the rename is applied');
+  assert.equal(activities?.shape, 'entries', 'the shape survived');
+  assert.equal(activities?.entries?.length, 1, 'the content survived');
+  assert.equal(applied.sections?.find((s) => s.key === 'summary')?.text, 'Ships software.');
+});
+
+test('a profile that predates sections does not lose its summary to the pass', () => {
+  // The case that would have hit every account that uploaded before this
+  // existed: a summary in the derived blob, and a plan naming only the four
+  // sections the app used to know. Taking that plan literally left the summary
+  // out of what the pass was allowed to return, so the validator dropped it and
+  // the polish that runs before every tailor deleted the paragraph.
+  const legacy = {
+    name: 'Ada',
+    contact: { email: 'a@b.com' },
+    summary: 'Software engineer who ships.',
+    education: [],
+    experience: [{ title: 'Engineer', dates: '2025', org: 'Acme', location: 'Remote', bullets: ['Shipped'] }],
+    projects: [],
+    skills: [{ category: 'Languages', items: 'TypeScript' }],
+    sections: [
+      { key: 'education', label: 'Education' },
+      { key: 'experience', label: 'Experience' },
+      { key: 'projects', label: 'Projects' },
+      { key: 'skills', label: 'Technical Skills' },
+    ],
+  } satisfies ResumeStructure;
+
+  const present = planSections(legacy)
+    .filter((s) => hasContent(contentFor(legacy, s)))
+    .map((s) => ({ key: s.key, label: s.label }));
+
+  assert.ok(present.some((s) => s.key === 'summary'), 'the summary is one of this page sections');
+  assert.ok(!present.some((s) => s.key === 'projects'), 'an empty section is not');
+
+  const result = validatePolish(
+    polish({ sections: [{ key: 'experience', label: 'Experience' }] }),
+    SOURCE_SKILLS,
+    present,
+  );
+  assert.ok(result.sections.some((s) => s.key === 'summary'), 'and it survives the pass');
+});
+
+test('polishing repeatedly does not empty the summary row', () => {
+  // Found by checking whether the wrong shape values would self-heal, not by
+  // reading the code: buildResume stripped content off the plan for all seven
+  // known keys. Right for the four whose content is rows and facts, wrong for
+  // the three that live on the section row itself — so the pass read an empty
+  // summary back and saved that emptiness, deleting the paragraph. The same
+  // failure this whole feature exists to fix, arriving through another door.
+  let plan: ResumeSection[] = [
+    { key: 'summary', label: 'Summary', shape: 'prose', text: 'Software engineer who ships.' },
+    { key: 'education', label: 'Education' },
+    { key: 'projects', label: 'Technical Projects' },
+    { key: 'skills', label: 'Technical Skills' },
+  ];
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    const built = buildResume([], [{ category: 'identity', text: 'Name: Ada' }], plan);
+    const applied = applyPolish(
+      built,
+      polish({ skillGroups: [], sections: plan.map((s) => ({ key: s.key, label: s.label })) }),
+    );
+    plan = applied.sections ?? [];
+
+    const summary = plan.find((s) => s.key === 'summary')!;
+    assert.deepEqual(
+      contentOf(summary),
+      { text: 'Software engineer who ships.' },
+      `summary survived polish ${pass + 1}`,
+    );
+    // And the shapes written to the row are the real ones, which also means a
+    // profile carrying the old wrong values corrects itself on the next pass.
+    assert.equal(shapeOf(plan.find((s) => s.key === 'projects')!), 'inline');
+    assert.equal(shapeOf(plan.find((s) => s.key === 'skills')!), 'groups');
+  }
 });

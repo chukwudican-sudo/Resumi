@@ -54,11 +54,18 @@ export type FactCategory =
 
 export type FactSource = 'interview' | 'resume_import' | 'linkedin' | 'github' | 'manual';
 
+/**
+ * The three the app has always had. Still meaningful — the interview scores
+ * against them and the resume builder reads them by name — but no longer the
+ * complete set: an entry can also belong to a section the person's own resume
+ * had, filed under that section's key.
+ */
 export type EntryKind = 'experience' | 'project' | 'education';
 
 export interface ProfileEntry {
   id: string;
-  kind: EntryKind;
+  /** One of EntryKind, or a custom section's key. See lib/sections.ts. */
+  kind: string;
   title?: string;
   org?: string;
   location?: string;
@@ -123,8 +130,45 @@ export interface ResumeStructure {
   certifications?: string[];
   awards?: string[];
   /**
-   * Section order and names, decided by the polish pass. Absent means the
-   * conventional order — nothing depends on polish having run.
+   * Every section, in the order it prints, with what it is called.
+   *
+   * Absent means the conventional order — nothing depends on this having been
+   * written. The seven keys the app knows appear here for ORDER AND LABEL ONLY;
+   * their content stays in the named fields above, which is what keeps every
+   * scorer, guard and importer reading the same place it always did. Any other
+   * key carries its content inline, because there is nowhere else for it.
    */
-  sections?: { key: 'education' | 'experience' | 'projects' | 'skills'; label: string }[];
+  sections?: ResumeSection[];
+}
+
+/** How a section is drawn. Five of these; the template already draws all five. */
+export type SectionShape = 'entries' | 'inline' | 'groups' | 'list' | 'prose';
+
+/**
+ * One row inside a custom section, in human terms rather than layout terms.
+ *
+ * The mapping onto the template's four heading slots is sections.ts's job —
+ * whoever writes one of these should be thinking about a role and an employer,
+ * not about which corner of the page each lands in.
+ */
+export interface SectionEntry {
+  title?: string;
+  org?: string;
+  location?: string;
+  dates?: string;
+  /** What it was built with. Only meaningful for the `inline` shape. */
+  tech?: string;
+  url?: string;
+  bullets?: string[];
+}
+
+export interface ResumeSection {
+  key: string;
+  label: string;
+  /** Omitted for the seven known keys, which carry their own. */
+  shape?: SectionShape;
+  entries?: SectionEntry[];
+  groups?: { category: string; items: string }[];
+  items?: string[];
+  text?: string;
 }

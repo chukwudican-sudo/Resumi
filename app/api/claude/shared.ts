@@ -149,6 +149,66 @@ export const RESUME_STRUCTURE_SCHEMA = {
   additionalProperties: false,
 };
 
+/**
+ * Sections a resume has that are not one of the seven the app knows by name.
+ *
+ * Deliberately NOT part of RESUME_STRUCTURE_SCHEMA. That schema is what the
+ * tailor and the instruct pass read and write, and leaving them unable to
+ * return a section makes dropping one impossible rather than merely forbidden —
+ * a stronger guarantee than any validator, on a path where a job going missing
+ * has happened before. This is attached to the extraction tool alone, which
+ * reads a file once and never edits anybody's resume.
+ *
+ * The model is not asked what KIND of section it is. It returns the content in
+ * whichever of these three fits, and the app reads the shape off the content —
+ * see inferShape in lib/sections.ts for why a model's own answer to that
+ * question is not worth having.
+ */
+export const EXTRA_SECTIONS_SCHEMA = {
+  type: 'array' as const,
+  description:
+    'Sections on the resume that are not education, experience, projects, skills, summary, certifications or awards — volunteering, extracurriculars, leadership, publications, languages, interests, and anything else it has. Omit if there are none.',
+  items: {
+    type: 'object' as const,
+    properties: {
+      label: {
+        type: 'string',
+        description: 'The section heading, exactly as the resume writes it. Do not tidy or shorten it.',
+      },
+      entries: {
+        type: 'array',
+        description:
+          'Use when the section is a list of things with headings — a role, a position, a publication. One object per item.',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'The role, position or name.' },
+            org: { type: 'string', description: 'The organisation, club, publisher or venue. Omit if there is none.' },
+            location: { type: 'string' },
+            dates: { type: 'string' },
+            url: { type: 'string' },
+            bullets: { type: 'array', items: { type: 'string' }, description: 'The lines underneath, in their own words.' },
+          },
+          required: ['title'],
+          additionalProperties: false,
+        },
+      },
+      lines: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Use when the section is a plain list of one-line items — certifications, awards, languages, interests. One string per line, exactly as written.',
+      },
+      text: {
+        type: 'string',
+        description: 'Use when the section is a paragraph of prose. The paragraph, exactly as written.',
+      },
+    },
+    required: ['label'],
+    additionalProperties: false,
+  },
+};
+
 export const TAILOR_TOOL: Anthropic.Tool = {
   name: 'submit_tailored_resume',
   description: 'Submit the fully tailored resume as an edited ResumeStructure along with a change log, match score, structural change flags, and any warnings.',
@@ -256,6 +316,13 @@ export const SOURCE_EXTRACTION_TOOL: Anthropic.Tool = {
       structure: {
         ...RESUME_STRUCTURE_SCHEMA,
         description: 'The extracted resume content. Return empty/default values if usable is false.',
+      },
+      sections: EXTRA_SECTIONS_SCHEMA,
+      order: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Every section heading on the resume, top to bottom, exactly as written — including the ones you put in "structure". This is how the resume is arranged, and it is kept. Omit the name/contact block at the top; that is not a section.',
       },
       usable: {
         type: 'boolean',

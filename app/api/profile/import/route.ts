@@ -4,6 +4,7 @@ import { NoToolUseError, callClaude } from '../../../lib/anthropic';
 import { SOURCE_EXTRACTION_PROMPT } from '../../../lib/systemPrompt';
 import { extractParagraphs } from '../../../lib/docxEngine';
 import type { ResumeStructure } from '../../../lib/types';
+import { sectionsFromStructure, type ExtractedSection } from '../../../lib/importRows';
 import { requireUserId } from '../../../server/auth';
 import { profileStrength } from '../../../lib/profileStrength';
 import { replaceProfileFromResume } from '../../../server/db/repository';
@@ -13,6 +14,10 @@ export const maxDuration = 60;
 
 interface SourceExtraction {
   structure: ResumeStructure;
+  /** Sections the app has no named field for. Absent on most resumes. */
+  sections?: ExtractedSection[];
+  /** Every heading, top to bottom — how this resume is actually arranged. */
+  order?: string[];
   usable: boolean;
   reason: string;
 }
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
 
   content.push({
     type: 'text',
-    text: 'Read the resume above and extract its content into ResumeStructure using the submit_source_extraction tool.',
+    text: 'Read the resume above and extract its content using the submit_source_extraction tool. Keep every section it has, under the heading it uses, and list the headings in order.',
   });
 
   try {
@@ -82,7 +87,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const structure = toolInput.structure;
+    // The sections this resume has, named and ordered as it had them. Attached
+    // to the structure rather than passed alongside it, because everything
+    // downstream — the renderer, the rail, polish, the rebuild after every save
+    // — reads the plan off the structure.
+    const structure = {
+      ...toolInput.structure,
+      sections: sectionsFromStructure(toolInput.structure, toolInput.sections, toolInput.order),
+    };
     await replaceProfileFromResume(userId, structure, profileStrength(structure), body.fileName ?? 'resume');
 
     return NextResponse.json({ structure });

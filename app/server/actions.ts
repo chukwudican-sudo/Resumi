@@ -19,6 +19,9 @@ import {
   setOnboardingGoal as setGoalRow,
   setUserLocale,
   upsertEntry as upsertEntryRow,
+  ensureSections,
+  listSections,
+  updateSectionContent,
 } from './db/repository';
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
 import type { ResumeStructure } from '../lib/types';
@@ -27,6 +30,7 @@ import { runPolish } from './polishProfile';
 import { getProfile, getUser } from './db/repository';
 import { RULE_MAX_LENGTH } from '../lib/rules';
 import { isKnownLocale } from '../lib/locales';
+import { entryKindFor } from '../lib/sections';
 
 /**
  * Mutations the UI can call directly.
@@ -101,17 +105,27 @@ export async function saveContactDetails(details: {
  * of the rows, so this costs a render and a write — no model, no latency.
  */
 async function refreshMasterResume(userId: string) {
-  const { entryRows, factRows } = await getResumeInputs(userId);
+  const { entryRows, factRows, sections } = await getResumeInputs(userId);
   const entries: EntryWithBullets[] = entryRows.map(entryFromRow);
 
-  const structure = buildResume(entries, factRows);
+  // A profile that predates the sections table has its summary only in the
+  // derived blob this function is about to overwrite. Seeding it first is what
+  // stops this save being the one that deletes it.
+  const plan = sections.length ? sections : await ensureSections(userId);
+
+  const structure = buildResume(entries, factRows, plan);
   await saveMasterResume(userId, structure, profileStrength(structure));
   return structure;
 }
 
 export interface EntryInput {
   id: string | null;
-  kind: 'experience' | 'education' | 'project';
+  /**
+   * Which section it belongs to. One of the three the app has always had, or
+   * the key of a section this person's resume actually has — a Volunteering
+   * entry is filed under 'volunteering', not squeezed into experience.
+   */
+  kind: string;
   title: string;
   org: string;
   location: string;
@@ -133,8 +147,16 @@ export interface EntryInput {
 export async function saveEntry(entry: EntryInput) {
   const userId = await requireUserId();
 
-  const allowed = ['experience', 'education', 'project'];
-  if (!allowed.includes(entry.kind)) throw new Error(`Unknown entry kind: ${entry.kind}`);
+  // Still a whitelist, just no longer a constant one. Anything outside the
+  // three defaults has to be a section this person actually has, so a stray
+  // kind cannot create a section nothing renders and nothing can find again.
+  const allowed = new Set([
+    'experience',
+    'education',
+    'project',
+    ...(await listSections(userId)).map((s) => entryKindFor(s.key)),
+  ]);
+  if (!allowed.has(entry.kind)) throw new Error(`Unknown entry kind: ${entry.kind}`);
 
   await upsertEntryRow(userId, entry);
   await refreshMasterResume(userId);
@@ -151,6 +173,38 @@ export async function removeEntry(entryId: string) {
 export async function saveSkills(groups: { category: string; items: string }[]) {
   const userId = await requireUserId();
   await saveSkillGroups(userId, groups.slice(0, 8));
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
+}
+
+/**
+ * Saves a section whose content has nowhere else to live.
+ *
+ * A summary's paragraph and a certifications list are not entries and are not
+ * facts — they are the section. Everything else about editing works the same
+ * way: write the row, rebuild the resume from rows, and the change is on the
+ * PDF before the page finishes refreshing.
+ *
+ * Only sections this person already has. Creating one is a different gesture
+ * with a different question attached (what is it called, what shape is it), and
+ * it is not this.
+ */
+export async function saveSectionContent(
+  key: string,
+  content: { text?: string; items?: string[] },
+) {
+  const userId = await requireUserId();
+
+  const mine = await listSections(userId);
+  const section = mine.find((s) => s.key === key);
+  if (!section) throw new Error(`Unknown section: ${key}`);
+
+  const cleaned =
+    section.shape === 'prose'
+      ? { text: (content.text ?? '').trim() }
+      : { items: (content.items ?? []).map((i) => i.trim()).filter(Boolean).slice(0, 30) };
+
+  await updateSectionContent(userId, key, cleaned);
   await refreshMasterResume(userId);
   revalidatePath('/setup');
 }

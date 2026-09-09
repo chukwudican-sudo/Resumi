@@ -1,4 +1,5 @@
 import { ResumeStructure } from './types';
+import { contentFor, hasContent, planSections } from './sections';
 
 // ponytail: the preamble below is duplicated verbatim from assets/main.tex
 // (lines 1-104, everything above \begin{document}). That file stays as the
@@ -191,119 +192,90 @@ export function renderResumeLatex(r: ResumeStructure): string {
   lines.push(`    \\small ${renderContact(r.contact)}`);
   lines.push('\\end{center}');
 
-  // Optional Summary
-  if (r.summary) {
-    lines.push('');
-    lines.push('\\section{Summary}');
-    lines.push(`\\small{${escapeLatex(r.summary)}}`);
-  }
-
   /** Bullets under one entry, or nothing at all when there are none yet. */
-  const pushBullets = (bullets: string[] | undefined) => {
-    const written = (bullets ?? []).filter((b) => b.trim());
-    if (!written.length) return;
+  const pushBullets = (bullets: string[]) => {
+    if (!bullets.length) return;
     lines.push('      \\resumeItemListStart');
-    for (const b of written) {
+    for (const b of bullets) {
       lines.push(`        \\resumeItem{${escapeLatex(b)}}`);
     }
     lines.push('      \\resumeItemListEnd');
   };
 
-  const emit: Record<string, (label: string) => void> = {
-    education: (label) => {
-      if (!r.education.length) return;
-      lines.push('');
-      lines.push(`\\section{${escapeLatex(label)}}`);
-      lines.push('  \\resumeSubHeadingListStart');
-      for (const e of r.education) {
-        lines.push(
-          `    \\resumeSubheading{${escapeLatex(e.school)}}{${escapeLatex(e.location)}}{${escapeLatex(e.degree)}}{${escapeLatex(e.dates)}}`,
-        );
-        pushBullets((e as { bullets?: string[] }).bullets);
-      }
-      lines.push('  \\resumeSubHeadingListEnd');
-    },
-
-    experience: (label) => {
-      if (!r.experience.length) return;
-      lines.push('');
-      lines.push(`\\section{${escapeLatex(label)}}`);
-      lines.push('  \\resumeSubHeadingListStart');
-      for (const x of r.experience) {
-        lines.push(
-          `    \\resumeSubheading{${escapeLatex(x.title)}}{${escapeLatex(x.dates)}}{${escapeLatex(x.org)}}{${escapeLatex(x.location)}}`,
-        );
-        pushBullets(x.bullets);
-      }
-      lines.push('  \\resumeSubHeadingListEnd');
-    },
-
-    projects: (label) => {
-      if (!r.projects.length) return;
-      lines.push('');
-      lines.push(`\\section{${escapeLatex(label)}}`);
-      lines.push('  \\resumeSubHeadingListStart');
-      for (const p of r.projects) {
-        // Without tech the separator would dangle after the project name.
-        const parts = [`\\textbf{${escapeLatex(p.name)}}`];
-        if (p.tech) parts.push(`\\emph{${escapeLatex(p.tech)}}`);
-        // A short label, never the URL. The heading cell does not wrap, so a
-        // full link pushed the dates past the right margin and clipped them
-        // off the page entirely.
-        if (p.url) parts.push(`\\href{${escapeLatex(withScheme(p.url))}}{\\underline{${escapeLatex(linkLabel(p.url))}}}`);
-        lines.push(`    \\resumeProjectHeading{${parts.join(' $|$ ')}}{${escapeLatex(p.dates)}}`);
-        pushBullets(p.bullets);
-      }
-      lines.push('  \\resumeSubHeadingListEnd');
-    },
-
-    skills: (label) => {
-      const skills = r.skills.filter((s) => s.items.trim());
-      if (!skills.length) return;
-      lines.push('');
-      lines.push(`\\section{${escapeLatex(label)}}`);
-      lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
-      const skillLines = skills
-        .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
-        .join('\n');
-      lines.push(`    \\small{\\item{\n${skillLines}\n    }}`);
-      lines.push(' \\end{itemize}');
-    },
+  const heading = (label: string) => {
+    lines.push('');
+    lines.push(`\\section{${escapeLatex(label)}}`);
   };
 
-  // The order and the names are the polish pass's decision when it has run.
-  // Falling back to the conventional order means nothing depends on it having.
-  const plan = r.sections?.length
-    ? r.sections
-    : ([
-        { key: 'education', label: 'Education' },
-        { key: 'experience', label: 'Experience' },
-        { key: 'projects', label: 'Projects' },
-        { key: 'skills', label: 'Technical Skills' },
-      ] as NonNullable<ResumeStructure['sections']>);
+  // Drawn by SHAPE, not by name.
+  //
+  // This used to be four functions keyed by 'education' | 'experience' |
+  // 'projects' | 'skills', with the summary hardcoded above the loop and
+  // certifications and awards hardcoded below it — which is why a section the
+  // app did not have a name for could not be drawn at all, and why the summary
+  // could never move. There were never seven ways to draw a section; there were
+  // five, used seven times. Now that is what the code says, and a Volunteering
+  // section is not a new renderer, it is `entries` with a different heading.
+  //
+  // Every branch is guarded by hasContent before it runs. That is not tidiness:
+  // an `itemize` with no `\item` in it aborts the whole compile, so an empty
+  // section is a failed PDF rather than a blank space.
+  for (const section of planSections(r)) {
+    const content = contentFor(r, section);
+    if (!hasContent(content)) continue;
 
-  for (const section of plan) emit[section.key]?.(section.label);
+    heading(section.label);
 
-  // Optional Certifications
-  if (r.certifications && r.certifications.length > 0) {
-    lines.push('');
-    lines.push('\\section{Certifications}');
-    lines.push('  \\resumeItemListStart');
-    for (const c of r.certifications) {
-      lines.push(`    \\resumeItem{${escapeLatex(c)}}`);
+    switch (content.shape) {
+      case 'prose':
+        lines.push(`\\small{${escapeLatex(content.text)}}`);
+        break;
+
+      case 'entries':
+        lines.push('  \\resumeSubHeadingListStart');
+        for (const e of content.entries) {
+          lines.push(
+            `    \\resumeSubheading{${escapeLatex(e.heading)}}{${escapeLatex(e.headingRight)}}{${escapeLatex(e.sub)}}{${escapeLatex(e.subRight)}}`,
+          );
+          pushBullets(e.bullets);
+        }
+        lines.push('  \\resumeSubHeadingListEnd');
+        break;
+
+      case 'inline':
+        lines.push('  \\resumeSubHeadingListStart');
+        for (const p of content.entries) {
+          // Without tech the separator would dangle after the name.
+          const parts = [`\\textbf{${escapeLatex(p.name)}}`];
+          if (p.tech) parts.push(`\\emph{${escapeLatex(p.tech)}}`);
+          // A short label, never the URL. The heading cell does not wrap, so a
+          // full link pushed the dates past the right margin and clipped them
+          // off the page entirely.
+          if (p.url) parts.push(`\\href{${escapeLatex(withScheme(p.url))}}{\\underline{${escapeLatex(linkLabel(p.url))}}}`);
+          lines.push(`    \\resumeProjectHeading{${parts.join(' $|$ ')}}{${escapeLatex(p.dates)}}`);
+          pushBullets(p.bullets);
+        }
+        lines.push('  \\resumeSubHeadingListEnd');
+        break;
+
+      case 'groups': {
+        lines.push(' \\begin{itemize}[leftmargin=0.15in, label={}]');
+        const groupLines = content.groups
+          .map((s) => `     \\textbf{${escapeLatex(s.category)}}{: ${escapeLatex(s.items)}} \\\\`)
+          .join('\n');
+        lines.push(`    \\small{\\item{\n${groupLines}\n    }}`);
+        lines.push(' \\end{itemize}');
+        break;
+      }
+
+      case 'list':
+        lines.push('  \\resumeItemListStart');
+        for (const item of content.items) {
+          lines.push(`    \\resumeItem{${escapeLatex(item)}}`);
+        }
+        lines.push('  \\resumeItemListEnd');
+        break;
     }
-    lines.push('  \\resumeItemListEnd');
-  }
-
-  // Optional Awards
-  if (r.awards && r.awards.length > 0) {
-    lines.push('');
-    lines.push('\\section{Awards}');
-    lines.push('  \\resumeItemListStart');
-    for (const a of r.awards) {
-      lines.push(`    \\resumeItem{${escapeLatex(a)}}`);
-    }
-    lines.push('  \\resumeItemListEnd');
   }
 
   const body = lines.join('\n');

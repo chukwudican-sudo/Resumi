@@ -3,7 +3,9 @@ import { db } from './client';
 import type { ResumeStructure } from '../../lib/types';
 import { MONTHLY_CREDITS, nextReset } from '../../lib/credits';
 import { splitEmployment } from '../../lib/employment';
-import { entriesFromStructure, factsFromStructure } from '../../lib/importRows';
+import { entriesFromStructure, factsFromStructure, sectionsFromStructure } from '../../lib/importRows';
+import { contentOf, sectionFromRow, shapeOf } from '../../lib/sections';
+import type { ResumeSection } from '../../lib/types';
 import {
   applications,
   documents,
@@ -12,6 +14,7 @@ import {
   interviewTurns,
   jobPostings,
   profileEntries,
+  profileSections,
   profiles,
   resumes,
   rules,
@@ -319,13 +322,24 @@ export async function replaceProfileFromResume(
     // The mapping lives in lib/importRows.ts, pure and tested, because dropping
     // a column here is invisible until somebody's resume comes back thinner
     // than the file they uploaded.
-    const rows = entriesFromStructure(structure).map((e) => ({
+    const sections = structure.sections ?? [];
+    const rows = entriesFromStructure(structure, sections).map((e) => ({
       id: newId('entry'),
       userId,
       source: 'resume_import',
       ...e,
     }));
     if (rows.length) await tx.insert(profileEntries).values(rows);
+
+    // The sections themselves, so the arrangement survives the first save.
+    //
+    // This is the half that had nowhere to go. The extractor pulled a summary
+    // out of an uploaded resume and it went into the blob below, where the next
+    // rebuild — any save, or the polish that runs before the first tailor —
+    // overwrote it, because the rebuild reads rows and no row held a summary.
+    await tx.delete(profileSections).where(eq(profileSections.userId, userId));
+    const sectionRowsToWrite = sectionRows(userId, sections);
+    if (sectionRowsToWrite.length) await tx.insert(profileSections).values(sectionRowsToWrite);
 
     // Skills and contact are facts, not entries, and neither was ever written.
     // Replaced wholesale rather than scoped by source, matching what
@@ -379,6 +393,120 @@ export async function replaceProfileFromResume(
       storagePath: '(not retained)', extractedAt: new Date(),
     });
   });
+}
+
+/**
+ * This person's sections, in the order they print.
+ *
+ * Empty for almost everybody, and that is the designed state rather than a
+ * migration that has not run: no rows means the conventional set, which is what
+ * the renderer already falls back to. Rows appear when an upload writes them,
+ * when polish reorders them, or when somebody edits one.
+ */
+export async function listSections(userId: string): Promise<ResumeSection[]> {
+  const rows = await db
+    .select()
+    .from(profileSections)
+    .where(eq(profileSections.userId, userId))
+    .orderBy(profileSections.orderIndex);
+  return rows.map(sectionFromRow);
+}
+
+/**
+ * Replaces the whole set, in the order given.
+ *
+ * Wholesale rather than merged, because the caller always holds the complete
+ * plan — an upload has just read the file, polish has just decided the order —
+ * and a section left behind would print twice or print in the wrong place.
+ *
+ * Order is the array's, not the caller's arithmetic. Passing an index around
+ * separately is how two sections end up sharing position 3.
+ */
+export async function saveSections(userId: string, sections: ResumeSection[]) {
+  await db.transaction(async (tx) => {
+    await tx.delete(profileSections).where(eq(profileSections.userId, userId));
+    const rows = sectionRows(userId, sections);
+    if (rows.length) await tx.insert(profileSections).values(rows);
+  });
+}
+
+/**
+ * Sections for a profile that predates them, derived from what it already has.
+ *
+ * Called only when there are no rows. A profile imported before this table
+ * existed keeps its summary, certifications and awards in
+ * `profiles.resume_structure` with nothing behind them — and that blob is
+ * DERIVED, rebuilt from rows after every save, so the first edit deletes them.
+ * That is the exact loss this feature fixes, and without this it is fixed for
+ * new uploads only: everyone already using the app would lose their summary the
+ * next time they saved anything.
+ *
+ * Returns [] when there is nothing worth keeping. No rows means the
+ * conventional set, which for a profile with none of these is already right —
+ * seeding it would be four rows saying what the fallback says for free.
+ */
+export async function ensureSections(userId: string): Promise<ResumeSection[]> {
+  const profile = await getProfile(userId);
+  const structure = profile?.resumeStructure as ResumeStructure | null;
+  if (!structure) return [];
+
+  const worthKeeping =
+    Boolean(structure.summary?.trim()) ||
+    (structure.certifications ?? []).some((c) => c?.trim()) ||
+    (structure.awards ?? []).some((a) => a?.trim()) ||
+    (structure.sections ?? []).length > 0;
+  if (!worthKeeping) return [];
+
+  // The order it was last given, by label, so a polished profile keeps the
+  // arrangement somebody already saw rather than reverting to the conventional
+  // one. No extras: a section outside the seven was never stored, so there is
+  // nothing to recover — those are gone and only a re-upload brings them back.
+  const seeded = sectionsFromStructure(structure, [], (structure.sections ?? []).map((s) => s.label));
+  if (!seeded.length) return [];
+
+  await saveSections(userId, seeded);
+  return seeded;
+}
+
+/**
+ * Rewrites one section's content, leaving its name and position alone.
+ *
+ * Merged into whatever is there rather than replacing the row, so editing a
+ * summary cannot silently reset the order somebody's resume was imported with.
+ * Updates nothing if the section is not theirs, which is the same protection
+ * upsertEntry gets from carrying the userId in its where clause.
+ */
+export async function updateSectionContent(
+  userId: string,
+  key: string,
+  content: Record<string, unknown>,
+) {
+  await db
+    .update(profileSections)
+    .set({ content, updatedAt: new Date() })
+    .where(and(eq(profileSections.userId, userId), eq(profileSections.key, key)));
+}
+
+function sectionRows(userId: string, sections: ResumeSection[]) {
+  const seen = new Set<string>();
+  return sections
+    .filter((s) => {
+      const key = s?.key?.trim();
+      // The unique index would reject a duplicate and take the whole
+      // transaction with it, which on the import path means losing the resume.
+      if (!key || !s.label?.trim() || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((s, i) => ({
+      id: newId('sect'),
+      userId,
+      key: s.key.trim(),
+      label: s.label.trim(),
+      shape: shapeOf(s),
+      content: contentOf(s),
+      orderIndex: i,
+    }));
 }
 
 export async function markProfileStale(userId: string) {
@@ -470,7 +598,7 @@ export async function getActiveRules(userId: string) {
  * and skill facts that make up the contact block and skills section.
  */
 export async function getResumeInputs(userId: string) {
-  const [entryRows, factRows] = await Promise.all([
+  const [entryRows, factRows, sectionRowsRead] = await Promise.all([
     db
       .select()
       .from(profileEntries)
@@ -480,8 +608,17 @@ export async function getResumeInputs(userId: string) {
       .select({ category: facts.category, text: facts.text })
       .from(facts)
       .where(and(eq(facts.userId, userId), eq(facts.status, 'active'))),
+    // Read here rather than by a second call from every caller. This is the one
+    // "everything the resume is made of" query, and a caller that forgot the
+    // third piece would rebuild somebody's resume without their sections and
+    // save the result — which is the exact shape of the bug this feature fixes.
+    db
+      .select()
+      .from(profileSections)
+      .where(eq(profileSections.userId, userId))
+      .orderBy(profileSections.orderIndex),
   ]);
-  return { entryRows, factRows };
+  return { entryRows, factRows, sections: sectionRowsRead.map(sectionFromRow) };
 }
 
 /**

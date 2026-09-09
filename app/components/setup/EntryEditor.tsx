@@ -8,7 +8,15 @@ import type { DateParts, PlaceParts } from '../../lib/entryFormat';
 import DateRange from './DateRange';
 import PlaceFields from './PlaceFields';
 
-export type Kind = 'experience' | 'education' | 'project';
+/**
+ * Which section an entry belongs to.
+ *
+ * A string rather than the three the app started with: an entry can belong to a
+ * section this person's own resume had — 'volunteering', 'extracurricular' —
+ * and the branches below that ask `kind === 'education'` are simply false for
+ * it, which leaves exactly the generic fields such an entry wants.
+ */
+export type Kind = string;
 
 export interface EditableEntry extends EntryInput {
   dates: DateParts;
@@ -28,7 +36,9 @@ export function blankEntry(kind: Kind): EditableEntry {
   };
 }
 
-const COPY: Record<Kind, { titleLabel: string; orgLabel: string; titlePlaceholder: string; orgPlaceholder: string }> = {
+interface Copy { titleLabel: string; orgLabel: string; titlePlaceholder: string; orgPlaceholder: string }
+
+const COPY: Record<string, Copy> = {
   experience: {
     titleLabel: 'Job title', orgLabel: 'Company',
     titlePlaceholder: 'Backend Engineering Intern', orgPlaceholder: 'Northbound',
@@ -42,6 +52,27 @@ const COPY: Record<Kind, { titleLabel: string; orgLabel: string; titlePlaceholde
     titlePlaceholder: 'Resumi', orgPlaceholder: 'Personal project',
   },
 };
+
+/**
+ * Field labels for a section the app has no copy written for.
+ *
+ * The table above holds three keys and `Kind` is a string, so every lookup in
+ * it type-checks and any unfamiliar section returned undefined — and the next
+ * line read `.titleLabel` off it. That crashed the editor for a section
+ * imported from somebody's own resume, on Edit and on Add alike, which made the
+ * whole section read-only. The same fallback exists in EntrySection; this is
+ * its second table, for the fields rather than the headings.
+ */
+function copyFor(kind: Kind): Copy {
+  return (
+    COPY[kind] ?? {
+      titleLabel: 'Title',
+      orgLabel: 'Organisation',
+      titlePlaceholder: 'Team Lead',
+      orgPlaceholder: 'Hack the North',
+    }
+  );
+}
 
 /**
  * One entry, with the fields that section actually needs.
@@ -62,7 +93,7 @@ export default function EntryEditor({
   onSaved: () => void;
   onCancel: () => void;
 }) {
-  const copy = COPY[kind];
+  const copy = copyFor(kind);
   const [draft, setDraft] = useState(entry);
   const [pending, startTransition] = useTransition();
 
@@ -88,7 +119,7 @@ export default function EntryEditor({
   return (
     <div>
       <h1 className="font-serif text-[34px] leading-tight">
-        {draft.id ? 'Edit' : kind === 'experience' ? 'Add a job' : kind === 'education' ? 'Add education' : 'Add a project'}
+        {draft.id ? 'Edit' : kind === 'experience' ? 'Add a job' : kind === 'education' ? 'Add education' : kind === 'project' ? 'Add a project' : 'Add an entry'}
       </h1>
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2">

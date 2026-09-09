@@ -1,7 +1,16 @@
 import { formatDates, formatPhone, formatPlace, formatWebsite, recencyKey } from './entryFormat';
 import { titleWithEmployment } from './employment';
 import { composeDegree } from './degree';
-import type { ProfileEntry, ResumeStructure } from './types';
+import type { ProfileEntry, ResumeSection, ResumeStructure, SectionEntry, SectionShape } from './types';
+import {
+  KNOWN_SHAPES,
+  STORED_ELSEWHERE,
+  contentFor,
+  entryKindFor,
+  hasContent,
+  planSections,
+  type SectionContent,
+} from './sections';
 
 /**
  * Turns what someone typed into their master resume.
@@ -139,7 +148,16 @@ function readSkills(facts: ContactFact[]): { category: string; items: string }[]
   return Array.from(groups, ([category, items]) => ({ category, items: items.join(', ') }));
 }
 
-export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): ResumeStructure {
+/**
+ * @param sections The person's own sections, if they have any. Empty means the
+ * conventional set — which is what every profile had before sections existed,
+ * so an untouched one builds byte-for-byte as it always did.
+ */
+export function buildResume(
+  entries: EntryWithBullets[],
+  facts: ContactFact[],
+  sections: ResumeSection[] = [],
+): ResumeStructure {
   const contact = readContact(facts);
   // Most recent first — but only when every entry in the section can actually
   // be placed.
@@ -166,7 +184,7 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
   // a separator on the page.
   const clean = (value: string | null | undefined) => (value ?? '').trim();
 
-  return {
+  const structure: ResumeStructure = {
     name: contact.name,
     contact: {
       email: contact.email || undefined,
@@ -208,60 +226,147 @@ export function buildResume(entries: EntryWithBullets[], facts: ContactFact[]): 
     })),
     skills: readSkills(facts),
   };
+
+  if (!sections.length) return structure;
+
+  // The person's own plan, which is the only place three of these fields can
+  // come from.
+  //
+  // Summary, certifications and awards were extracted from uploaded resumes for
+  // as long as the extractor has existed, and then died here: this function
+  // reads rows, no row held a summary, and so the rebuild that runs after every
+  // save produced a structure with no summary in it. The paragraph survived in
+  // the derived blob until the first save or the first Polish overwrote it. It
+  // did not look like data loss because the preview rendered from the blob.
+  const named = new Map(sections.map((s) => [s.key, s]));
+  const text = named.get('summary')?.text?.trim();
+  if (text) structure.summary = text;
+  const certifications = written(named.get('certifications')?.items);
+  if (certifications.length) structure.certifications = certifications;
+  const awards = written(named.get('awards')?.items);
+  if (awards.length) structure.awards = awards;
+
+  structure.sections = sections.map((section) => {
+    const shape = section.shape ?? KNOWN_SHAPES[section.key];
+    // The four whose content is rows and facts carry order and label only — it
+    // stays in the named field above, where every scorer, guard and importer
+    // already reads it.
+    if (STORED_ELSEWHERE.has(section.key)) return { key: section.key, label: section.label };
+    // The other three keep theirs. Stripping it here read as an empty summary
+    // to everything downstream, and polish wrote that emptiness back to the row
+    // — deleting the paragraph on the next pass, which is the very failure this
+    // feature exists to fix, arriving through a different door.
+    if (KNOWN_SHAPES[section.key]) return section;
+    if (shape !== 'entries' && shape !== 'inline') return section;
+    // A custom section's entries are rows like anybody else's, filed under the
+    // section's own key.
+    return { ...section, entries: byKind(entryKindFor(section.key)).map(asSectionEntry) };
+  });
+
+  return structure;
+
+  function asSectionEntry(e: EntryWithBullets): SectionEntry {
+    return {
+      title: titleWithEmployment(clean(e.title), e.extra?.employment),
+      org: clean(e.org),
+      location: formatPlace(placeOf(e), e.location, home),
+      // Formatted with the experience rule: a volunteering stint reads like a
+      // job, not like a degree with an expected completion date.
+      dates: formatDates(datesOf(e), 'experience', e.datesDisplay),
+      tech: clean(e.tech),
+      url: clean(e.url) || undefined,
+      bullets: e.bullets ?? [],
+    };
+  }
+}
+
+function written(values: string[] | undefined | null): string[] {
+  return (values ?? []).map((v) => (v ?? '').trim()).filter(Boolean);
 }
 
 /**
- * Which sections still need something, for the setup rail.
+ * The rail: every section this person has, in the order it prints.
  *
- * Ordered as the form is, and expressed as what is missing rather than as a
- * percentage — "add your first job" is actionable in a way that "7% complete"
- * is not, and a low percentage on the opening screen mostly communicates how
- * far you are from finishing.
+ * Ordered by the plan rather than by a fixed list, because the two used to
+ * disagree in public — the rail read Experience, Education, Projects while the
+ * PDF beside it printed Education, Projects, Work Experience, and nothing on
+ * screen said which one was real.
+ *
+ * Expressed as what is missing rather than as a percentage: "add your first
+ * job" is actionable in a way that "7% complete" is not, and a low percentage
+ * on the opening screen mostly communicates how far you are from finishing.
  */
 export interface SectionStatus {
-  key: 'contact' | 'experience' | 'education' | 'projects' | 'skills';
+  key: string;
   label: string;
+  /** Which editor to open. 'contact' is authored here but never printed. */
+  shape: SectionShape | 'contact';
   done: boolean;
   detail: string;
 }
 
-export function sectionStatus(entries: EntryWithBullets[], facts: ContactFact[]): SectionStatus[] {
-  const contact = readContact(facts);
-  const count = (kind: string) => entries.filter((e) => e.kind === kind).length;
-  const skills = readSkills(facts).length;
-
-  return [
+export function sectionStatus(structure: ResumeStructure): SectionStatus[] {
+  const rail: SectionStatus[] = [
     {
       key: 'contact',
       label: 'Contact',
-      done: Boolean(contact.name && contact.email),
-      detail: contact.name && contact.email ? 'Name and email set' : 'Name and email needed',
-    },
-    {
-      key: 'experience',
-      label: 'Experience',
-      done: count('experience') > 0,
-      detail: count('experience') ? `${count('experience')} added` : 'None yet',
-    },
-    {
-      key: 'education',
-      label: 'Education',
-      done: count('education') > 0,
-      detail: count('education') ? `${count('education')} added` : 'None yet',
-    },
-    {
-      key: 'projects',
-      label: 'Projects',
-      done: count('project') > 0,
-      detail: count('project') ? `${count('project')} added` : 'Optional',
-    },
-    {
-      key: 'skills',
-      label: 'Skills',
-      done: skills > 0,
-      detail: skills ? `${skills} ${skills === 1 ? 'group' : 'groups'}` : 'None yet',
+      shape: 'contact',
+      done: Boolean(structure.name && structure.contact?.email),
+      detail: structure.name && structure.contact?.email ? 'Name and email set' : 'Name and email needed',
     },
   ];
+
+  // Which sections this person actually declared, as opposed to the ones the
+  // conventional fallback supplies. An extra they have is theirs whether or not
+  // there is anything in it right now.
+  const declared = new Set((structure.sections ?? []).map((s) => s.key));
+
+  for (const section of planSections(structure)) {
+    const content = contentFor(structure, section);
+    const filled = hasContent(content);
+    // An extra nobody has is not a to-do. Offering everyone an empty Summary,
+    // Certifications and Awards would put three new rows on a screen that did
+    // not ask to change.
+    //
+    // But once somebody HAS one, it stays on the rail even when empty —
+    // otherwise clearing the box to rewrite a summary makes the section vanish
+    // mid-edit, with no way back to it.
+    if (section.optional && !filled && !declared.has(section.key)) continue;
+    rail.push({
+      key: section.key,
+      label: section.label,
+      shape: section.shape,
+      done: filled,
+      detail: detailFor(section.key, content),
+    });
+  }
+
+  return rail;
+}
+
+function detailFor(key: string, content: SectionContent): string {
+  switch (content.shape) {
+    case 'entries':
+    case 'inline': {
+      const n = content.entries.length;
+      if (n) return `${n} added`;
+      // Projects is the one section somebody can reasonably not have and still
+      // have a finished resume, so it does not read as an omission.
+      return key === 'projects' ? 'Optional' : 'None yet';
+    }
+    case 'groups': {
+      const n = content.groups.length;
+      return n ? `${n} ${n === 1 ? 'group' : 'groups'}` : 'None yet';
+    }
+    case 'list': {
+      const n = content.items.length;
+      return n ? `${n} added` : 'None yet';
+    }
+    case 'prose': {
+      const n = content.text ? content.text.split(/\n\s*\n/).filter((p) => p.trim()).length : 0;
+      return n ? `${n} ${n === 1 ? 'paragraph' : 'paragraphs'}` : 'None yet';
+    }
+  }
 }
 
 /** Enough to tailor from: someone reachable, with at least one thing they have done. */

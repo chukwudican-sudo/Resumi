@@ -35,7 +35,6 @@ CONTENT TAILORING REQUIREMENTS — follow all of these:
 - Rewrite bullet points to directly mirror the language, tools, frameworks, and priorities named in the job posting. Do not insert one keyword into an otherwise unchanged sentence — fully rewrite the bullet around the job's requirements.
 - Reorder skills — both the categories and the items within each category — so the skills the job posting names first appear first. You may freely reorder skills.
 - Leaving an editable bullet completely untouched is only acceptable if it is already a near-perfect match for this specific job posting.
-- Content that doesn't fit the canonical sections (Education, Experience, Projects, Technical Skills, and optional Summary, Certifications, Awards) is dropped — note anything you drop in "warnings".
 
 STRUCTURAL CHANGES: A structural change is (1) moving a bullet from one entry into a different entry (e.g. pulling a bullet from one job or project and placing it under another), or (2) substantively renaming or repurposing a section's meaning. Rewriting a bullet in place, reordering skills, and tightening or expanding wording are minor changes and do NOT require approval — do not report them as structural changes.
 
@@ -153,9 +152,10 @@ export const SOURCE_EXTRACTION_PROMPT = `You read an uploaded resume (a "Source 
 Read the resume carefully and populate the ResumeStructure faithfully:
 - Extract the person's real name, contact details (phone, email, LinkedIn, GitHub, website), and every section.
 - NEVER fabricate, invent, or embellish. Use only what is actually written in the document. If a field isn't present, leave it out (omit optional fields; use empty strings/arrays only where the schema requires them).
-- Map the resume's sections onto the canonical set: Education, Experience, Projects, and Technical Skills, plus the optional Summary, Certifications, and Awards when the resume clearly contains them.
+- Education, Experience, Projects, Technical Skills, Summary, Certifications and Awards go in "structure" when the resume has them.
+- EVERY OTHER SECTION GOES IN "sections". Volunteering, extracurriculars, leadership, activities, publications, languages, interests, references — whatever this resume has. Keep the person's own heading, word for word. This resume's sections are theirs, not a set you are matching against, and a section you leave out is one they lose.
+- List every heading in "order", top to bottom, exactly as written — including the ones you put in "structure". The arrangement is part of what they wrote and it is kept.
 - Preserve the user's real wording for bullets and descriptions — do not rewrite or tailor anything here. This is extraction, not tailoring.
-- Content that does not fit the canonical set (hobbies, references, interests, etc.) is simply omitted.
 - For skills, group them into categories (e.g. "Languages", "Frameworks", "Tools") with the items joined as a single string when the resume presents them that way; otherwise use one sensible category.
 
 USABILITY: If the document is a readable resume, set "usable" to true and fill in "structure". If it is NOT usable — a scanned or image-only PDF with no extractable text, a blank/corrupt file, or a document that is clearly not a resume at all — set "usable" to false and give a short, plain-English "reason" (e.g. "This PDF appears to be a scanned image with no readable text." or "This file doesn't look like a resume."). When usable is false, the structure will be ignored, so you may return empty values for it.`;

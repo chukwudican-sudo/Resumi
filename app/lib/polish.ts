@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { callClaude } from './anthropic';
-import type { ResumeStructure } from './types';
+import type { ResumeSection, ResumeStructure } from './types';
+import { CONVENTIONAL_ORDER, contentFor, hasContent, planSections } from './sections';
 
 /**
  * The editorial pass over a resume nobody has a job posting for yet.
@@ -36,16 +37,17 @@ WHAT YOU DECIDE
    - Every term you emit must appear in the skills you were given. Do not add a skill because it would fit a group nicely. Do not list the same term in two groups.
    - Write terms the way the industry writes them: "PostgreSQL" not "postgres", "REST API design" not "rest apis".
 
-2. SECTION ORDER AND NAMES. Decide the order of education, experience, projects and skills, and what each section is called.
+2. SECTION ORDER AND NAMES. You are given this person's sections, by key, with what each is currently called. Return EVERY key you were given, exactly once, in the order they should appear — and no key you were not given. You are deciding order and names. You are not deciding which sections exist; that is theirs, not yours.
 
    Work it out in this order, and follow it:
    a. Is there a degree in progress, or one finished within roughly the last year? If so, EDUCATION GOES FIRST. A student is read as a student, and burying the degree makes a reader hunt for the thing that explains the rest of the page. Only someone several years past graduating puts education below their work.
    b. Then compare their jobs against their projects, for the kind of work the resume is for. Whichever is the stronger evidence goes next. Someone whose jobs are in another field entirely — retail, admin, finance — and whose projects are substantial software should have PROJECTS ABOVE EXPERIENCE. Someone with real industry experience in the field should not.
    c. Skills last, unless the resume is very thin on everything else.
+   d. A section you were given that is not one of those four — a summary, volunteering, publications, activities — goes where it reads best for this person. A summary belongs at the top if it is there at all. Supporting sections go below the main evidence.
 
    Do not put skills or projects above education for someone still studying, and do not reorder simply to look different from the conventional layout.
 
-   Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section.
+   Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section. A section they named themselves keeps that name unless it is plainly a mistake — "Extracurricular & Community Activities" is what they call it, and shortening it to "Activities" is your preference, not an improvement.
 
 3. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake.
 
@@ -84,11 +86,16 @@ const POLISH_TOOL: Anthropic.Tool = {
       sections: {
         type: 'array',
         description:
-          'Every section, in the order it should appear on the page. Include all four keys exactly once.',
+          'Every section, in the order it should appear on the page. Use the keys listed in the message, each exactly once, and no others.',
         items: {
           type: 'object',
           properties: {
-            key: { type: 'string', enum: ['education', 'experience', 'projects', 'skills'] },
+            // No enum. It used to name the same four keys forever, which meant
+            // a section this person actually has — Volunteering, a Summary —
+            // could not be returned, and validatePolish then deleted it for
+            // being absent. The keys are given in the message instead, and
+            // anything not on that list is dropped below.
+            key: { type: 'string', description: 'The section key, exactly as given in the message.' },
             label: { type: 'string', description: 'What this section is called on the page.' },
           },
           required: ['key', 'label'],
@@ -108,21 +115,20 @@ const POLISH_TOOL: Anthropic.Tool = {
 
 export interface PolishResult {
   skillGroups: { category: string; items: string[] }[];
-  sections: { key: SectionKey; label: string }[];
+  sections: { key: string; label: string }[];
   corrections: { from: string; to: string; reason: string }[];
   warnings: string[];
 }
 
-export type SectionKey = 'education' | 'experience' | 'projects' | 'skills';
-
-const SECTION_KEYS: SectionKey[] = ['education', 'experience', 'projects', 'skills'];
-
-const DEFAULT_SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: 'education', label: 'Education' },
-  { key: 'experience', label: 'Experience' },
-  { key: 'projects', label: 'Projects' },
-  { key: 'skills', label: 'Technical Skills' },
-];
+/**
+ * The four printed sections everybody has, for a profile that has never said
+ * otherwise. Derived rather than retyped — this list and the renderer's
+ * fallback drifting apart is how a section ends up in one and not the other.
+ */
+const DEFAULT_SECTIONS = CONVENTIONAL_ORDER.filter((s) => !s.optional).map((s) => ({
+  key: s.key,
+  label: s.label,
+}));
 
 /**
  * Whatever came back, as a list.
@@ -225,7 +231,22 @@ export function correctText(text: string, corrections: { from: string; to: strin
   );
 }
 
-export function validatePolish(raw: PolishResult, sourceSkills: string): PolishResult {
+/**
+ * @param known The sections this person actually has, in their current order.
+ * Both the whitelist and the fallback: a key the model returns that is not in
+ * here was invented, and a key in here the model did not return was forgotten,
+ * and neither may change what sections exist.
+ *
+ * This parameter is the fix for a section-deleting bug. `known` used to be a
+ * hardcoded list of four, so a Volunteering section survived the upload, sat in
+ * the database, and was deleted by the polish that runs before every tailor —
+ * the feature appearing to work right up until the first time it mattered.
+ */
+export function validatePolish(
+  raw: PolishResult,
+  sourceSkills: string,
+  known: { key: string; label: string }[] = DEFAULT_SECTIONS,
+): PolishResult {
   const haystack = normalise(sourceSkills);
 
   const seen = new Set<string>();
@@ -284,16 +305,18 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
     last.items.push(...missing);
   }
 
-  // Every section appears exactly once, whatever came back.
-  const byKey = new Map<SectionKey, string>();
+  // Every section appears exactly once, whatever came back. Ordering is the
+  // model's to decide; existence is not.
+  const allowed = new Map(known.map((k) => [k.key, k.label]));
+  const byKey = new Map<string, string>();
   for (const section of asList<PolishResult['sections'][number]>(raw.sections)) {
-    if (section && SECTION_KEYS.includes(section.key) && !byKey.has(section.key)) {
-      byKey.set(section.key, section.label.trim() || defaultLabel(section.key));
-    }
+    if (!section || typeof section.key !== 'string') continue;
+    if (!allowed.has(section.key) || byKey.has(section.key)) continue;
+    byKey.set(section.key, (section.label ?? '').trim() || allowed.get(section.key)!);
   }
   const sections = [
     ...Array.from(byKey, ([key, label]) => ({ key, label })),
-    ...DEFAULT_SECTIONS.filter((d) => !byKey.has(d.key)),
+    ...known.filter((k) => !byKey.has(k.key)),
   ];
 
   const corrections = validateCorrections(raw.corrections);
@@ -304,10 +327,6 @@ export function validatePolish(raw: PolishResult, sourceSkills: string): PolishR
     corrections,
     warnings: asList<string>(raw.warnings).filter((w): w is string => typeof w === 'string' && w.trim() !== ''),
   };
-}
-
-function defaultLabel(key: SectionKey): string {
-  return DEFAULT_SECTIONS.find((d) => d.key === key)!.label;
 }
 
 /** Levenshtein, used only to tell a typo fix from a rewrite. */
@@ -338,6 +357,19 @@ function editDistance(a: string, b: string): number {
  * across untouched — there is nothing in `PolishResult` that could change one.
  */
 export function applyPolish(structure: ResumeStructure, polish: PolishResult): ResumeStructure {
+  // Order and labels from the pass; shape and content from what was already
+  // there. Assigning polish.sections wholesale would be right for the four the
+  // app has always had and wrong for every other one: the pass returns a key
+  // and a label, so a custom section would come back stripped of the shape that
+  // says how to draw it and the content that is the section — deleted, in
+  // effect, by the thing that was only asked to order it.
+  const stored = new Map((structure.sections ?? []).map((s) => [s.key, s]));
+  const sections: ResumeSection[] = polish.sections.map((s) => ({
+    ...(stored.get(s.key) ?? {}),
+    key: s.key,
+    label: s.label,
+  }));
+
   return {
     ...structure,
     experience: structure.experience.map((x) => ({ ...x, bullets: x.bullets })),
@@ -345,7 +377,7 @@ export function applyPolish(structure: ResumeStructure, polish: PolishResult): R
     skills: polish.skillGroups.length
       ? polish.skillGroups.map((g) => ({ category: g.category, items: g.items.join(', ') }))
       : structure.skills,
-    sections: polish.sections,
+    sections,
   };
 }
 
@@ -427,6 +459,22 @@ export async function polishResume(
 ): Promise<{ polish: PolishResult; applied: ResumeStructure }> {
   const sourceSkills = structure.skills.map((s) => `${s.category}: ${s.items}`).join('\n');
 
+  // The sections this person actually has — the whole list the pass may order,
+  // and nothing outside it. Built from the structure rather than from a
+  // constant, so a Summary or a Volunteering section is orderable like any
+  // other instead of being invisible to the pass and deleted by its validator.
+  //
+  // Read through planSections rather than off structure.sections directly. A
+  // profile that predates the sections table has a summary and no plan naming
+  // it, and taking the plan literally would leave the summary out of `known` —
+  // so the pass could not return it, the validator would not restore it, and
+  // this call would be the one that deleted it. planSections answers the
+  // question actually being asked: what is on this page.
+  const present = planSections(structure)
+    .filter((s) => hasContent(contentFor(structure, s)))
+    .map((s) => ({ key: s.key, label: s.label }));
+  const known = present.length ? present : DEFAULT_SECTIONS;
+
   const content = [
     {
       type: 'text' as const,
@@ -470,6 +518,9 @@ export async function polishResume(
           )
           .join('\n') || '(none)',
         '',
+        'Their sections, in the order they currently print. Return every one of these keys exactly once and no others — you are deciding the order and the names, not which sections exist:',
+        known.map((k) => `- ${k.key} (currently "${k.label}")`).join('\n'),
+        '',
         'Group and name the skills, decide the section order and names, and write the warnings.',
         'Spelling is somebody else\'s job — do not comment on it.',
       ].join('\n'),
@@ -484,6 +535,6 @@ export async function polishResume(
     tool: POLISH_TOOL,
   });
 
-  const polish = validatePolish(toolInput, sourceSkills);
+  const polish = validatePolish(toolInput, sourceSkills, known);
   return { polish, applied: applyPolish(structure, polish) };
 }
