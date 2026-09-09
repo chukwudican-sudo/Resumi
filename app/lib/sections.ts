@@ -277,6 +277,26 @@ function readsAsGroups(lines: string[]): boolean {
 }
 
 /**
+ * Whether an entry in this section is expected to be described.
+ *
+ * The line is between things you DID and things you HOLD. A job, a project, a
+ * volunteering role are actions, and an action with nothing under it prints a
+ * heading over blank space. A certificate and an award are complete with a
+ * name, an issuer and a year — there is nothing missing about one that has no
+ * bullets, and saying so puts a warning on a finished section.
+ *
+ * Education is exempt for its own reason: coursework is worth listing but a
+ * degree without it is still a degree.
+ *
+ * Deliberately NOT the same question as which sections the strength score
+ * counts. That is about which numbers move the score; this is about which
+ * entries would print broken.
+ */
+export function expectsBullets(kind: string): boolean {
+  return kind !== 'education' && !FLEXIBLE.has(kind);
+}
+
+/**
  * The sections this person actually has.
  *
  * One answer to a question the app was giving three. `planSections` returns all

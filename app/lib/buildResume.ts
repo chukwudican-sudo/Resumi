@@ -395,9 +395,21 @@ function detailFor(key: string, content: SectionContent): string {
   }
 }
 
-/** Enough to tailor from: someone reachable, with at least one thing they have done. */
+/**
+ * Enough to tailor from: someone reachable, with at least one thing they have
+ * done.
+ *
+ * "Something they have done" used to mean a job or a project, which was the
+ * whole world when those were the only sections that could hold one. A first
+ * year with a degree, a tutoring post at the library and two certificates has a
+ * real resume and got no Download button at all — no explanation either, since
+ * this hides the buttons rather than refusing them.
+ *
+ * Education alone still is not enough: a degree is something you have, and the
+ * rule is about something you did.
+ */
 export function isResumeUsable(entries: EntryWithBullets[], facts: ContactFact[]): boolean {
   const contact = readContact(facts);
-  const hasSomething = entries.some((e) => e.kind === 'experience' || e.kind === 'project');
+  const hasSomething = entries.some((e) => e.kind !== 'education');
   return Boolean(contact.name && contact.email && hasSomething);
 }

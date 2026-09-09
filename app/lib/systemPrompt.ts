@@ -128,14 +128,6 @@ export function buildUserContext(opts: {
   return lines.join('\n');
 }
 
-/**
- * Kept so the legacy /api/claude handlers still compile. Those handlers are no
- * longer reachable from the UI — the live path is /api/applications/[id]/tailor
- * — and they carry an older document-based flow.
- */
-
-export const UNIVERSAL_RULES = TAILOR_INVARIANT;
-
 export const EXTRACTION_PROMPT = `You extract structured job posting information from screenshots and/or pasted text for Resumi, a resume-tailoring tool.
 
 Read every attached image (in a sensible reading order if there are multiple) and any pasted text. Extract:

@@ -2,7 +2,7 @@ import { formatDates, formatPlace } from '../../lib/entryFormat';
 import { titleWithEmployment } from '../../lib/employment';
 import { composeDegree } from '../../lib/degree';
 import type { ContactFact, EntryWithBullets } from '../../lib/buildResume';
-import { KNOWN_SHAPES as DEFAULT_SHAPES, entryKindFor } from '../../lib/sections';
+import { KNOWN_SHAPES as DEFAULT_SHAPES, entryKindFor, expectsBullets } from '../../lib/sections';
 import type { ResumeSection } from '../../lib/types';
 
 /**
@@ -66,7 +66,12 @@ function describe(entry: EntryWithBullets, kind: string): Item {
     detail: [kind === 'project' ? entry.tech : entry.org, dates, place, lines]
       .filter(Boolean)
       .join(' · '),
-    gap: !count ? 'No bullets yet' : !dates ? 'No dates yet' : null,
+    // Only where an entry would actually print broken. This read "anything but
+    // education", correct when there were three kinds — and once a resume could
+    // have its own sections it put "No bullets yet" on every certificate and
+    // every award, six warnings on two finished sections, under a legend
+    // calling them "missing something". A certificate is not missing anything.
+    gap: expectsBullets(kind) && !count ? 'No bullets yet' : !dates ? 'No dates yet' : null,
   };
 }
 

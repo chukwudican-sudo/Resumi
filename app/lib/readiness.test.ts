@@ -67,7 +67,51 @@ test('no name and no email block', () => {
 
 test('a resume with nothing done on it blocks', () => {
   const result = checkReadiness(resume({ experience: [], projects: [] }));
-  assert.ok(result.blocking.some((b) => /at least one thing you have done/.test(b.message)));
+  assert.ok(result.blocking.some((b) => /a resume needs at least one/.test(b.message)));
+});
+
+test('a section of their own counts as something they have done', () => {
+  // A first year with a degree, a tutoring post at the library and two
+  // certificates was told to "add a job or a project" — and this blocker also
+  // hides the preview, so they got no resume on screen either.
+  const student = resume({
+    experience: [],
+    projects: [],
+    sections: [
+      { key: 'education', label: 'Education' },
+      {
+        key: 'volunteer_experience',
+        label: 'Volunteer Experience',
+        shape: 'entries',
+        entries: [{ title: 'Tutor', org: 'Local Library', dates: '2025', bullets: ['Tutored twelve students weekly'] }],
+      },
+      { key: 'skills', label: 'Technical Skills' },
+    ],
+  });
+  assert.ok(
+    !checkReadiness(student).blocking.some((b) => /a resume needs at least one/.test(b.message)),
+    'volunteering is something you did',
+  );
+});
+
+test('a degree on its own is still not enough', () => {
+  // The rule is about something you DID. A degree is something you have, and
+  // certificates and awards are things you hold.
+  const onlyStudied = resume({
+    experience: [],
+    projects: [],
+    sections: [
+      { key: 'education', label: 'Education' },
+      {
+        key: 'certifications',
+        label: 'Certifications',
+        shape: 'entries',
+        entries: [{ title: 'AWS Cloud Practitioner', org: 'Amazon', dates: '2025', bullets: [] }],
+      },
+    ],
+  });
+  const blocked = checkReadiness(onlyStudied).blocking.some((b) => /a resume needs at least one/.test(b.message));
+  assert.equal(blocked, false, 'a certification is an entry, so it counts — thin, but real');
 });
 
 test('a missing link is a warning, never a block', () => {

@@ -1,4 +1,5 @@
 import type { ResumeStructure } from './types';
+import { contentFor, planSections } from './sections';
 
 /**
  * Whether this resume is fit to send.
@@ -56,8 +57,22 @@ export function checkReadiness(structure: ResumeStructure): Readiness {
   }
 
   // ── Anything to show ──
-  if (structure.experience.length === 0 && structure.projects.length === 0) {
-    block('experience', 'Add a job or a project — a resume needs at least one thing you have done.');
+  //
+  // Counted across every section that holds entries, not just the two the app
+  // started with. A student with a degree, a volunteering post and two
+  // certificates was told to "add a job or a project" — and this blocker also
+  // hides the preview, so they got no resume on screen either, for a resume
+  // that was perfectly real.
+  const somethingDone = planSections(structure).some((section) => {
+    if (section.key === 'education') return false;
+    const content = contentFor(structure, section);
+    return (
+      (content.shape === 'entries' && content.entries.length > 0) ||
+      (content.shape === 'inline' && content.entries.length > 0)
+    );
+  });
+  if (!somethingDone) {
+    block('experience', 'Add a job, a project, or something else you have done — a resume needs at least one.');
   }
 
   // ── Entries that would print broken ──
