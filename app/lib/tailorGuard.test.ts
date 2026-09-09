@@ -300,3 +300,46 @@ test('a warning leads the log rather than trailing it', () => {
   assert.ok(log.length >= 1);
   for (const line of warnings) assert.ok(line.trim().endsWith('.'), `not a sentence: ${line}`);
 });
+
+// ── Nothing appears that was not already there ─────────────────────────────
+
+test('a tailor cannot invent certifications for somebody who has none', () => {
+  // keepList handed back whatever the model sent when there was no source list
+  // to compare against, and the tailor's schema still carries the field. That
+  // is a fabricated credential on a real resume — the one failure this guard
+  // exists to prevent. Entries-shaped certifications leave the flat field
+  // empty, so it stopped being a corner case and became everybody who has any.
+  const tailored = validateTailored(SOURCE, {
+    ...SOURCE,
+    certifications: ['AWS Certified Solutions Architect – Professional'],
+    awards: ['Employee of the Year'],
+  });
+  assert.equal(tailored.structure.certifications, undefined, 'nothing invented');
+  assert.equal(tailored.structure.awards, undefined);
+});
+
+test('a tailor cannot add a summary to a resume that has none', () => {
+  const tailored = validateTailored(
+    { ...SOURCE, summary: undefined },
+    { ...SOURCE, summary: 'A results-driven professional with a passion for excellence.' },
+  );
+  assert.equal(tailored.structure.summary, undefined, 'the person decides what sections they have');
+});
+
+test('a summary the person does have is still restored when dropped', () => {
+  const withSummary = { ...SOURCE, summary: 'Ships software.' };
+  const tailored = validateTailored(withSummary, { ...withSummary, summary: '' });
+  assert.equal(tailored.structure.summary, 'Ships software.');
+});
+
+test('certifications the person does have are kept, and a dropped one comes back', () => {
+  const withCerts = { ...SOURCE, certifications: ['AWS Certified Cloud Practitioner', 'CFA Level I'] };
+  const tailored = validateTailored(withCerts, {
+    ...withCerts,
+    certifications: ['AWS Certified Cloud Practitioner'],
+  });
+  assert.deepEqual(tailored.structure.certifications, [
+    'AWS Certified Cloud Practitioner',
+    'CFA Level I',
+  ]);
+});

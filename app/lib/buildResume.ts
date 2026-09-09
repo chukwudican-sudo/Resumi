@@ -8,6 +8,7 @@ import {
   contentFor,
   entryKindFor,
   hasContent,
+  ownSections,
   planSections,
   type SectionContent,
 } from './sections';
@@ -153,30 +154,39 @@ function readSkills(facts: ContactFact[]): { category: string; items: string }[]
  * conventional set — which is what every profile had before sections existed,
  * so an untouched one builds byte-for-byte as it always did.
  */
+/**
+ * One section's entries, in the order they will print.
+ *
+ * Exported because the editor has to agree with the page. It listed entries in
+ * the order they were added while the resume printed them newest first, so the
+ * form said Dean's List, Scholarship, Hackathon and the PDF beside it said
+ * Hackathon, Dean's List, Scholarship — and there was no way to tell from the
+ * editor what you were about to send.
+ *
+ * Most recent first, but only when every entry in the section can be placed.
+ * recencyKey scores an undated entry 0, so in a mixed section it sinks to the
+ * bottom regardless of where its owner put it. That is a real case now that
+ * imports parse dates: a resume where two jobs give months and one says
+ * "Summer 2025" would have the third pushed to the end, which is not what the
+ * file said and not what anyone asked for. One rule per section instead —
+ * dates when they are all there, the order they were given when they are not.
+ */
+export function inPrintOrder<T extends EntryWithBullets>(entries: T[]): T[] {
+  const allDated = entries.every((e) => recencyKey(datesOf(e)) > 0);
+  return [...entries].sort((a, b) => {
+    if (!allDated) return a.orderIndex - b.orderIndex;
+    const diff = recencyKey(datesOf(b)) - recencyKey(datesOf(a));
+    return diff !== 0 ? diff : a.orderIndex - b.orderIndex;
+  });
+}
+
 export function buildResume(
   entries: EntryWithBullets[],
   facts: ContactFact[],
   sections: ResumeSection[] = [],
 ): ResumeStructure {
   const contact = readContact(facts);
-  // Most recent first — but only when every entry in the section can actually
-  // be placed.
-  //
-  // recencyKey scores an undated entry 0, so in a mixed section it sinks to the
-  // bottom regardless of where its owner put it. That is a real case now that
-  // imports parse dates: a resume where two jobs give months and one says
-  // "Summer 2025" would have the third pushed to the end, which is not what the
-  // file said and not what anyone asked for. One rule per section instead —
-  // dates when they are all there, the order they were given when they are not.
-  const byKind = (kind: string) => {
-    const mine = entries.filter((e) => e.kind === kind);
-    const allDated = mine.every((e) => recencyKey(datesOf(e)) > 0);
-    return [...mine].sort((a, b) => {
-      if (!allDated) return a.orderIndex - b.orderIndex;
-      const diff = recencyKey(datesOf(b)) - recencyKey(datesOf(a));
-      return diff !== 0 ? diff : a.orderIndex - b.orderIndex;
-    });
-  };
+  const byKind = (kind: string) => inPrintOrder(entries.filter((e) => e.kind === kind));
 
   const home = readContact(facts).location.split(',').pop()?.trim() || null;
 
@@ -341,22 +351,13 @@ export function sectionStatus(structure: ResumeStructure, contactSaved = true): 
     },
   ];
 
-  // Which sections this person actually declared, as opposed to the ones the
-  // conventional fallback supplies. An extra they have is theirs whether or not
-  // there is anything in it right now.
-  const declared = new Set((structure.sections ?? []).map((s) => s.key));
-
-  for (const section of planSections(structure)) {
+  // The rule this used to state inline is now `ownSections`, because four other
+  // things need the same answer and they were each giving their own. An extra
+  // nobody has is not a to-do; one somebody HAS stays here even while empty,
+  // or clearing a summary to rewrite it makes the section vanish mid-edit.
+  for (const section of ownSections(structure)) {
     const content = contentFor(structure, section);
     const filled = hasContent(content);
-    // An extra nobody has is not a to-do. Offering everyone an empty Summary,
-    // Certifications and Awards would put three new rows on a screen that did
-    // not ask to change.
-    //
-    // But once somebody HAS one, it stays on the rail even when empty —
-    // otherwise clearing the box to rewrite a summary makes the section vanish
-    // mid-edit, with no way back to it.
-    if (section.optional && !filled && !declared.has(section.key)) continue;
     rail.push({
       key: section.key,
       label: section.label,

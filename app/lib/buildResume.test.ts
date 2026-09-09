@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { buildResume, entryFromRow, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from './buildResume';
+import { buildResume, entryFromRow, inPrintOrder, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from './buildResume';
 
 let seq = 0;
 function entry(over: Partial<EntryWithBullets> = {}): EntryWithBullets {
@@ -161,4 +161,31 @@ test('entryFromRow carries every stored column through to the resume', () => {
   const entryKeys = new Set(Object.keys(entryFromRow(row)));
   const missing = Object.keys(row).filter((k) => !entryKeys.has(k));
   assert.deepEqual(missing, [], `columns dropped in conversion: ${missing.join(', ')}`);
+});
+
+test('the editor and the page order entries the same way', () => {
+  // These disagreed: the form listed entries in the order they were added while
+  // the resume printed them newest first, so an awards section read Dean's
+  // List, Scholarship, Hackathon in the editor and Hackathon, Dean's List,
+  // Scholarship on the PDF beside it.
+  const rows = [
+    entry({ kind: 'awards', title: "Dean's Honour List", startYear: 2025, orderIndex: 0 }),
+    entry({ kind: 'awards', title: 'Faculty Entrance Scholarship', startYear: 2023, orderIndex: 1 }),
+    entry({ kind: 'awards', title: 'Hackathon Top Placement', startYear: 2026, orderIndex: 2 }),
+  ];
+  assert.deepEqual(inPrintOrder(rows).map((e) => e.title), [
+    'Hackathon Top Placement',
+    "Dean's Honour List",
+    'Faculty Entrance Scholarship',
+  ]);
+});
+
+test('a section where one entry has no date keeps the order it was given', () => {
+  // Sorting a mixed section by date sinks the undated one to the bottom
+  // wherever its owner put it.
+  const rows = [
+    entry({ kind: 'awards', title: 'Undated', orderIndex: 0 }),
+    entry({ kind: 'awards', title: 'Dated', startYear: 2026, orderIndex: 1 }),
+  ];
+  assert.deepEqual(inPrintOrder(rows).map((e) => e.title), ['Undated', 'Dated']);
 });

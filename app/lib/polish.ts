@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { callClaude } from './anthropic';
 import type { ResumeSection, ResumeStructure } from './types';
-import { CONVENTIONAL_ORDER, STORED_ELSEWHERE, contentFor, hasContent, planSections } from './sections';
+import { CONVENTIONAL_ORDER, STORED_ELSEWHERE, contentFor, hasContent, ownSections, planSections } from './sections';
 
 /**
  * The editorial pass over a resume nobody has a job posting for yet.
@@ -47,7 +47,9 @@ WHAT YOU DECIDE
 
    Do not put skills or projects above education for someone still studying, and do not reorder simply to look different from the conventional layout.
 
-   Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section. A section they named themselves keeps that name unless it is plainly a mistake — "Extracurricular & Community Activities" is what they call it, and shortening it to "Activities" is your preference, not an improvement.
+   Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section. A section they named themselves comes back EXACTLY as they wrote it — "Extracurricular & Community Activities" is what they call it, and shortening it to "Activities" is your preference, not an improvement.
+
+   The spelling convention above does NOT apply to section names. "Awards & Honors" stays "Awards & Honors" even on a Canadian resume: that is their heading, not prose you are correcting. Only a genuine misspelling — "Certifcations", "Expereince" — is worth fixing in a name.
 
 3. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake, an award or certificate with no issuer or no date, a certificate that has expired.
 
@@ -521,9 +523,14 @@ export async function polishResume(
   // so the pass could not return it, the validator would not restore it, and
   // this call would be the one that deleted it. planSections answers the
   // question actually being asked: what is on this page.
-  const present = planSections(structure)
-    .filter((s) => hasContent(contentFor(structure, s)))
-    .map((s) => ({ key: s.key, label: s.label }));
+  //
+  // Filtered by CONTENT until 2026-09-09, which quietly deleted any section
+  // that was empty at the moment somebody polished: a summary just added and
+  // not yet written, or one cleared to rewrite. It fell out of `known`, the
+  // pass could not return it, applyPolish rebuilt the plan without it, and
+  // runPolish saved that over the rows. ownSections keeps a declared section
+  // whether or not there is anything in it yet.
+  const present = ownSections(structure).map((s) => ({ key: s.key, label: s.label }));
   const known = present.length ? present : DEFAULT_SECTIONS;
 
   const content = [

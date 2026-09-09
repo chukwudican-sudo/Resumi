@@ -425,7 +425,15 @@ export function validateTailored(source: ResumeStructure, tailored: unknown): Ta
   // ── the rest ──
   const keepList = (from: unknown, fallback: string[] | undefined, what: string): string[] | undefined => {
     const src = fallback ?? [];
-    if (!src.length) return asList<string>(from).filter(Boolean).length ? asList<string>(from) : fallback;
+    // Nothing on the profile means nothing on the tailored copy.
+    //
+    // This used to hand back whatever the model sent when there was no source
+    // list to check against — and the tailor's schema still has these fields,
+    // so it can fill one in. That is an invented credential on somebody's
+    // resume, which is the one failure this whole guard exists to prevent.
+    // Certifications stored as entries leave this field empty, so it stopped
+    // being a corner case and started being everybody who has any.
+    if (!src.length) return fallback;
     const out = asList<string>(from).filter((v) => typeof v === 'string' && v.trim());
     const missing = src.filter((v) => !out.some((o) => norm(o) === norm(v)));
     if (!missing.length) return out;
@@ -437,7 +445,9 @@ export function validateTailored(source: ResumeStructure, tailored: unknown): Ta
     return [...out, ...missing];
   };
 
-  const summary = asText(raw.summary).trim() || (source.summary ?? undefined);
+  // Same rule for the summary: a tailored copy does not grow a section the
+  // master resume does not have. The person decides what sections they have.
+  const summary = source.summary?.trim() ? asText(raw.summary).trim() || source.summary : undefined;
   if (source.summary?.trim() && !asText(raw.summary).trim()) {
     repairs.push({
       kind: 'entry',

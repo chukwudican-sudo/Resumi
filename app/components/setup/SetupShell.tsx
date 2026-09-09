@@ -11,12 +11,14 @@ import { checkReadiness } from '../../lib/readiness';
 import DownloadPdf from '../applications/DownloadPdf';
 import PolishButton from './PolishButton';
 import type { ResumeSection, ResumeStructure } from '../../lib/types';
-import { contentFor, entryKindFor, planSections } from '../../lib/sections';
+import { contentFor, entryKindFor, isRemovable, planSections } from '../../lib/sections';
 import ContactSection, { type Contact } from './ContactSection';
 import EntrySection from './EntrySection';
 import SkillsSection, { type SkillGroup } from './SkillsSection';
 import ProseSection from './ProseSection';
 import ListSection from './ListSection';
+import AddSection from './AddSection';
+import RemoveSection from './RemoveSection';
 
 /**
  * Which section is open. Any key this person's resume actually has, plus
@@ -110,6 +112,11 @@ export default function SetupShell({
   // the first. Hardcoding the successor per section is how a new one ends up
   // being a dead end nothing leads out of.
   const nextKey = status[(status.findIndex((s) => s.key === open?.key) + 1) % status.length]?.key ?? 'contact';
+  // Where removing the open section lands you: the one above it. Falling back
+  // to status[0] would throw somebody to Contact for deleting something near
+  // the bottom of their resume.
+  const previousKey =
+    status[Math.max(0, status.findIndex((s) => s.key === open?.key) - 1)]?.key ?? 'contact';
 
   // Whether there is enough here to compile. The same check the download and
   // the preview endpoint make, so the pane never shows a resume that the
@@ -230,6 +237,18 @@ export default function SetupShell({
               </button>
             ))}
           </div>
+
+          {/*
+            Under the sections rather than beside them: it is the end of the
+            list, not a control over it. Held shut while a form is dirty for the
+            same reason Polish and Download are — adding refreshes the page, and
+            an open unsaved form would go with it.
+          */}
+          <AddSection
+            taken={new Set(status.map((s) => s.key))}
+            disabled={dirty}
+            onAdded={(key) => { setDirty(false); setSection(key); }}
+          />
 
           {/*
             The diagnosis, which used to live on a separate read-only page that
@@ -356,6 +375,32 @@ export default function SetupShell({
                 onDirty={setDirty}
               />
             )}
+
+            {/*
+              One control for five editors. Put inside each of them it would be
+              five copies of the same confirmation, and four chances for them to
+              drift apart.
+
+              Not offered for Contact, nor for the four the conventional
+              fallback restores — removing one of those is a button that does
+              nothing, which is worse than not having it.
+            */}
+            {open && open.shape !== 'contact' && isRemovable(open.key) ? (
+              <RemoveSection
+                // Prefixed, because this is a SIBLING of the editor above and
+                // React keys only have to be unique among siblings — which is
+                // exactly what makes sharing one so quiet. mapRemainingChildren
+                // builds a Map keyed by key, so the second child overwrites the
+                // first; cleanup then deletes only what is still in that map,
+                // and the orphaned editor is never unmounted. Switching between
+                // two sections left both on screen, then three.
+                key={`remove-${open.key}`}
+                sectionKey={open.key}
+                label={open.label}
+                entries={entries.filter((e) => e.kind === entryKindFor(open.key)).length}
+                onRemoved={() => { setDirty(false); setSection(previousKey); afterSave(); }}
+              />
+            ) : null}
           </div>
         </div>
 

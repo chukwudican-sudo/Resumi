@@ -431,6 +431,33 @@ export async function saveSections(userId: string, sections: ResumeSection[]) {
 }
 
 /**
+ * A section and everything filed under it, in one transaction.
+ *
+ * Separate from saveSections because the two deletes must succeed or fail
+ * together: the plan without the section, and the entries the section held.
+ * Either alone leaves the profile describing something that is not there.
+ */
+export async function removeSectionAndEntries(
+  userId: string,
+  key: string,
+  remaining: ResumeSection[],
+): Promise<number> {
+  let removed = 0;
+  await db.transaction(async (tx) => {
+    const gone = await tx
+      .delete(profileEntries)
+      .where(and(eq(profileEntries.userId, userId), eq(profileEntries.kind, key)))
+      .returning({ id: profileEntries.id });
+    removed = gone.length;
+
+    await tx.delete(profileSections).where(eq(profileSections.userId, userId));
+    const rows = sectionRows(userId, remaining);
+    if (rows.length) await tx.insert(profileSections).values(rows);
+  });
+  return removed;
+}
+
+/**
  * Sections for a profile that predates them, derived from what it already has.
  *
  * Called only when there are no rows. A profile imported before this table

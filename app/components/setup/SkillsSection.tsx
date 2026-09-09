@@ -97,6 +97,12 @@ export default function SkillsSection({
       </p>
 
       <div className="mt-7 flex flex-col gap-3">
+        {rows.length === 0 ? (
+          <p className="rounded border border-dashed border-rule-field px-4 py-6 text-center text-[13px] text-ink-faint">
+            {levels ? 'No languages. This section will not print until you add one.'
+                    : 'Nothing here. This section will not print until you add something.'}
+          </p>
+        ) : null}
         {rows.map((row, i) => (
           <div key={i} className="flex items-start gap-2">
             <input
@@ -165,18 +171,23 @@ export default function SkillsSection({
                 className="w-full rounded border border-rule-field bg-ground-surface px-3.5 py-3 text-[14.5px] outline-none transition placeholder:text-ink-ghost focus:border-accent"
               />
             )}
-            {rows.length > 1 ? (
-              <button
-                type="button"
-                onClick={() => edit(rows.filter((_, j) => j !== i))}
-                className="pt-3 text-ink-ghost transition hover:text-flag"
-                aria-label="Remove group"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            ) : null}
+            {/*
+              The last row is removable too. Hiding its × meant a section could
+              be emptied down to one row and no further — there was no way to
+              clear a Languages section at all, and the leftover row printed its
+              value with no label beside it. An empty form is not a problem when
+              the button to add one back is directly underneath.
+            */}
+            <button
+              type="button"
+              onClick={() => edit(rows.filter((_, j) => j !== i))}
+              className="pt-3 text-ink-ghost transition hover:text-flag"
+              aria-label={levels ? 'Remove language' : 'Remove group'}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         ))}
       </div>

@@ -104,7 +104,26 @@ export const CONVENTIONAL_ORDER: PlannedSection[] = [
 
 const RANK = new Map(CONVENTIONAL_ORDER.map((s, i) => [s.key, i]));
 
-const SHAPES: SectionShape[] = ['entries', 'inline', 'groups', 'list', 'prose'];
+export const SHAPES: SectionShape[] = ['entries', 'inline', 'groups', 'list', 'prose'];
+
+/*
+ * There is deliberately no cap on how many sections a resume may have.
+ *
+ * There was one — ten — decided before the catalogue existed, and the catalogue
+ * then outgrew it: four core sections plus nine offered ones is thirteen, so
+ * somebody could pick a section straight off the list and be refused by a limit
+ * for doing exactly what the list invited. A rule that blocks its own menu is
+ * not a rule.
+ *
+ * It was also the only cap in the app. Nothing stops thirty jobs, fifty bullets
+ * or a summary of any length, and a resume runs long through those far sooner
+ * than through headings. A section prints nothing until it has content, so an
+ * accidental add costs nothing on the page either.
+ *
+ * If length ever needs guarding, the honest signal is the page count the
+ * tailoring already estimates, said near the preview where length is visible —
+ * not a number of headings guessed at in advance.
+ */
 
 const clean = (value: string | null | undefined): string => (value ?? '').trim();
 
@@ -258,6 +277,35 @@ function readsAsGroups(lines: string[]): boolean {
 }
 
 /**
+ * The sections this person actually has.
+ *
+ * One answer to a question the app was giving three. `planSections` returns all
+ * seven whatever the profile holds, because it describes where things go rather
+ * than what exists; polish filtered by content; the rail used a third rule. That
+ * was survivable while sections only ever arrived from an upload, and stops
+ * being survivable the moment somebody can add one — five things need to agree
+ * on whether a section is there: the rail, what may be offered to add, the cap,
+ * what a first add seeds from, and what polish is allowed to return.
+ *
+ * The rule is the rail's, because it was the only one that was right: a section
+ * is theirs if they DECLARED it (there is a row), or it has something in it, or
+ * it is one of the four every resume is expected to carry.
+ *
+ * Declared-but-empty matters most. It is a section somebody just added and has
+ * not filled in, or one they cleared to rewrite — and the version of this that
+ * filtered by content deleted both on the next polish.
+ */
+export function ownSections(structure: ResumeStructure): PlannedSection[] {
+  const declared = new Set((structure.sections ?? []).map((s) => s?.key).filter(Boolean));
+  return planSections(structure).filter(
+    (section) =>
+      !section.optional ||
+      declared.has(section.key) ||
+      hasContent(contentFor(structure, section)),
+  );
+}
+
+/**
  * The content of one planned section, in the form its drawer wants.
  *
  * Known keys read the named fields — the ones every scorer, guard and importer
@@ -403,6 +451,102 @@ export function hasContent(content: SectionContent): boolean {
 
 function written(values: string[] | undefined | null): string[] {
   return (values ?? []).map(clean).filter(Boolean);
+}
+
+/**
+ * The sections somebody is offered when they ask to add one.
+ *
+ * Named things rather than layouts, because a layout is the app's problem. Each
+ * carries the shape it should have, so the word never reaches the screen —
+ * "Summary" is a paragraph and "Certifications" has an issuer and a year, and
+ * nobody should have to be told that to pick one.
+ *
+ * Certifications and Awards are `entries` rather than the flat `list` their
+ * named field holds: somebody adding one by hand has an issuer and a year to
+ * type, and both keys are FLEXIBLE precisely so the shape can be theirs.
+ */
+export interface Addable {
+  label: string;
+  shape: SectionShape;
+  /** What goes in it, in the fewest words that distinguish it. */
+  detail: string;
+}
+
+export const ADDABLE: Addable[] = [
+  { label: 'Summary', shape: 'prose', detail: 'a paragraph at the top' },
+  { label: 'Certifications', shape: 'entries', detail: 'name, issuer, year' },
+  { label: 'Awards', shape: 'entries', detail: 'name, issuer, year' },
+  { label: 'Languages', shape: 'groups', detail: 'language and how well you speak it' },
+  { label: 'Volunteer Experience', shape: 'entries', detail: 'role, organisation, dates, bullets' },
+  // Its own row rather than folded into volunteering: unpaid work for an
+  // organisation and the clubs somebody belongs to are different things, and a
+  // resume that separates them did so on purpose.
+  { label: 'Extracurricular & Community Activities', shape: 'entries', detail: 'clubs, societies, activities' },
+  { label: 'Publications', shape: 'inline', detail: 'title, where, when' },
+  { label: 'Interests', shape: 'list', detail: 'a short list' },
+  { label: 'References', shape: 'list', detail: 'names, or available on request' },
+];
+
+/** How the five layouts are described to somebody naming their own section. */
+export const LAYOUTS: { shape: SectionShape; label: string; detail: string }[] = [
+  { shape: 'entries', label: 'Like a job', detail: 'role, organisation, dates, and bullets' },
+  { shape: 'inline', label: 'Like a project', detail: 'name, what it was built with, a link' },
+  { shape: 'groups', label: 'Label and value', detail: 'like your skills — "Languages: Python, Go"' },
+  { shape: 'list', label: 'A plain list', detail: 'one line each, no dates' },
+  { shape: 'prose', label: 'A paragraph', detail: 'like a summary' },
+];
+
+/**
+ * Sections that can actually be removed.
+ *
+ * Not a policy. `planSections` splices any missing conventional key straight
+ * back, so deleting one of the four would be a button that does nothing —
+ * they are left empty instead, which already stops them printing. The other
+ * three conventional keys come back too, but as optional-and-empty they are
+ * hidden from the rail and dropped by the renderer, so removing them works.
+ */
+export function isRemovable(key: string): boolean {
+  return !STORED_ELSEWHERE.has(key);
+}
+
+/**
+ * The plan with one section added, or null when they already have it.
+ *
+ * A known key goes to its conventional position — a summary belongs at the top
+ * of a resume, not at the bottom of it, and appending would be the app pleading
+ * ignorance about something it knows. Anything else goes last, where it was
+ * asked for.
+ */
+export function withSectionAdded(
+  sections: ResumeSection[],
+  label: string,
+  shape: SectionShape,
+): ResumeSection[] | null {
+  const taken = sections.map((s) => s.key);
+  const key = keyFor(label, taken);
+  if (taken.includes(key)) return null;
+
+  const section: ResumeSection = {
+    key,
+    label: label.trim(),
+    shape: KNOWN_SHAPES[key] && !FLEXIBLE.has(key) ? KNOWN_SHAPES[key] : shape,
+  };
+
+  const rank = RANK.get(key);
+  if (rank === undefined) return [...sections, section];
+
+  // After the last section that conventionally precedes this one.
+  let at = 0;
+  sections.forEach((s, i) => {
+    const other = RANK.get(s.key);
+    if (other !== undefined && other < rank) at = i + 1;
+  });
+  return [...sections.slice(0, at), section, ...sections.slice(at)];
+}
+
+/** The plan without one section. */
+export function withSectionRemoved(sections: ResumeSection[], key: string): ResumeSection[] {
+  return sections.filter((s) => s.key !== key);
 }
 
 /**

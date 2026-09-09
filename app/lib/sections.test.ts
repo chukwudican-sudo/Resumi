@@ -1,7 +1,12 @@
 import assert from 'node:assert';
 import test from 'node:test';
 import {
+  ADDABLE,
   CONVENTIONAL_ORDER,
+  isRemovable,
+  ownSections,
+  withSectionAdded,
+  withSectionRemoved,
   contentFor,
   contentOf,
   hasContent,
@@ -14,7 +19,7 @@ import {
 import { sectionStatus } from './buildResume';
 import { renderResumeLatex } from './latexEngine';
 import { formatDates } from './entryFormat';
-import type { ResumeStructure } from './types';
+import type { ResumeSection, ResumeStructure } from './types';
 
 const base: ResumeStructure = {
   name: 'Jane Doe',
@@ -654,4 +659,145 @@ test('the compound headings that were already decided still hold', () => {
   assert.strictEqual(keyFor('Professional Experience'), 'experience');
   assert.strictEqual(keyFor('Technical Projects'), 'projects');
   assert.strictEqual(keyFor('Technical Skills'), 'skills');
+});
+
+// ── Adding and removing ────────────────────────────────────────────────────
+
+const PLAN: ResumeSection[] = [
+  { key: 'education', label: 'Education' },
+  { key: 'experience', label: 'Work Experience' },
+  { key: 'projects', label: 'Technical Projects' },
+  { key: 'skills', label: 'Technical Skills' },
+];
+
+test('a Summary lands at the top, where a summary goes', () => {
+  const next = withSectionAdded(PLAN, 'Summary', 'prose')!;
+  assert.deepStrictEqual(next.map((s) => s.key), [
+    'summary', 'education', 'experience', 'projects', 'skills',
+  ]);
+  assert.strictEqual(next[0].shape, 'prose');
+});
+
+test('certifications land after skills, awards after certifications', () => {
+  const withCerts = withSectionAdded(PLAN, 'Certifications', 'entries')!;
+  assert.deepStrictEqual(withCerts.map((s) => s.key).slice(-1), ['certifications']);
+  const withBoth = withSectionAdded(withCerts, 'Awards', 'entries')!;
+  assert.deepStrictEqual(withBoth.map((s) => s.key).slice(-2), ['certifications', 'awards']);
+});
+
+test('a section the app has no place for goes last, where it was asked for', () => {
+  const next = withSectionAdded(PLAN, 'Volunteer Experience', 'entries')!;
+  assert.strictEqual(next[next.length - 1].key, 'volunteer_experience');
+  assert.strictEqual(next[next.length - 1].label, 'Volunteer Experience');
+});
+
+test('a conventional position is honoured even when the plan is reordered', () => {
+  // Polish may have put projects above experience.
+  const reordered: ResumeSection[] = [
+    { key: 'education', label: 'Education' },
+    { key: 'projects', label: 'Projects' },
+    { key: 'experience', label: 'Experience' },
+  ];
+  assert.deepStrictEqual(withSectionAdded(reordered, 'Summary', 'prose')!.map((s) => s.key), [
+    'summary', 'education', 'projects', 'experience',
+  ]);
+});
+
+test('a section they already have is refused rather than duplicated', () => {
+  assert.strictEqual(withSectionAdded(PLAN, 'Experience', 'entries'), null);
+  // And through the back door: a different spelling of the same section.
+  const withAwards = withSectionAdded(PLAN, 'Awards & Honours', 'entries')!;
+  assert.strictEqual(withSectionAdded(withAwards, 'Awards', 'entries'), null);
+  assert.strictEqual(withSectionAdded(withAwards, 'Honors & Awards', 'entries'), null);
+});
+
+test('a known key keeps its own shape, unless it is one of the flexible two', () => {
+  // Nothing should make a summary render as a list of jobs.
+  assert.strictEqual(withSectionAdded(PLAN, 'Summary', 'entries')![0].shape, 'prose');
+  // Certifications and Awards are the resume's to shape.
+  const certs = withSectionAdded(PLAN, 'Certifications', 'entries')!.find((s) => s.key === 'certifications');
+  assert.strictEqual(certs!.shape, 'entries');
+});
+
+test('removing takes one out and leaves the rest alone', () => {
+  const withSummary = withSectionAdded(PLAN, 'Summary', 'prose')!;
+  assert.deepStrictEqual(withSectionRemoved(withSummary, 'summary').map((s) => s.key), [
+    'education', 'experience', 'projects', 'skills',
+  ]);
+});
+
+test('the four the fallback restores are not offered as removable', () => {
+  for (const key of ['education', 'experience', 'projects', 'skills']) {
+    assert.strictEqual(isRemovable(key), false, key);
+  }
+  for (const key of ['summary', 'certifications', 'awards', 'volunteering']) {
+    assert.strictEqual(isRemovable(key), true, key);
+  }
+});
+
+// ── The one answer ─────────────────────────────────────────────────────────
+
+test('a profile with no rows owns the four, not all seven', () => {
+  // planSections describes where things GO. ownSections says what EXISTS, and
+  // seeding a plan from the wrong one puts Certifications and Awards in the
+  // rail of somebody who has neither.
+  assert.deepStrictEqual(ownSections(base).map((s) => s.key), [
+    'education', 'experience', 'projects', 'skills',
+  ]);
+});
+
+test('a section declared but not yet filled in is still owned', () => {
+  // This is what stops a just-added section being deleted by the next polish.
+  const justAdded: ResumeStructure = {
+    ...base,
+    sections: [{ key: 'summary', label: 'Summary', shape: 'prose', text: '' }],
+  };
+  assert.ok(ownSections(justAdded).some((s) => s.key === 'summary'));
+});
+
+test('a section with content but no row is owned too', () => {
+  // A profile that predates the sections table.
+  assert.ok(ownSections({ ...base, summary: 'Ships software.' }).some((s) => s.key === 'summary'));
+});
+
+test('every section the catalogue offers can actually be added', () => {
+  // The cap used to make this false: four core sections plus the catalogue came
+  // to more than it allowed, so a section could be offered and then refused for
+  // being one too many.
+  let plan: ResumeSection[] = [
+    { key: 'education', label: 'Education' },
+    { key: 'experience', label: 'Experience' },
+    { key: 'projects', label: 'Projects' },
+    { key: 'skills', label: 'Technical Skills' },
+  ];
+  for (const a of ADDABLE) {
+    const next = withSectionAdded(plan, a.label, a.shape);
+    assert.ok(next, `${a.label} was refused`);
+    plan = next;
+  }
+  assert.strictEqual(plan.length, 4 + ADDABLE.length);
+});
+
+test('the catalogue has no two entries that resolve to one section', () => {
+  // Two rows both landing on `awards` would offer a duplicate that the server
+  // then refuses on click.
+  const keys = ADDABLE.map((a) => keyFor(a.label));
+  assert.strictEqual(new Set(keys).size, keys.length, keys.join(', '));
+});
+
+test('sections named by hand keep their own identity', () => {
+  // "Something else…" is the escape hatch for everything not on the list, and
+  // the danger is a name being swallowed by a section it merely resembles.
+  const plan: ResumeSection[] = [{ key: 'experience', label: 'Experience' }];
+  for (const [label, expected] of [
+    ['Leadership', 'leadership'],
+    ['Professional Development', 'professional_development'],
+    ['Conferences & Talks', 'conferences_talks'],
+    ['Memberships', 'memberships'],
+    ['Patents', 'patents'],
+  ] as const) {
+    const next = withSectionAdded(plan, label, 'entries');
+    assert.ok(next, `${label} was refused`);
+    assert.strictEqual(next[next.length - 1].key, expected, label);
+  }
 });

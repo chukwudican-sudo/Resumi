@@ -3,8 +3,8 @@
 import { useState, useTransition } from 'react';
 import { removeEntry } from '../../server/actions';
 import { formatDates, formatPlace } from '../../lib/entryFormat';
-import { hasQuantity } from '../../lib/profileStrength';
-import type { EntryWithBullets } from '../../lib/buildResume';
+import { SCORED_KINDS, hasQuantity } from '../../lib/profileStrength';
+import { inPrintOrder, type EntryWithBullets } from '../../lib/buildResume';
 import EntryEditor, { blankEntry, type EditableEntry, type Kind } from './EntryEditor';
 
 interface Copy { title: string; blurb: string; add: string; empty: string }
@@ -67,7 +67,10 @@ export default function EntrySection({
   onDirty: (dirty: boolean) => void;
 }) {
   const copy = copyFor(kind, label);
-  const mine = entries.filter((e) => e.kind === kind).sort((a, b) => a.orderIndex - b.orderIndex);
+  // Sorted the way the page prints them, not the way they were added. These
+  // used to disagree, so the form showed one order and the PDF beside it
+  // showed another.
+  const mine = inPrintOrder(entries.filter((e) => e.kind === kind));
   const [editing, setEditing] = useState<EditableEntry | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -164,9 +167,10 @@ export default function EntrySection({
           // still reads as not-yet-strong at a glance, but nothing here ever
           // tells somebody their job is deficient.
           //
-          // Education is exempt: the score counts experience and projects only,
-          // so a mark on a degree would report on something nothing measures.
-          const quantified = kind !== 'education' && (entry.bullets ?? []).some(hasQuantity);
+          // Only where the score counts it. A mark on a degree, an award or a
+          // certificate reports on something nothing measures — "Credential
+          // #1000" was earning one for containing a number.
+          const quantified = SCORED_KINDS.has(kind) && (entry.bullets ?? []).some(hasQuantity);
 
 
           return (

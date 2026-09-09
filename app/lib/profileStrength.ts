@@ -21,6 +21,17 @@ const WEIGHTS = {
   depth: 10,       // enough bullets per entry to say something
 };
 
+/**
+ * Sections where a number in a bullet is what the score is counting.
+ *
+ * The "quantified" mark on an entry says this bullet carries the kind of number
+ * that makes it land — which is only true where the score measures it. It used
+ * to be written as "not education", correct when there were three kinds and
+ * wrong the moment a resume could have its own: a certificate reading
+ * "Credential #1000" was awarded a badge for having a number in it.
+ */
+export const SCORED_KINDS = new Set(['experience', 'project']);
+
 /** A digit that is not merely a year. Mirrors the interview's own rule. */
 export function hasQuantity(text: string): boolean {
   if (/(\d+(\.\d+)?\s*%|[$£€]\s*\d|\d+(\.\d+)?\s*[xX]\b)/.test(text)) return true;

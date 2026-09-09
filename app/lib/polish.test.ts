@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import test from 'node:test';
 import { applyPolish, otherSections, overlapNote, validateCorrections, validatePolish, type PolishResult } from './polish';
-import { contentFor, contentOf, hasContent, planSections, shapeOf } from './sections';
+import { contentFor, contentOf, hasContent, ownSections, planSections, shapeOf } from './sections';
 import { buildResume } from './buildResume';
 import type { ResumeSection, ResumeStructure } from './types';
 
@@ -579,4 +579,64 @@ test('the four spelled out elsewhere are not sent twice', () => {
   assert.ok(!seen.includes('Acme'), 'so does experience');
   assert.ok(!seen.includes('Git'), 'and skills');
   assert.equal(seen, '(none)');
+});
+
+test('a section just added and not yet written survives a polish', () => {
+  // The failure this replaces: `known` was built from sections WITH CONTENT, so
+  // a summary somebody had added but not typed into fell out of it, the pass
+  // could not return it, applyPolish rebuilt the plan without it, and runPolish
+  // saved that over the rows. Every newly added section was one Polish away
+  // from disappearing.
+  const justAdded = {
+    name: 'Ada',
+    contact: { email: 'a@b.com' },
+    education: [],
+    experience: [{ title: 'Engineer', org: 'Acme', location: 'Remote', dates: '2025', bullets: ['Shipped'] }],
+    projects: [],
+    skills: [{ category: 'Tools', items: 'Git' }],
+    sections: [
+      { key: 'summary', label: 'Summary', shape: 'prose' as const, text: '' },
+      { key: 'experience', label: 'Experience' },
+      { key: 'skills', label: 'Technical Skills' },
+    ],
+  } satisfies ResumeStructure;
+
+  const known = ownSections(justAdded).map((s) => ({ key: s.key, label: s.label }));
+  assert.ok(known.some((k) => k.key === 'summary'), 'the pass is allowed to return it');
+
+  const applied = applyPolish(
+    justAdded,
+    validatePolish({ skillGroups: [], sections: known, corrections: [], warnings: [] }, 'Git', known),
+  );
+  assert.ok(
+    applied.sections?.some((s) => s.key === 'summary'),
+    'and it is still in the plan that gets saved over the rows',
+  );
+});
+
+test('a section removed on purpose does not come back from a polish', () => {
+  // The mirror. validatePolish back-fills anything missing from `known`, so a
+  // deleted section must be absent from ownSections too or removing it is
+  // undone by the next pass.
+  const afterRemoval = {
+    name: 'Ada',
+    contact: { email: 'a@b.com' },
+    education: [],
+    experience: [{ title: 'Engineer', org: 'Acme', location: 'Remote', dates: '2025', bullets: ['Shipped'] }],
+    projects: [],
+    skills: [{ category: 'Tools', items: 'Git' }],
+    sections: [
+      { key: 'experience', label: 'Experience' },
+      { key: 'skills', label: 'Technical Skills' },
+    ],
+  } satisfies ResumeStructure;
+
+  const known = ownSections(afterRemoval).map((s) => ({ key: s.key, label: s.label }));
+  assert.ok(!known.some((k) => k.key === 'summary'));
+
+  const applied = applyPolish(
+    afterRemoval,
+    validatePolish({ skillGroups: [], sections: known, corrections: [], warnings: [] }, 'Git', known),
+  );
+  assert.ok(!applied.sections?.some((s) => s.key === 'summary'));
 });

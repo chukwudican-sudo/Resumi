@@ -21,6 +21,8 @@ import {
   upsertEntry as upsertEntryRow,
   ensureSections,
   listSections,
+  removeSectionAndEntries,
+  saveSections,
   updateSectionContent,
 } from './db/repository';
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
@@ -30,7 +32,15 @@ import { runPolish } from './polishProfile';
 import { getProfile, getUser } from './db/repository';
 import { RULE_MAX_LENGTH } from '../lib/rules';
 import { isKnownLocale } from '../lib/locales';
-import { entryKindFor } from '../lib/sections';
+import {
+  SHAPES,
+  entryKindFor,
+  isRemovable,
+  ownSections,
+  withSectionAdded,
+  withSectionRemoved,
+} from '../lib/sections';
+import type { SectionShape } from '../lib/types';
 
 /**
  * Mutations the UI can call directly.
@@ -216,6 +226,68 @@ export async function saveSectionContent(
   await updateSectionContent(userId, key, cleaned);
   await refreshMasterResume(userId);
   revalidatePath('/setup');
+}
+
+/**
+ * Adds a section this person does not have.
+ *
+ * The key comes from `keyFor`, which is what makes the catalogue safe: somebody
+ * choosing "Awards" gets the awards section they already have rather than a
+ * second one beside it, and the same is true of anything they type themselves —
+ * "Honors & Awards" and "Awards" resolve to one place.
+ *
+ * Returns the key so the screen can open what was just made. Without it the
+ * section appears somewhere in a rail of eight and has to be hunted for.
+ */
+export async function addSection(label: string, shape: string): Promise<string> {
+  const userId = await requireUserId();
+
+  const name = label.trim();
+  if (!name) throw new Error('A section needs a name.');
+  if (!SHAPES.includes(shape as SectionShape)) throw new Error(`Unknown layout: ${shape}`);
+
+  // The plan as it stands. An empty one is seeded from what they OWN rather
+  // than from planSections, which would declare all seven and put
+  // Certifications and Awards in the rail of somebody who has neither.
+  const { entryRows, factRows, sections } = await getResumeInputs(userId);
+  const current = sections.length
+    ? sections
+    : ownSections(buildResume(entryRows.map(entryFromRow), factRows)).map((s) => ({
+        key: s.key,
+        label: s.label,
+      }));
+
+  const next = withSectionAdded(current, name, shape as SectionShape);
+  if (!next) throw new Error(`You already have a ${name} section.`);
+
+  await saveSections(userId, next);
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
+
+  return next.find((s) => !current.some((c) => c.key === s.key))!.key;
+}
+
+/**
+ * Removes a section, and everything filed under it.
+ *
+ * Destructive and irreversible, so the screen arms it first and says how many
+ * entries go with it — the same shape of confirmation deleting a single entry
+ * already gets, for the same reason: there is no undo and no trace afterwards.
+ */
+export async function removeSection(key: string): Promise<number> {
+  const userId = await requireUserId();
+
+  // The four the conventional fallback restores. Removing one would be a button
+  // that does nothing, which is worse than not offering it.
+  if (!isRemovable(key)) throw new Error(`${key} cannot be removed — leave it empty instead.`);
+
+  const sections = await listSections(userId);
+  if (!sections.some((s) => s.key === key)) throw new Error(`No such section: ${key}`);
+
+  const removed = await removeSectionAndEntries(userId, key, withSectionRemoved(sections, key));
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
+  return removed;
 }
 
 /**
