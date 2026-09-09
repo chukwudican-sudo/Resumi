@@ -7,6 +7,7 @@ import {
   ownSections,
   withSectionAdded,
   withSectionRemoved,
+  withSectionRenamed,
   contentFor,
   contentOf,
   hasContent,
@@ -800,4 +801,44 @@ test('sections named by hand keep their own identity', () => {
     assert.ok(next, `${label} was refused`);
     assert.strictEqual(next[next.length - 1].key, expected, label);
   }
+});
+
+// ── Renaming ───────────────────────────────────────────────────────────────
+
+test('renaming changes the label and never the key', () => {
+  // The key is what every entry is filed under. Changing it would mean
+  // re-filing all of them on each rename, for nothing anybody can see.
+  const plan: ResumeSection[] = [
+    { key: 'volunteer_experience', label: 'Volunteer Experience', shape: 'entries' },
+    { key: 'experience', label: 'Experience' },
+  ];
+  const next = withSectionRenamed(plan, 'volunteer_experience', 'Community Work')!;
+  assert.strictEqual(next[0].key, 'volunteer_experience');
+  assert.strictEqual(next[0].label, 'Community Work');
+  assert.strictEqual(next[0].shape, 'entries', 'and nothing else moves');
+});
+
+test('the four the app knows can be renamed too', () => {
+  // Polish already renames these, so a person should be able to.
+  const plan: ResumeSection[] = [{ key: 'experience', label: 'Experience' }];
+  assert.strictEqual(withSectionRenamed(plan, 'experience', 'Work History')![0].label, 'Work History');
+  assert.strictEqual(withSectionRenamed(plan, 'experience', 'Work History')![0].key, 'experience');
+});
+
+test('a name that is really another section they have is refused', () => {
+  // Two headings both reading "Awards" with different things underneath.
+  const plan: ResumeSection[] = [
+    { key: 'awards', label: 'Awards & Honours', shape: 'entries' },
+    { key: 'volunteer_experience', label: 'Volunteer Experience', shape: 'entries' },
+  ];
+  assert.strictEqual(withSectionRenamed(plan, 'volunteer_experience', 'Awards'), null);
+  assert.strictEqual(withSectionRenamed(plan, 'volunteer_experience', 'Honors & Awards'), null);
+  // But a spelling of its OWN name is fine — that is the whole point.
+  assert.strictEqual(withSectionRenamed(plan, 'awards', 'Honours & Awards')![0].label, 'Honours & Awards');
+});
+
+test('an empty name, or a section that is not there, is refused', () => {
+  const plan: ResumeSection[] = [{ key: 'awards', label: 'Awards' }];
+  assert.strictEqual(withSectionRenamed(plan, 'awards', '   '), null);
+  assert.strictEqual(withSectionRenamed(plan, 'nope', 'Anything'), null);
 });

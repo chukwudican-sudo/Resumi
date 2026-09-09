@@ -131,7 +131,39 @@ test('a section named twice is taken once', () => {
     SOURCE_SKILLS,
   );
   assert.equal(result.sections.filter((s) => s.key === 'projects').length, 1);
-  assert.equal(result.sections[0].label, 'Technical Projects');
+});
+
+test('the pass cannot rename a section, whatever it sends back', () => {
+  // Asking was not enough. A section renamed to "Real Projects" came back as
+  // "Projects", because a list of labels gives the model no way to tell which
+  // are somebody's own words — so the label it returns is discarded and the
+  // person's is kept. Only the order survives the trip.
+  const theirs = [
+    { key: 'projects', label: 'Real Projects' },
+    { key: 'experience', label: 'Where I Have Worked' },
+    { key: 'skills', label: 'Technical Skills' },
+  ];
+  const result = validatePolish(
+    polish({
+      sections: [
+        { key: 'skills', label: 'Skills' },
+        { key: 'projects', label: 'Projects' },
+        { key: 'experience', label: 'Experience' },
+      ],
+    }),
+    SOURCE_SKILLS,
+    theirs,
+  );
+
+  assert.deepEqual(
+    result.sections,
+    [
+      { key: 'skills', label: 'Technical Skills' },
+      { key: 'projects', label: 'Real Projects' },
+      { key: 'experience', label: 'Where I Have Worked' },
+    ],
+    'the order is the pass\'s, every name is theirs',
+  );
 });
 
 test('a typo is corrected', () => {

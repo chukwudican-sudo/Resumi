@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { saveSectionContent } from '../../server/actions';
+import SectionHeading from './SectionHeading';
 
 /**
  * A section that is a plain list of one-line items.
@@ -47,7 +48,7 @@ export default function ListSection({
 
   return (
     <div>
-      <h1 className="font-serif text-[34px] leading-tight">{label}</h1>
+      <SectionHeading sectionKey={sectionKey} label={label} onRenamed={onSaved} />
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink-prose">
         One per line, in the order they should appear. Put the ones worth reading first &mdash;
         the last few on a list like this are rarely read at all.

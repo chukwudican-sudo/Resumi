@@ -39,6 +39,7 @@ import {
   ownSections,
   withSectionAdded,
   withSectionRemoved,
+  withSectionRenamed,
 } from '../lib/sections';
 import type { SectionShape } from '../lib/types';
 
@@ -265,6 +266,32 @@ export async function addSection(label: string, shape: string): Promise<string> 
   revalidatePath('/setup');
 
   return next.find((s) => !current.some((c) => c.key === s.key))!.key;
+}
+
+/**
+ * Renames a section, and nothing else.
+ *
+ * The label is what appears on the page and in the rail; the key underneath is
+ * untouched, so no entry moves and nothing has to be re-filed. Adding a section
+ * from the list means taking the app's wording for a heading on somebody's own
+ * resume — this is what gives it back.
+ */
+export async function renameSection(key: string, label: string): Promise<void> {
+  const userId = await requireUserId();
+
+  const sections = await listSections(userId);
+  const next = withSectionRenamed(sections, key, label);
+  if (!next) {
+    throw new Error(
+      sections.some((s) => s.key === key)
+        ? `You already have a section called that.`
+        : `No such section: ${key}`,
+    );
+  }
+
+  await saveSections(userId, next);
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
 }
 
 /**

@@ -368,6 +368,7 @@ export default function SetupShell({
               <EntrySection
                 key={open.key}
                 kind={entryKindFor(open.key)}
+                sectionKey={open.key}
                 label={open.label}
                 entries={entries}
                 onChange={afterSave}

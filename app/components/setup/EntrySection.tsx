@@ -6,6 +6,7 @@ import { formatDates, formatPlace } from '../../lib/entryFormat';
 import { SCORED_KINDS, hasQuantity } from '../../lib/profileStrength';
 import { inPrintOrder, type EntryWithBullets } from '../../lib/buildResume';
 import EntryEditor, { blankEntry, type EditableEntry, type Kind } from './EntryEditor';
+import SectionHeading from './SectionHeading';
 
 interface Copy { title: string; blurb: string; add: string; empty: string }
 
@@ -51,6 +52,7 @@ function copyFor(kind: Kind, label?: string): Copy {
 
 export default function EntrySection({
   kind,
+  sectionKey,
   label,
   entries,
   onChange,
@@ -58,7 +60,12 @@ export default function EntrySection({
   onDirty,
 }: {
   kind: Kind;
-  /** What this section is called. Only needed for one the app has no copy for. */
+  /**
+   * Which section this is. Not the same as `kind`: Projects is keyed
+   * `projects` and files its entries under `project`.
+   */
+  sectionKey: string;
+  /** What this section is called, as the person named it. */
   label?: string;
   entries: EntryWithBullets[];
   onChange: () => void;
@@ -141,7 +148,16 @@ export default function EntrySection({
 
   return (
     <div>
-      <h1 className="font-serif text-[34px] leading-tight">{copy.title}</h1>
+      {/*
+        The section's own name, not the copy table's.
+        
+        This showed `copy.title`, which is a fixed word per kind — so a resume
+        whose rail and PDF both said "Technical Projects" had an editor headed
+        "Projects", and renaming would have left the old name sitting here. The
+        field labels below still come from the table: they describe the boxes,
+        not the section.
+      */}
+      <SectionHeading sectionKey={sectionKey} label={label ?? copy.title} onRenamed={onChange} />
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink-prose">{copy.blurb}</p>
 
       <div className="mt-7 flex flex-col gap-3">

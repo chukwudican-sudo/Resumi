@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { saveSectionContent, saveSkills } from '../../server/actions';
 import { joinLevel, levelOptions, splitLevel } from '../../lib/proficiency';
+import SectionHeading from './SectionHeading';
 
 export interface SkillGroup {
   category: string;
@@ -82,7 +83,7 @@ export default function SkillsSection({
 
   return (
     <div>
-      <h1 className="font-serif text-[34px] leading-tight">{label}</h1>
+      <SectionHeading sectionKey={sectionKey} label={label} onRenamed={onSaved} />
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink-prose">
         {isSkills ? (
           <>

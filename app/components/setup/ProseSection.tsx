@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { saveSectionContent } from '../../server/actions';
+import SectionHeading from './SectionHeading';
 
 /**
  * A section that is one piece of writing — a summary, an objective, a profile.
@@ -45,7 +46,7 @@ export default function ProseSection({
 
   return (
     <div>
-      <h1 className="font-serif text-[34px] leading-tight">{label}</h1>
+      <SectionHeading sectionKey={sectionKey} label={label} onRenamed={onSaved} />
       <p className="mt-2.5 text-[15px] leading-relaxed text-ink-prose">
         Three or four lines at the top of the page, in your own voice. A recruiter reads this
         first and then decides whether to read the rest, so it is worth being specific &mdash; what

@@ -37,7 +37,9 @@ WHAT YOU DECIDE
    - Every term you emit must appear in the skills you were given. Do not add a skill because it would fit a group nicely. Do not list the same term in two groups.
    - Write terms the way the industry writes them: "PostgreSQL" not "postgres", "REST API design" not "rest apis".
 
-2. SECTION ORDER AND NAMES. You are given this person's sections, by key, with what each is currently called. Return EVERY key you were given, exactly once, in the order they should appear — and no key you were not given. You are deciding order and names. You are not deciding which sections exist; that is theirs, not yours.
+2. SECTION ORDER. You are given this person's sections, by key, with what each is called. Return EVERY key you were given, exactly once, in the order they should appear — and no key you were not given.
+
+   YOU ARE DECIDING THE ORDER AND NOTHING ELSE. Copy each label back exactly as it was given to you, character for character. Not a shorter version, not a more conventional one, not a correction. "Real Projects" comes back as "Real Projects"; "Technical Projects" does not become "Projects". Which sections exist is theirs, and so is what they are called.
 
    Work it out in this order, and follow it:
    a. Is there a degree in progress, or one finished within roughly the last year? If so, EDUCATION GOES FIRST. A student is read as a student, and burying the degree makes a reader hunt for the thing that explains the rest of the page. Only someone several years past graduating puts education below their work.
@@ -47,9 +49,7 @@ WHAT YOU DECIDE
 
    Do not put skills or projects above education for someone still studying, and do not reorder simply to look different from the conventional layout.
 
-   Names: "Projects" or "Technical Projects", "Experience" or "Work Experience", "Education". Pick what fits what is actually in the section. A section they named themselves comes back EXACTLY as they wrote it — "Extracurricular & Community Activities" is what they call it, and shortening it to "Activities" is your preference, not an improvement.
-
-   The spelling convention above does NOT apply to section names. "Awards & Honors" stays "Awards & Honors" even on a Canadian resume: that is their heading, not prose you are correcting. Only a genuine misspelling — "Certifcations", "Expereince" — is worth fixing in a name.
+   The label you are given is the person's own word for that part of their life — either what their resume said or what they typed in themselves. You cannot tell which, and it does not matter: both are theirs. The spelling convention above does not apply to it either. "Awards & Honors" stays "Awards & Honors" on a Canadian resume.
 
 3. WARNINGS. Plain sentences addressed to the person, about what would weaken this resume in front of a recruiter: an entry with no bullets, no link to any work, a degree with no credential, a skill that shows up in their projects but is missing from their skills, dates that overlap in a way that looks like a mistake, an award or certificate with no issuer or no date, a certificate that has expired.
 
@@ -88,7 +88,7 @@ const POLISH_TOOL: Anthropic.Tool = {
       sections: {
         type: 'array',
         description:
-          'Every section, in the order it should appear on the page. Use the keys listed in the message, each exactly once, and no others.',
+          'Every section, in the order it should appear on the page. Use the keys listed in the message, each exactly once, and no others. The ORDER of this array is the whole answer.',
         items: {
           type: 'object',
           properties: {
@@ -98,9 +98,13 @@ const POLISH_TOOL: Anthropic.Tool = {
             // being absent. The keys are given in the message instead, and
             // anything not on that list is dropped below.
             key: { type: 'string', description: 'The section key, exactly as given in the message.' },
-            label: { type: 'string', description: 'What this section is called on the page.' },
+            label: {
+              type: 'string',
+              description:
+                'Ignored. The section keeps the name the person gave it; send back the one you were given or omit this.',
+            },
           },
-          required: ['key', 'label'],
+          required: ['key'],
           additionalProperties: false,
         },
       },
@@ -314,7 +318,16 @@ export function validatePolish(
   for (const section of asList<PolishResult['sections'][number]>(raw.sections)) {
     if (!section || typeof section.key !== 'string') continue;
     if (!allowed.has(section.key) || byKey.has(section.key)) continue;
-    byKey.set(section.key, (section.label ?? '').trim() || allowed.get(section.key)!);
+    // The label the pass returned is DISCARDED. Only the order it puts the keys
+    // in is used.
+    //
+    // The prompt asks for the label back unchanged, and asking was not enough:
+    // a section renamed to "Real Projects" came back as "Projects", because a
+    // list of labels gives no way to tell which are the person's own words and
+    // an instruction to keep them cannot survive that. Every label is theirs —
+    // from their file or typed in — so the pass never needs to send one back,
+    // and now it cannot.
+    byKey.set(section.key, allowed.get(section.key)!);
   }
   const sections = [
     ...Array.from(byKey, ([key, label]) => ({ key, label })),

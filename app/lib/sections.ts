@@ -544,6 +544,33 @@ export function withSectionAdded(
   return [...sections.slice(0, at), section, ...sections.slice(at)];
 }
 
+/**
+ * The plan with one section renamed, or null when the name is not usable.
+ *
+ * The KEY never changes. It is an internal id nobody sees, every entry is filed
+ * under it, and re-filing all of them on each rename would be work with nothing
+ * to show for it — so "Volunteer Experience" renamed to "Community Work" keeps
+ * `volunteer_experience` underneath and simply prints differently.
+ *
+ * Refused when the new name resolves to a DIFFERENT section they already have:
+ * renaming their volunteering to "Awards" beside a real awards section would
+ * put two identical headings on one resume with different things under them.
+ */
+export function withSectionRenamed(
+  sections: ResumeSection[],
+  key: string,
+  label: string,
+): ResumeSection[] | null {
+  const name = label.trim();
+  if (!name) return null;
+  if (!sections.some((s) => s.key === key)) return null;
+
+  const resolved = keyFor(name);
+  if (resolved !== key && sections.some((s) => s.key === resolved)) return null;
+
+  return sections.map((s) => (s.key === key ? { ...s, label: name } : s));
+}
+
 /** The plan without one section. */
 export function withSectionRemoved(sections: ResumeSection[], key: string): ResumeSection[] {
   return sections.filter((s) => s.key !== key);
