@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { polishMasterResume } from '../../server/actions';
 import { useUndo } from '../undo/UndoProvider';
+import { useEscape } from '../useEscape';
 
 /**
  * Gets the PDF onto someone's machine.
@@ -41,6 +42,10 @@ export default function DownloadPdf({
   const [blocking, setBlocking] = useState<{ message: string }[]>([]);
   const [polishNote, setPolishNote] = useState<string | null>(null);
   const { dismiss } = useUndo();
+
+  // The "Not ready to send" list had the same problem as the polish panel: a
+  // popover with one small × and no other exit.
+  useEscape(blocking.length > 0, () => setBlocking([]));
 
   async function download() {
     setState('working');

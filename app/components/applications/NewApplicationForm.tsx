@@ -48,11 +48,20 @@ export default function NewApplicationForm({ detailCount }: { detailCount: numbe
   return (
     <main className="min-h-screen bg-ground font-sans text-ink">
       <div className="flex h-[62px] items-center justify-between border-b border-rule bg-ground-surface px-8">
-        <Link href="/applications" className="flex items-center gap-3.5 text-ink-prose transition hover:text-ink">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
+        {/*
+          The logo is the way off this screen.
+          
+          There is no back arrow here on purpose — the browser has one directly
+          above, and a second arrow beneath it competes with the control people
+          already reach for. But a screen with NO exit of its own is a dead end
+          on a phone, where the browser's arrow lives in a toolbar that hides
+          itself, and in an installed window, where there is no toolbar at all.
+        */}
+        <Link href="/applications" className="flex items-center gap-2.5 transition hover:opacity-70">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
-          <span className="text-sm">Applications</span>
+          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
         </Link>
       </div>
 

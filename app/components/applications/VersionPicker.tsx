@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEscape } from '../useEscape';
 
 export interface ResumeVersion {
   id: string;
@@ -31,6 +32,10 @@ export default function VersionPicker({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // Closed on a click elsewhere but not on Escape, which is the half of the
+  // pair people reach for without looking.
+  useEscape(open, () => setOpen(false));
   const [pending, startTransition] = useTransition();
 
   // With one version there is no history to offer, so it stays a plain label.

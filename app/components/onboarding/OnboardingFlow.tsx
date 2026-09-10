@@ -1,13 +1,13 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { saveContactDetails, saveOnboardingGoal } from '../../server/actions';
-import { fileToBase64 } from '../../lib/fileToBase64';
+import { useResumeUpload } from '../ResumeUpload';
 import { validateContact, validateContactField, type ContactField } from '../../lib/contactValidation';
 import type { ResumeStructure } from '../../lib/types';
 
-const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 export interface Contact {
   name: string;
@@ -166,9 +166,10 @@ export default function OnboardingFlow({
   const [field, setField] = useState(initialField);
   const [contact, setContact] = useState<Contact>(initialContact);
   const [pending, startTransition] = useTransition();
-  const [parsing, setParsing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement | null>(null);
+  // The same reader the setup rail uses. It was written here first and inlined
+  // here only; a second copy on /setup would be the one that stops matching.
+  const upload = useResumeUpload({ onDone: () => router.push('/setup') });
+  const parsing = upload.parsing;
 
   function continueToContact() {
     startTransition(async () => {
@@ -187,51 +188,25 @@ export default function OnboardingFlow({
   const setField_ = (key: keyof Contact) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setContact((c) => ({ ...c, [key]: e.target.value }));
 
-  async function handleFile(file: File) {
-    const name = file.name.toLowerCase();
-    const mimeType =
-      file.type === 'application/pdf' || name.endsWith('.pdf')
-        ? 'application/pdf'
-        : file.type === DOCX_MIME || name.endsWith('.docx')
-          ? DOCX_MIME
-          : null;
-
-    if (!mimeType) {
-      setError('Upload a PDF or Word (.docx) resume.');
-      return;
-    }
-
-    setError(null);
-    setParsing(true);
-    try {
-      const base64 = await fileToBase64(file);
-      const response = await fetch('/api/profile/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: { base64, mimeType }, fileName: file.name }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data?.error?.message ?? "We couldn't read this as a resume. Try a different file.");
-        return;
-      }
-      router.push('/setup');
-    } catch {
-      setError("We couldn't read that file. Make sure it isn't password protected.");
-    } finally {
-      setParsing(false);
-    }
-  }
-
   return (
     <main className="flex min-h-screen flex-col bg-ground font-sans text-ink">
       <div className="flex h-[74px] items-center justify-between border-b border-rule px-6 sm:px-14">
-        <div className="flex items-center gap-2.5">
+        {/*
+          A link, not a mark.
+
+          This was inert markup, and on this screen that mattered more than
+          anywhere else in the app: onboarding renders no AppNav, step 1 has
+          nothing above it to go back to, and the only two exits are the two
+          forward buttons on step 2. It was the one screen in the app you could
+          not leave. The logo is the quiet way out that every other page
+          already has.
+        */}
+        <Link href="/applications" className="flex items-center gap-2.5 transition hover:opacity-70">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
             <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
           <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-3.5">
           {/*
             Two, because there are two. It counted three and the last bar never
@@ -329,7 +304,7 @@ export default function OnboardingFlow({
               <button
                 type="button"
                 disabled={parsing}
-                onClick={() => fileInput.current?.click()}
+                onClick={upload.pick}
                 className="flex items-start gap-[18px] rounded-md border border-accent bg-accent-tint p-[26px] text-left transition hover:bg-accent-wash disabled:opacity-60"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-accent-line bg-ground-surface">
@@ -349,17 +324,7 @@ export default function OnboardingFlow({
                 </span>
               </button>
 
-              <input
-                ref={fileInput}
-                type="file"
-                accept="application/pdf,.pdf,.docx"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (file) handleFile(file);
-                }}
-              />
+              {upload.input}
 
               <button
                 type="button"
@@ -384,7 +349,7 @@ export default function OnboardingFlow({
               </button>
             </div>
 
-            {error ? <p className="mt-4 text-sm text-flag">{error}</p> : null}
+            {upload.error ? <p className="mt-4 text-sm text-flag">{upload.error}</p> : null}
 
             <div className="mt-7 flex items-start gap-3 rounded-md bg-ground-band px-[18px] py-4">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8A8680" strokeWidth="1.7" strokeLinecap="round" className="mt-px shrink-0">
@@ -402,8 +367,12 @@ export default function OnboardingFlow({
                 type="button"
                 // Was setStep(2) while already on step 2, so it did nothing at
                 // all and there was no way back to the first question.
+                //
+                // No longer disabled while a file is parsing either. That
+                // pinned somebody to this screen for the whole of a 30-second
+                // read with every exit switched off — and the one moment you
+                // most want out of an upload is while it is happening.
                 onClick={() => setStep(1)}
-                disabled={parsing}
                 className="py-3 text-[14.5px] text-ink-muted transition hover:text-ink disabled:opacity-50"
               >
                 Back

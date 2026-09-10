@@ -11,6 +11,7 @@ import {
 } from '../../server/actions';
 import { useUndo } from '../undo/UndoProvider';
 import { useConfirm } from '../undo/ConfirmProvider';
+import { useEscape } from '../useEscape';
 import { RULE_MAX_LENGTH } from '../../lib/rules';
 
 export interface Rule {
@@ -46,6 +47,29 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
 
   const rules = initialRules;
   const activeCount = rules.filter((r) => r.active).length;
+
+  /**
+   * Leaving a rule mid-edit, from the button or from Escape.
+   *
+   * It used to discard silently while the entry editor two screens over asked
+   * first — the same gesture, on the same kind of half-written text, answered
+   * two ways. A rule is one sentence somebody worked out the wording of, which
+   * is exactly the sort of thing that is annoying to lose and quick to lose.
+   */
+  async function cancelEdit() {
+    const before = rules.find((r) => r.id === editingId)?.text ?? '';
+    if (editingText.trim() !== before.trim()) {
+      const ok = await ask({
+        title: 'Discard this edit?',
+        body: 'Your changes to this rule have not been saved.',
+        action: 'Discard',
+      });
+      if (!ok) return;
+    }
+    setEditingId(null);
+  }
+
+  useEscape(editingId !== null, () => void cancelEdit());
 
   function submit() {
     const text = draft.trim();
@@ -145,7 +169,7 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
                     <div className="mt-2.5 flex justify-end gap-3">
                       <button
                         type="button"
-                        onClick={() => setEditingId(null)}
+                        onClick={() => void cancelEdit()}
                         className="text-[13px] text-ink-muted transition hover:text-ink"
                       >
                         Cancel

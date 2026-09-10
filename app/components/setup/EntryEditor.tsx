@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { removeEntry, saveEntry, type EntryInput } from '../../server/actions';
 import { useUndo } from '../undo/UndoProvider';
 import { useConfirm } from '../undo/ConfirmProvider';
+import { useEscape } from '../useEscape';
 import { isLink } from '../../lib/contactValidation';
 import { CREDENTIALS } from '../../lib/degree';
 import type { DateParts, PlaceParts } from '../../lib/entryFormat';
@@ -170,6 +171,33 @@ export default function EntryEditor({
   // judged the same way wherever it is typed.
   const urlProblem = draft.url.trim() && !isLink(draft.url) ? 'That does not look like a link.' : null;
   const canSave = draft.title.trim().length > 0 && !urlProblem;
+
+  /**
+   * Leaving without saving, from the button or from the key.
+   *
+   * One function so the two cannot diverge. An Escape that skipped the question
+   * would be a faster way to lose an afternoon's typing than the button it sits
+   * beside — the opposite of what a way out is for.
+   */
+  async function cancel() {
+    // Asking only when something actually changed keeps it out of the way of
+    // opening an entry, looking at it, and closing it again.
+    const changed = JSON.stringify(draft) !== JSON.stringify(entry);
+    if (changed) {
+      const ok = await ask({
+        title: 'Discard these changes?',
+        body: 'Nothing you have typed here has been saved yet.',
+        action: 'Discard',
+      });
+      if (!ok) return;
+    }
+    onCancel();
+  }
+
+  // Always on: this editor replaces the whole centre column, and on a new entry
+  // with an empty title the Save button is disabled — so Cancel was the single
+  // exit from a full-screen form.
+  useEscape(true, () => void cancel());
 
   function save() {
     // The entry as it was when this form opened. For an edit that IS the undo —
@@ -401,21 +429,7 @@ export default function EntryEditor({
       <div className="mt-8 flex items-center justify-between border-t border-rule pt-6">
         <button
           type="button"
-          onClick={async () => {
-            // Cancel sits beside Save and throws away everything typed. Asking
-            // only when something actually changed keeps it out of the way of
-            // opening an entry, looking at it, and closing it again.
-            const changed = JSON.stringify(draft) !== JSON.stringify(entry);
-            if (changed) {
-              const ok = await ask({
-                title: 'Discard these changes?',
-                body: 'Nothing you have typed here has been saved yet.',
-                action: 'Discard',
-              });
-              if (!ok) return;
-            }
-            onCancel();
-          }}
+          onClick={() => void cancel()}
           disabled={pending}
           className="text-sm text-ink-muted transition hover:text-ink disabled:opacity-50"
         >

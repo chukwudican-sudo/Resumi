@@ -8,9 +8,30 @@ import Link from 'next/link';
  * marking an application as sent — because that is what starts the follow-up
  * clock and turns this from a resume generator into a job-search tool.
  */
-export default function EmptyApplications({ hasProfile }: { hasProfile: boolean }) {
+export default function EmptyApplications({
+  hasProfile,
+  startedSetup = false,
+}: {
+  hasProfile: boolean;
+  /**
+   * Whether they have already been through onboarding.
+   *
+   * Somebody who chose "Fill it in myself" and left before saving anything has
+   * no profile, so the button below reads "Build my profile" — and sending them
+   * to /onboarding asks them to choose again between uploading and typing, a
+   * choice they already made, with no way back to the editor they picked.
+   */
+  startedSetup?: boolean;
+}) {
   const steps = [
-    { title: 'Build your profile', detail: 'Answer some questions, or upload a resume', done: hasProfile },
+    {
+      title: 'Build your profile',
+      // Was "Answer some questions, or upload a resume". The questions were the
+      // interview, and the interview is closed — it redirects to /setup. This
+      // now says what actually happens.
+      detail: 'Upload a resume, or type it in',
+      done: hasProfile,
+    },
     { title: 'Add your first job posting', detail: 'Paste the posting text', done: false },
     { title: 'Download a tailored resume', detail: 'Check it, then send it', done: false },
     { title: 'Mark it as applied', detail: 'So we can remind you to follow up', done: false },
@@ -34,11 +55,11 @@ export default function EmptyApplications({ hasProfile }: { hasProfile: boolean 
           <p className="mt-5 max-w-[400px] text-base leading-relaxed text-ink-prose">
             {hasProfile
               ? 'Paste in a job posting and Resumi rewrites your resume around it. Everything you make stays here — most people end up with thirty or forty.'
-              : 'Answer a few questions about your work and we will build a resume profile from your answers. It takes about five minutes and you only do it once.'}
+              : 'Upload a resume and we will pull everything out of it, or type it in yourself. It takes about five minutes and you only do it once.'}
           </p>
 
           <Link
-            href={hasProfile ? '/applications/new' : '/onboarding'}
+            href={hasProfile ? '/applications/new' : startedSetup ? '/setup' : '/onboarding'}
             className="mt-8 inline-flex items-center gap-2.5 rounded bg-accent px-[26px] py-[15px] text-[15px] font-medium text-ground transition hover:bg-accent-hover"
           >
             {hasProfile ? (
@@ -49,7 +70,7 @@ export default function EmptyApplications({ hasProfile }: { hasProfile: boolean 
                 Add a job posting
               </>
             ) : (
-              'Build my profile'
+              startedSetup ? 'Pick up where you left off' : 'Build my profile'
             )}
           </Link>
 

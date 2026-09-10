@@ -28,6 +28,50 @@ export interface Readiness {
   ready: boolean;
 }
 
+/**
+ * Whether there is anything on here that the person DID.
+ *
+ * Counted across every section that holds entries, not just the two the app
+ * started with. A student with a degree, a volunteering post and two
+ * certificates was told to "add a job or a project" — and that blocker also
+ * hides the preview, so they got no resume on screen either, for a resume that
+ * was perfectly real.
+ *
+ * Education is excluded on purpose: the rule is about something you DID, and a
+ * degree is something you HAVE.
+ */
+function somethingDone(structure: ResumeStructure): boolean {
+  return planSections(structure).some((section) => {
+    if (section.key === 'education') return false;
+    const content = contentFor(structure, section);
+    return (
+      (content.shape === 'entries' && content.entries.length > 0) ||
+      (content.shape === 'inline' && content.entries.length > 0)
+    );
+  });
+}
+
+/**
+ * Enough to tailor FROM: a name, and one thing you have done.
+ *
+ * Every gate in the app used to ask `structure?.name` and nothing else, which
+ * is satisfied by typing your name into Contact and pressing Save — that alone
+ * creates the profiles row. Somebody in that state passed /applications/new,
+ * passed the tailor route, and spent a credit rewriting a resume with no jobs,
+ * no education and no skills on it. The tailor spends before it generates, so
+ * the credit was simply gone. Invisible on the import path, which always
+ * arrives with entries; about fifteen seconds away from scratch.
+ *
+ * Deliberately NOT `checkReadiness(...).ready`. That is the bar for handing
+ * over a finished PDF and it blocks on an entry missing its dates — refusing to
+ * let somebody even start an application over a missing month would be the tool
+ * having an opinion where it was not asked for one.
+ */
+export function hasEnoughToTailor(structure: ResumeStructure | null | undefined): boolean {
+  if (!structure?.name?.trim()) return false;
+  return somethingDone(structure);
+}
+
 /** A skill entry that reads as a sentence rather than a term. */
 function readsAsProse(items: string): boolean {
   return items
@@ -58,20 +102,11 @@ export function checkReadiness(structure: ResumeStructure): Readiness {
 
   // ── Anything to show ──
   //
-  // Counted across every section that holds entries, not just the two the app
-  // started with. A student with a degree, a volunteering post and two
-  // certificates was told to "add a job or a project" — and this blocker also
-  // hides the preview, so they got no resume on screen either, for a resume
-  // that was perfectly real.
-  const somethingDone = planSections(structure).some((section) => {
-    if (section.key === 'education') return false;
-    const content = contentFor(structure, section);
-    return (
-      (content.shape === 'entries' && content.entries.length > 0) ||
-      (content.shape === 'inline' && content.entries.length > 0)
-    );
-  });
-  if (!somethingDone) {
+  // Shares its rule with hasEnoughToTailor rather than restating it. Two copies
+  // of "does this person have anything on their resume" is how the answer drifts
+  // — the gate would start letting people through that this blocker still
+  // stops, and neither would be obviously wrong on its own.
+  if (!somethingDone(structure)) {
     block('experience', 'Add a job, a project, or something else you have done — a resume needs at least one.');
   }
 

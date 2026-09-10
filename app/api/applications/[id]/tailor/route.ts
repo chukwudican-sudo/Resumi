@@ -7,6 +7,7 @@ import { surfaceRepairs, validateTailored } from '../../../../lib/tailorGuard';
 import { requireUserId } from '../../../../server/auth';
 import { MONTHLY_CREDITS } from '../../../../lib/credits';
 import { polishIfStale } from '../../../../server/polishProfile';
+import { hasEnoughToTailor } from '../../../../lib/readiness';
 import {
   getActiveRules,
   getUser,
@@ -55,7 +56,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!record) return errorResponse({ type: 'generic', message: 'Application not found.' }, 404);
 
   const profileStructure = (profile?.resumeStructure ?? null) as ResumeStructure | null;
-  if (!profileStructure?.name) {
+  // A name alone used to be enough to get past here, and this check sits ABOVE
+  // the spend — so an empty resume did not just produce nothing, it cost a
+  // credit to produce nothing.
+  if (!hasEnoughToTailor(profileStructure)) {
     return errorResponse({ type: 'generic', message: 'Build your profile first.' }, 400);
   }
 

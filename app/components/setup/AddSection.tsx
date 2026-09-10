@@ -78,7 +78,17 @@ export default function AddSection({
       if (!panel.current?.contains(e.target as Node)) close();
     };
     const escape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      // One view at a time. From the naming box this used to collapse the whole
+      // panel and throw away the name being typed — so the key people press to
+      // undo a wrong turn was the one that cost the most. It now does what the
+      // Back button does, and closes only once there is nothing to step back to.
+      if (naming) {
+        setNaming(false);
+        setError(null);
+        return;
+      }
+      close();
     };
 
     document.addEventListener('pointerdown', away);
@@ -87,7 +97,7 @@ export default function AddSection({
       document.removeEventListener('pointerdown', away);
       document.removeEventListener('keydown', escape);
     };
-  }, [open]);
+  }, [open, naming]);
 
   function add(name: string, withShape: SectionShape) {
     setError(null);

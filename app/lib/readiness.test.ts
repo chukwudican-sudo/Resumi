@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { checkReadiness } from './readiness';
+import { checkReadiness, hasEnoughToTailor } from './readiness';
 import type { ResumeStructure } from './types';
 
 function resume(over: Partial<ResumeStructure> = {}): ResumeStructure {
@@ -154,5 +154,85 @@ test('every issue names a section, so the message can point somewhere', () => {
   for (const issue of [...result.blocking, ...result.warnings]) {
     assert.ok(issue.section, `"${issue.message}" has nowhere to send them`);
     assert.ok(issue.message.trim().length > 0);
+  }
+});
+
+
+// ── The gate every page was getting wrong ──────────────────────────────────
+//
+// Three places asked `structure?.name` and nothing else — /applications/new,
+// the tailor route, and the applications empty state. Typing a name into
+// Contact and pressing Save creates the profiles row, so all three passed, and
+// the tailor spends its credit BEFORE it generates. A resume with no jobs, no
+// education and no skills therefore cost a credit to rewrite.
+
+test('nothing at all is not enough to tailor from', () => {
+  assert.equal(hasEnoughToTailor(null), false);
+  assert.equal(hasEnoughToTailor(undefined), false);
+});
+
+test('a name on its own is not enough to tailor from', () => {
+  // The fifteen-second path: open Contact, type a name, press Save.
+  const nameOnly = resume({ name: 'Chukwudi Ndubuisi', education: [], experience: [], projects: [], skills: [] });
+  assert.equal(hasEnoughToTailor(nameOnly), false);
+});
+
+test('a resume with no name is not enough, however much is on it', () => {
+  assert.equal(hasEnoughToTailor(resume({ name: '' })), false);
+  assert.equal(hasEnoughToTailor(resume({ name: '   ' })), false, 'whitespace is not a name');
+});
+
+test('a name and one project is enough to tailor from', () => {
+  const justAProject = resume({ experience: [], education: [], skills: [] });
+  assert.equal(hasEnoughToTailor(justAProject), true);
+});
+
+test('a degree on its own is not enough to tailor from', () => {
+  // Same rule as the blocker: something you DID, not something you have.
+  const onlyStudied = resume({ experience: [], projects: [] });
+  assert.equal(hasEnoughToTailor(onlyStudied), false);
+});
+
+test('an entry in a section of their own is enough to tailor from', () => {
+  // The trap this was already caught by once. A gate that counted only
+  // experience and projects would send a student with a volunteering post back
+  // to build a profile they had already built.
+  const student = resume({
+    experience: [],
+    projects: [],
+    sections: [
+      { key: 'education', label: 'Education' },
+      {
+        key: 'volunteer_experience',
+        label: 'Volunteer Experience',
+        shape: 'entries',
+        entries: [{ title: 'Tutor', org: 'Local Library', dates: '2025', bullets: ['Tutored twelve students weekly'] }],
+      },
+      { key: 'skills', label: 'Technical Skills' },
+    ],
+  });
+  assert.equal(hasEnoughToTailor(student), true);
+});
+
+test('the gate and the blocker never disagree about the same resume', () => {
+  // They share `somethingDone` rather than each testing it. Two copies of this
+  // rule would drift, and neither would look wrong on its own — the gate would
+  // start letting people through that the blocker still stops.
+  const cases = [
+    resume(),
+    resume({ experience: [], projects: [] }),
+    resume({ experience: [], projects: [], education: [] }),
+    resume({ name: '' }),
+  ];
+  for (const structure of cases) {
+    const blocked = checkReadiness(structure).blocking.some((b) =>
+      /a resume needs at least one/.test(b.message),
+    );
+    const named = Boolean(structure.name?.trim());
+    assert.equal(
+      hasEnoughToTailor(structure),
+      named && !blocked,
+      `disagreed about ${JSON.stringify(structure.name)} / ${structure.experience.length} jobs`,
+    );
   }
 });

@@ -173,26 +173,43 @@ export async function getProfileEntries(userId: string) {
  * signal that nothing is being paid attention to — and it violates the one rule
  * the interview leans on hardest, on its very first question.
  *
- * Written once, at account creation. Anything the person later corrects in the
- * conversation supersedes these rather than colliding with them.
+ * Written once, at account creation. Anything the person later corrects
+ * supersedes these rather than colliding with them.
+ *
+ * **Idempotent for real, by asking.** It used to lean on `onConflictDoNothing`,
+ * which guarded nothing at all: the conflict target is the primary key and
+ * `newId('fact')` mints a new one every call, so a second call inserted a
+ * SECOND `Name:` fact rather than doing nothing. That was survivable only
+ * because exactly one caller existed and it ran once, inside the branch that
+ * creates the user row. It is called from the Clerk webhook now too, and Clerk
+ * retries deliveries.
+ *
+ * Existing labels are left alone rather than updated. A name changed in Clerk
+ * is not a licence to rewrite the name on somebody's resume.
  */
 export async function seedIdentityFacts(userId: string, name: string | null, email: string | null) {
+  const already = await db
+    .select({ text: facts.text })
+    .from(facts)
+    .where(and(eq(facts.userId, userId), eq(facts.category, 'identity')));
+  const has = (label: string) => already.some((f) => f.text.startsWith(`${label}: `));
+
   const rows: (typeof facts.$inferInsert)[] = [];
-  if (name?.trim()) {
+  if (name?.trim() && !has('Name')) {
     rows.push({
       id: newId('fact'), userId, entryId: null,
       category: 'identity', text: `Name: ${name.trim()}`,
       hasNumber: false, confidence: 1, source: 'manual', sourceTurnId: null,
     });
   }
-  if (email?.trim()) {
+  if (email?.trim() && !has('Email')) {
     rows.push({
       id: newId('fact'), userId, entryId: null,
       category: 'identity', text: `Email: ${email.trim()}`,
       hasNumber: false, confidence: 1, source: 'manual', sourceTurnId: null,
     });
   }
-  if (rows.length) await db.insert(facts).values(rows).onConflictDoNothing();
+  if (rows.length) await db.insert(facts).values(rows);
 }
 
 /**

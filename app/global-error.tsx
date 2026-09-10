@@ -55,6 +55,21 @@ export default function GlobalError({
             >
               Reload
             </button>
+            {/*
+              A plain anchor, and the only way off this screen.
+              
+              This replaces the root layout when the root layout itself fails,
+              so there is no Link, no router and no nav — it offered a reload
+              button and nothing else, which for a fault that survives a reload
+              is a room with no door. A full page load is exactly what is wanted
+              here anyway.
+            */}
+            <a
+              href="/applications"
+              style={{ marginLeft: 18, fontSize: 14, color: '#2F5D50' }}
+            >
+              Back to your applications
+            </a>
           </div>
         </main>
       </body>

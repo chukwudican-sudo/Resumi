@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { currentUserId } from '../server/auth';
 
 /**
  * What Resumi promises and what it asks in return.
@@ -15,7 +16,9 @@ export const metadata = {
 
 const UPDATED = '5 September 2026';
 
-export default function TermsPage() {
+export default async function TermsPage() {
+  // Signed in or not decides where "back" actually lands — see below.
+  const signedIn = Boolean(await currentUserId());
   return (
     <main className="min-h-screen bg-ground font-sans text-ink">
       <div className="flex h-[74px] items-center justify-between border-b border-rule px-6 sm:px-14">
@@ -165,8 +168,17 @@ export default function TermsPage() {
         </Section>
 
         <div className="mt-14 flex items-center gap-5 border-t border-rule pt-7">
-          <Link href="/" className="text-[14px] text-accent transition hover:text-accent-hover">
-            &larr; Back to Resumi
+          {/*
+            Where this goes for a signed-in reader is not "/". The landing page
+            redirects them to /applications, so the link said one thing and did
+            another — read the policy, press back, and land somewhere you were
+            not. It now says where it is taking you.
+          */}
+          <Link
+            href={signedIn ? '/applications' : '/'}
+            className="text-[14px] text-accent transition hover:text-accent-hover"
+          >
+            &larr; {signedIn ? 'Back to your applications' : 'Back to Resumi'}
           </Link>
           <Link href="/privacy" className="text-[14px] text-ink-muted transition hover:text-ink">
             Privacy

@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { polishMasterResume, undoPolish } from '../../server/actions';
 import { useUndo } from '../undo/UndoProvider';
+import { useEscape } from '../useEscape';
 
 /**
  * Hands the editorial decisions to the model, and shows what it decided.
@@ -38,6 +39,11 @@ export default function PolishButton({
    * nothing.
    */
   const [undoState, setUndoState] = useState<'ready' | 'undoing' | 'done' | 'gone'>('ready');
+
+  // The panel is not a toast — it stays until dismissed, deliberately, because
+  // reading sixteen corrections takes longer than any timer. That made the × the
+  // only way out of a box overhanging the resume preview.
+  useEscape(result !== null, () => setResult(null));
 
   async function revert() {
     setUndoState('undoing');

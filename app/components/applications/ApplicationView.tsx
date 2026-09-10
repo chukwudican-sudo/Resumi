@@ -107,10 +107,20 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
         <div className="flex items-center gap-4">
-          <Link href="/applications" className="text-ink-prose transition hover:text-ink">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
+          {/*
+            The logo is the way off this screen.
+
+            There is no back arrow here on purpose — the browser has one directly
+            above, and a second arrow beneath it competes with the control people
+            already reach for. But a screen with NO exit of its own is a dead end
+            on a phone, where the browser's arrow lives in a toolbar that hides
+            itself, and in an installed window, where there is no toolbar at all.
+          */}
+          <Link href="/applications" className="flex items-center gap-2.5 transition hover:opacity-70">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
             </svg>
+            <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
           </Link>
           <div className="flex flex-col">
             <span className="text-sm text-ink">{posting.role ?? 'Untitled role'}</span>
@@ -264,6 +274,23 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
                     the gaps, what changed &mdash; describes this version, and the download gives
                     you this one. Restore it to work from here.
                   </p>
+                  {/*
+                    A way forward as well as a way to commit.
+                    
+                    The banner explained you were somewhere old and offered only
+                    Restore — which WRITES a new version. Somebody who opened an
+                    old one to look at it had no way back to the latest that did
+                    not change something, short of the browser.
+                  */}
+                  <Link
+                    href={`/applications/${applicationId}`}
+                    className="mt-3 inline-flex items-center gap-2 text-[12.5px] text-accent transition hover:text-accent-hover"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                    Back to the latest version
+                  </Link>
                   <RestoreVersion
                     applicationId={applicationId}
                     version={resume.version}

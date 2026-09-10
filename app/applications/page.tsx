@@ -2,8 +2,10 @@ import Link from 'next/link';
 import AppNav from '../components/AppNav';
 import ApplicationRow, { type ApplicationRowData, type ApplicationStatus } from '../components/applications/ApplicationRow';
 import EmptyApplications from '../components/applications/EmptyApplications';
+import type { ResumeStructure } from '../lib/types';
 import Nudges from '../components/applications/Nudges';
 import { nextAction } from '../lib/nextAction';
+import { hasEnoughToTailor } from '../lib/readiness';
 import { requireUserId } from '../server/auth';
 import {
   countApplicationsByStatus,
@@ -42,8 +44,18 @@ export default async function ApplicationsPage() {
   //
   // The identical mistake was found and fixed in app/onboarding/page.tsx; this
   // copy of it survived.
-  const structure = (profile?.resumeStructure ?? null) as { name?: string } | null;
-  const hasProfile = Boolean(structure?.name);
+  //
+  // And "a resume exists" is not "a name exists". Typing your name into Contact
+  // and saving creates the profiles row, which used to be enough to tick this
+  // step and open the door to a tailor with nothing on the page.
+  const structure = (profile?.resumeStructure ?? null) as ResumeStructure | null;
+  const hasProfile = hasEnoughToTailor(structure);
+
+  // Whether they have already been through onboarding. Somebody who took "Fill
+  // it in myself" and left before saving anything has this set and nothing
+  // else — sending them back to onboarding offers them a choice they already
+  // made, and hides the editor they chose.
+  const startedSetup = Boolean(user?.stage);
 
   const applications: ApplicationRowData[] = list.map((r) => ({
     id: r.id,
@@ -72,7 +84,7 @@ export default async function ApplicationsPage() {
       <AppNav active="applications" credits={user?.credits} />
 
       {total === 0 ? (
-        <EmptyApplications hasProfile={hasProfile} />
+        <EmptyApplications hasProfile={hasProfile} startedSetup={startedSetup} />
       ) : (
         <div className="mx-auto flex max-w-[1240px] flex-col gap-5 px-9 py-8">
           <div className="flex items-end justify-between">

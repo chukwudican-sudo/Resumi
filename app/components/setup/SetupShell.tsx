@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
 import { hasQuantity, profileStrength } from '../../lib/profileStrength';
@@ -17,6 +18,8 @@ import SkillsSection, { type SkillGroup } from './SkillsSection';
 import ProseSection from './ProseSection';
 import ListSection from './ListSection';
 import AddSection from './AddSection';
+import SetupUpload from './SetupUpload';
+import ReadinessPanel from './ReadinessPanel';
 import { useConfirm } from '../undo/ConfirmProvider';
 import RemoveSection from './RemoveSection';
 
@@ -82,6 +85,46 @@ export default function SetupShell({
   // teaching them to drive this component.
   const searchParams = useSearchParams();
   const [section, setSection] = useState<SectionKey>(() => searchParams.get('section') || 'contact');
+
+  /**
+   * The open section, written back to the address bar.
+   *
+   * It was read once, as a lazy initializer, and never written — so the URL
+   * said `/setup` whichever section you were in. Two things fell out of that: a
+   * refresh always dropped you back on Contact, and a second click on "add a
+   * skill" from Insights or a nudge did nothing at all, because the link
+   * resolved to a route the component was already mounted on and the
+   * initializer had run long ago.
+   *
+   * `history.replaceState` rather than `router.replace`: the latter is a soft
+   * navigation and would re-run this page's server component on every click in
+   * the rail. This is Next's own escape hatch for a URL that should follow the
+   * screen without fetching anything.
+   *
+   * Replace and not push, so the browser's back arrow — now the only back in
+   * the app — leaves /setup in one press instead of walking backwards through
+   * every section you looked at.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('section') === section) return;
+    params.set('section', section);
+    window.history.replaceState(null, '', `${window.location.pathname}?${params}`);
+  }, [section]);
+
+  // And the other direction: a link aimed here while this is already mounted.
+  // Next soft-navigates without remounting, so nothing would move without this.
+  //
+  // One known limit, and it is the cheaper end of a trade. `replaceState` is
+  // invisible to Next's router, so its idea of the URL lags the address bar —
+  // which means a link back to the section you originally arrived on can be
+  // treated as a navigation to where it already is, and not fire. Closing that
+  // would mean `router.replace`, and a server round-trip on every click in the
+  // rail to fix a case that costs one more click.
+  useEffect(() => {
+    const wanted = searchParams.get('section');
+    if (wanted) setSection(wanted);
+  }, [searchParams]);
   const [contact, setContact] = useState(initialContact);
 
   // Polishing reads the database and writes corrections back to it, while an
@@ -142,7 +185,12 @@ export default function SetupShell({
   // Whether there is enough here to compile. The same check the download and
   // the preview endpoint make, so the pane never shows a resume that the
   // buttons beside it would refuse to produce.
-  const ready = useMemo(() => checkReadiness(resume).ready, [resume]);
+  //
+  // The whole result is kept now, not just `.ready`. The list of what is
+  // standing in the way was computed on every render and discarded — see
+  // ReadinessPanel.
+  const readiness = useMemo(() => checkReadiness(resume), [resume]);
+  const ready = readiness.ready;
 
   // Scored here rather than read from profiles.strength, and scored on `built`
   // rather than on `resume`. The stored figure lags a save behind, and the
@@ -203,12 +251,24 @@ export default function SetupShell({
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
-        <div className="flex items-center gap-2.5">
+        {/*
+          A link, like it is on every page that renders AppNav. This bar is
+          /setup's own, and the mark in it was inert markup — which on a page
+          with no nav meant the one exit was the Done button in the far corner.
+
+          There is deliberately no back arrow beside it. The browser already has
+          one, an inch above this bar, and a second arrow underneath the first
+          is a control competing with the one people already know. Done is the
+          labelled exit, and it asks about unsaved work; the browser's arrow is
+          the quick one, and does not.
+        */}
+        <Link href="/applications" className="flex items-center gap-2.5 transition hover:opacity-70">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
             <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
           <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
-        </div>
+        </Link>
+
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of {status.length} sections</span>
           {dirty ? (
@@ -287,6 +347,22 @@ export default function SetupShell({
           />
 
           {/*
+            Uploading is no longer something only onboarding can do.
+
+            Choosing "Fill it in myself" used to be a one-way door: the only way
+            to change your mind was to get back to a screen with no route to it.
+            Offering the file here means never needing to go backwards for it —
+            which is also what lets the back control above mean one fixed thing.
+          */}
+          <SetupUpload
+            disabled={dirty}
+            entryCount={entries.length}
+            sectionCount={sections.length}
+            hasSkills={skillGroups.length > 0}
+            onDone={afterSave}
+          />
+
+          {/*
             The diagnosis, which used to live on a separate read-only page that
             listed the same entries over again. Here it sits beside the forms
             that answer it.
@@ -336,7 +412,14 @@ export default function SetupShell({
                     <button
                       key={w.key}
                       type="button"
-                      onClick={() => { setDirty(false); setSection(w.key); }}
+                      // Through mayLeave like the rail and the readiness panel.
+                      // This was the third way out of an unsaved form that did
+                      // not ask, and the last one left.
+                      onClick={async () => {
+                        if (!(await mayLeave())) return;
+                        setDirty(false);
+                        setSection(w.key);
+                      }}
                       className="text-left text-[12.5px] leading-relaxed text-accent transition hover:text-accent-hover hover:underline hover:underline-offset-2"
                     >
                       {w.count} {w.noun} {w.count === 1 ? 'entry does' : 'entries do'} not have one yet &rarr;
@@ -474,7 +557,23 @@ export default function SetupShell({
               <PdfPreview reloadKey={savedAt} />
             </>
           ) : (
-            <MaterialList entries={entries} facts={facts} sections={sections} />
+            // Not ready. The pane is otherwise dead space for the whole of
+            // somebody's first session — "Nothing yet" above a blank rectangle
+            // — while the app is holding the exact list of what is missing.
+            <div className="flex w-full flex-col">
+              <ReadinessPanel
+                blocking={readiness.blocking}
+                // Through the same guard the rail uses. Jumping straight to the
+                // section would be a way out of an unsaved form that does not
+                // ask — the one hole the rail was just closed against.
+                onGo={async (key) => {
+                  if (!(await mayLeave())) return;
+                  setDirty(false);
+                  setSection(key);
+                }}
+              />
+              <MaterialList entries={entries} facts={facts} sections={sections} />
+            </div>
           )}
         </aside>
       </div>

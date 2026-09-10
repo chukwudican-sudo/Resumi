@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { setApplicationStatus } from '../../server/actions';
 import type { ApplicationStatus } from './ApplicationRow';
+import { useEscape } from '../useEscape';
 
 /**
  * Where this application stands.
@@ -32,6 +33,9 @@ export default function StatusPicker({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // Same pair as the version picker: click-away worked, Escape did not.
+  useEscape(open, () => setOpen(false));
   const [pending, startTransition] = useTransition();
 
   const current = OPTIONS.find((o) => o.value === status) ?? OPTIONS[0];

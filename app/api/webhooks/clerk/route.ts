@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { Webhook } from 'svix';
-import { deleteUserData, upsertUser } from '../../../server/db/repository';
+import { deleteUserData, seedIdentityFacts, upsertUser } from '../../../server/db/repository';
 
 /**
  * Keeps the users table in step with Clerk.
@@ -78,7 +78,22 @@ export async function POST(request: Request) {
           break;
         }
         // Idempotent: Clerk retries deliveries, and the same event may arrive twice.
-        await upsertUser(event.data.id, email, displayName(event.data));
+        const name = displayName(event.data);
+        await upsertUser(event.data.id, email, name);
+
+        // Seeded here as well as in syncCurrentUser, because whichever of the
+        // two wins the race is the one that creates the row — and syncCurrentUser
+        // seeds ONLY when it creates it. In production this webhook usually
+        // wins, so the facts were never written: the setup rail read the facts
+        // table and said "Name and email needed" beside a form already showing
+        // both. Locally there is no webhook, which is exactly why it could not
+        // be reproduced.
+        //
+        // Only on creation. A name edited in Clerk afterwards must not reach
+        // back into a resume the person has since made their own.
+        if (event.type === 'user.created') {
+          await seedIdentityFacts(event.data.id, name ?? null, email);
+        }
         break;
       }
 
