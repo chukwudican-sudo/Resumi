@@ -105,7 +105,20 @@ export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaude
   // Before spending anything, not after.
   await assertWithinLimits(opts.userId, opts.kind);
 
-  const client = new Anthropic();
+  /**
+   * Given a budget that fits inside the function's.
+   *
+   * Bare, this takes the SDK defaults: a **ten-minute** timeout and two
+   * automatic retries — inside routes that declare `maxDuration = 60`. A single
+   * 529 therefore became three sequential attempts, the platform killed the
+   * function partway through the second, and the person got a platform error
+   * page instead of this app's own capacity message. The SDK's timeout was an
+   * order of magnitude larger than the budget and could never fire.
+   *
+   * One retry, and a timeout that leaves room for the response to be read and
+   * the usage row written before the function is cut off.
+   */
+  const client = new Anthropic({ timeout: 50_000, maxRetries: 1 });
 
   // The system prompt is the stable part of every request, so it carries the
   // cache breakpoint. Anything volatile must stay in the user content or the

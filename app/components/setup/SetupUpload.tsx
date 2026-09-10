@@ -1,6 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useResumeUpload } from '../ResumeUpload';
+import { IMPORT_STEPS } from '../../lib/waits';
+import type { WaitControl } from './waitControl';
 import { useConfirm } from '../undo/ConfirmProvider';
 
 /**
@@ -21,6 +24,7 @@ export default function SetupUpload({
   sectionCount,
   hasSkills,
   onDone,
+  wait,
 }: {
   /** Held shut while a form is dirty, for the same reason "+ Add a section" is. */
   disabled: boolean;
@@ -28,6 +32,8 @@ export default function SetupUpload({
   sectionCount: number;
   hasSkills: boolean;
   onDone: () => void;
+  /** The preview pane carries the wait — this card is far too small to. */
+  wait: WaitControl;
 }) {
   const ask = useConfirm();
 
@@ -70,8 +76,20 @@ export default function SetupUpload({
     <div className="mt-4 hidden lg:block">
       <button
         type="button"
-        onClick={upload.pick}
-        disabled={disabled || upload.parsing}
+        onClick={() => {
+          // Started before the picker opens, so the pane commits the moment the
+          // gesture does — not thirty seconds later when bytes start moving.
+          wait.start({
+            title: 'Reading your resume.',
+            steps: IMPORT_STEPS,
+            estimate: 'Usually about thirty seconds.',
+            // The window: this replaces every entry, section and fact. The rail
+            // and the editor behind it are already gone.
+            scope: 'window',
+          });
+          upload.pick();
+        }}
+        disabled={disabled || upload.busy}
         className="flex w-full flex-col items-start gap-1.5 rounded-md border border-accent-line bg-accent-tint p-3.5 text-left transition hover:bg-accent-wash disabled:opacity-40 disabled:hover:bg-accent-tint"
       >
         <span className="flex items-center gap-2.5">
@@ -81,13 +99,13 @@ export default function SetupUpload({
             <path d="M12 3v13" />
           </svg>
           <span className="text-[13.5px] text-ink">
-            {upload.parsing ? 'Reading your resume…' : 'Upload a resume'}
+            {upload.busy ? 'Reading your resume…' : 'Upload a resume'}
           </span>
         </span>
 
         {/* The cost, stated the way onboarding states it. Somebody weighing this
             against typing wants the two numbers, not an adjective. */}
-        {!upload.parsing ? (
+        {!upload.busy ? (
           <>
             {/* self-start, or a flex column stretches it into a full-width bar. */}
             <span className="self-start rounded-[3px] bg-accent-line px-1.5 py-0.5 text-[10.5px] text-accent">

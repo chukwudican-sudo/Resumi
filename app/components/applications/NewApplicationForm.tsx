@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Spinner from '../Spinner';
 
 /**
  * One screen: the posting, and a button.
@@ -125,7 +126,13 @@ export default function NewApplicationForm({ detailCount }: { detailCount: numbe
               disabled={busy || !text.trim()}
               className="rounded bg-accent px-[30px] py-3.5 text-[15px] font-medium text-ground transition hover:bg-accent-hover disabled:bg-rule-field disabled:text-ink-ghost"
             >
-              {busy ? 'Reading the posting…' : 'Tailor my resume'}
+              {busy ? (
+          <span className="flex items-center justify-center gap-2.5">
+            <Spinner /> Reading the posting…
+          </span>
+        ) : (
+          'Tailor my resume'
+        )}
             </button>
             {/*
               A greyed-out button with no reason beside it is a dead end. The

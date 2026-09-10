@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ResumeStructure } from '../../lib/types';
 import DownloadPdf from './DownloadPdf';
+import Stages from '../Stages';
+import Takeover from '../Takeover';
+import { INSTRUCT_STEPS, REASSURE, tailorSteps } from '../../lib/waits';
 import StatusPicker from './StatusPicker';
 import VersionPicker, { type ResumeVersion } from './VersionPicker';
 import type { ApplicationStatus } from './ApplicationRow';
@@ -16,6 +19,8 @@ interface Props {
   applicationId: string;
   /** False while an older version is being read. Then the screen is read-only. */
   isLatest: boolean;
+  /** Whether a tailor will run the editorial pass first — three calls, not one. */
+  polishFirst: boolean;
   status: ApplicationStatus;
   posting: {
     company: string | null;
@@ -36,7 +41,7 @@ interface Props {
   versions: ResumeVersion[];
 }
 
-export default function ApplicationView({ applicationId, isLatest, status, posting, resume, versions }: Props) {
+export default function ApplicationView({ applicationId, isLatest, polishFirst, status, posting, resume, versions }: Props) {
   const router = useRouter();
   const [tailoring, setTailoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +108,19 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
   // re-render that follows it.
   const busy = tailoring || pending;
 
+  // Tailoring produces the entire workspace from nothing — three model calls on
+  // a stale profile — so there is nothing behind it worth leaving on screen.
+  if (busy) {
+    return (
+      <Takeover
+        title="Rewriting your resume for this one."
+        steps={tailorSteps(polishFirst)}
+        done={!busy}
+        estimate="Usually about a minute."
+      />
+    );
+  }
+
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
@@ -146,21 +164,13 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
       {!resume ? (
         <div className="flex flex-grow items-center justify-center px-6 py-16">
           <div className="max-w-[520px] text-center">
-            <h1 className="font-serif text-[38px] leading-[1.1]">
-              {busy ? 'Rewriting your resume for this one.' : 'Ready when you are.'}
-            </h1>
+            <h1 className="font-serif text-[38px] leading-[1.1]">Ready when you are.</h1>
             <p className="mt-4 text-[15.5px] leading-relaxed text-ink-prose">
-              {busy
-                ? 'It is reading the posting, matching it against everything you have told us, and rewriting your experience around what this role actually asks for.'
-                : 'We have the posting. Tailoring rewrites your profile around it — keeping everything true, and putting what matters for this role first.'}
+              We have the posting. Tailoring rewrites your profile around it &mdash; keeping
+              everything true, and putting what matters for this role first.
             </p>
 
-            {busy ? (
-              <div className="mt-9 flex items-center justify-center gap-3">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-rule border-t-accent" />
-                <span className="text-[15px] text-ink-prose">Usually about a minute</span>
-              </div>
-            ) : (
+            {busy ? null : (
               <button
                 type="button"
                 onClick={tailor}
@@ -225,7 +235,25 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
             </p>
           </div>
 
-          <div className="order-1 flex min-h-0 flex-col items-center bg-ground-band px-8 py-7 lg:order-none lg:overflow-y-auto">
+          <div className="relative order-1 flex min-h-0 flex-col items-center bg-ground-band px-8 py-7 lg:order-none lg:overflow-y-auto">
+            {/*
+              An instruction rewrites the resume, so the wait sits over the
+              resume. "make bullet three shorter" costs a full regeneration —
+              the tool requires everything returned verbatim — so this is ten to
+              thirty seconds behind a button that only said "Applying…".
+            */}
+            {editing ? (
+              <div className="absolute inset-0 z-10 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-ground-band px-8">
+                <div className="w-full max-w-[290px]">
+                  <Stages
+                    steps={INSTRUCT_STEPS}
+                    done={!editing}
+                    estimate="Usually about twenty seconds."
+                    reassure={REASSURE}
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="mb-4 flex w-full max-w-[600px] items-center justify-between">
               <span className="text-xs text-ink-muted">
                 Version {resume.version}
@@ -419,7 +447,7 @@ export default function ApplicationView({ applicationId, isLatest, status, posti
                       type="button"
                       onClick={applyInstruction}
                       disabled={editing || busy || !instruction.trim()}
-                      className="rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:bg-rule-field disabled:text-ink-ghost"
+                      className="rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:pointer-events-none disabled:bg-rule-field disabled:text-ink-ghost"
                     >
                       {editing ? 'Applying…' : 'Apply'}
                     </button>

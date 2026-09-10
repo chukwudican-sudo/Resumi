@@ -144,16 +144,18 @@ export default function ContactSection({
 
       <div className="mt-8 flex items-center justify-between border-t border-rule pt-6">
         <span className="text-[13px] text-ink-faint">
-          {saved ? 'Saved' : 'Not saved yet'}
+          {pending ? 'Saving…' : saved ? 'Saved' : 'Not saved yet'}
         </span>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => save(false)}
             disabled={pending}
-            className="rounded border border-rule-field px-5 py-3 text-sm text-ink-prose transition hover:border-ink-faint disabled:opacity-50"
+            className="rounded border border-rule-field px-5 py-3 text-sm text-ink-prose transition hover:border-ink-faint disabled:pointer-events-none disabled:opacity-50"
           >
-            Save
+            {/* It never changed its label while the button beside it did — the
+                same press, reported two ways. */}
+            {pending ? 'Saving…' : 'Save'}
           </button>
           <button
             type="button"

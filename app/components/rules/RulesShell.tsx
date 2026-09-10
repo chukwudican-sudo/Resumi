@@ -85,6 +85,10 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
     const next = [...rules];
     const target = index + direction;
     if (target < 0 || target >= next.length) return;
+    // The swap. It was missing — this copied the array, checked the bounds, and
+    // posted the UNCHANGED order, so Move up and Move down have never done
+    // anything since the day they were written.
+    [next[index], next[target]] = [next[target], next[index]];
     // Reordering offers nothing — moving it back is the undo — but it still has
     // to take away an offer standing from the last change. An offer that
     // outlives the change it belongs to reverts the wrong step.
@@ -237,7 +241,11 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
                         dismiss();
                         startTransition(() => toggleRule(rule.id, !rule.active));
                       }}
-                      className="flex items-center gap-2 text-[12.5px] text-ink-muted transition hover:text-ink"
+                      // It had no disabled state at all, so the pill sat in its
+                      // old position — fully clickable — for the whole round
+                      // trip, and double-pressing was trivial.
+                      disabled={pending}
+                      className="flex items-center gap-2 text-[12.5px] text-ink-muted transition hover:text-ink disabled:pointer-events-none disabled:opacity-50"
                     >
                       <span
                         className={`flex h-[15px] w-[26px] items-center rounded-full px-[2px] transition ${

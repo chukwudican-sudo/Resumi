@@ -20,6 +20,10 @@ import ListSection from './ListSection';
 import AddSection from './AddSection';
 import SetupUpload from './SetupUpload';
 import ReadinessPanel from './ReadinessPanel';
+import Stages from '../Stages';
+import Takeover from '../Takeover';
+import { REASSURE } from '../../lib/waits';
+import type { WaitControl, WaitRequest } from './waitControl';
 import { useConfirm } from '../undo/ConfirmProvider';
 import RemoveSection from './RemoveSection';
 
@@ -148,7 +152,16 @@ export default function SetupShell({
    * every returning one straight past it.
    */
   const [contactSaved, setContactSaved] = useState(false);
-  const [, startTransition] = useTransition();
+  /**
+   * Read, not discarded.
+   *
+   * This was `const [, startTransition]`. router.refresh() does not resolve, so
+   * without watching the transition the Save button un-dimmed while the server
+   * was still rendering — leaving it live over a list that still showed the old
+   * values. The one place in the app that got this right says why: "a second
+   * click there spends a second credit."
+   */
+  const [refreshing, startTransition] = useTransition();
 
   // Entries and facts come straight from props rather than being copied into
   // state. router.refresh() re-renders the server component and hands down new
@@ -214,6 +227,26 @@ export default function SetupShell({
     ).filter((w) => w.count > 0);
   }, [built]);
 
+  /**
+   * What the pane is showing instead of the resume, if anything.
+   *
+   * Held here rather than in the button that started it: the wait belongs where
+   * the result will appear, and the three controls that can start one — Polish,
+   * Download-on-a-stale-resume, and the uploader — all live somewhere else on
+   * the screen.
+   */
+  const [wait, setWait] = useState<(WaitRequest & { percent?: number; done: boolean }) | null>(null);
+
+  const waitControl: WaitControl = useMemo(
+    () => ({
+      start: (request) => setWait({ ...request, done: false }),
+      progress: (percent) => setWait((w) => (w ? { ...w, percent } : w)),
+      finish: () => setWait((w) => (w ? { ...w, done: true } : w)),
+      cancel: () => setWait(null),
+    }),
+    [],
+  );
+
   function afterSave() {
     startTransition(() => router.refresh());
   }
@@ -248,6 +281,20 @@ export default function SetupShell({
     return content.shape === 'list' ? content.items : [];
   }
 
+  // Importing replaces the whole profile, so it takes the whole window — the
+  // rail, the editor and the preview are all about to be something else.
+  if (wait?.scope === 'window') {
+    return (
+      <Takeover
+        title={wait.title}
+        steps={wait.steps}
+        done={wait.done}
+        percent={wait.percent}
+        estimate={wait.estimate}
+      />
+    );
+  }
+
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
@@ -274,8 +321,8 @@ export default function SetupShell({
           {dirty ? (
             <span className="text-[12.5px] text-ink-faint">Save or cancel first</span>
           ) : null}
-          {usable ? <PolishButton stale={stale} disabled={dirty || !contactSaved} /> : null}
-          {usable ? <DownloadPdf polishFirst={stale} disabled={dirty || !contactSaved} /> : null}
+          {usable ? <PolishButton stale={stale} disabled={dirty || refreshing || !contactSaved} wait={waitControl} /> : null}
+          {usable ? <DownloadPdf polishFirst={stale} disabled={dirty || refreshing || !contactSaved} wait={waitControl} /> : null}
           {/*
             A button rather than a Link, so leaving the page asks the same
             question the rail does. A <Link> navigates before anything can be
@@ -341,7 +388,7 @@ export default function SetupShell({
           */}
           <AddSection
             taken={new Set(status.map((s) => s.key))}
-            disabled={dirty}
+            disabled={dirty || refreshing}
             onAdded={(key) => { setDirty(false); setSection(key); }}
             onUndone={() => { setDirty(false); setSection(previousKey); afterSave(); }}
           />
@@ -355,11 +402,12 @@ export default function SetupShell({
             which is also what lets the back control above mean one fixed thing.
           */}
           <SetupUpload
-            disabled={dirty}
+            disabled={dirty || refreshing}
             entryCount={entries.length}
             sectionCount={sections.length}
             hasSkills={skillGroups.length > 0}
             onDone={afterSave}
+            wait={waitControl}
           />
 
           {/*
@@ -529,7 +577,14 @@ export default function SetupShell({
         </div>
 
         {/* the actual resume, not a thumbnail */}
-        <aside className="hidden min-h-0 flex-col items-center border-l border-rule bg-ground-band px-6 py-8 lg:flex lg:overflow-y-auto">
+        {/*
+          `relative` here and the scrolling moved inside, so the wait below can
+          sit on the VISIBLE pane. An absolutely-positioned overlay inside a
+          scroll container covers the full scroll height instead — fine on a
+          short resume, and a scrim that stops halfway down a long one.
+        */}
+        <aside className="relative hidden min-h-0 flex-col border-l border-rule bg-ground-band lg:flex">
+        <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-8">
           {ready ? (
             // The real document, once there is enough to make one. Not a
             // drawing of it — the drawing and the download disagreed about
@@ -575,6 +630,30 @@ export default function SetupShell({
               <MaterialList entries={entries} facts={facts} sections={sections} />
             </div>
           )}
+        </div>
+
+        {/*
+          The wait, where the result will appear.
+          
+          Not beside Polish or Download — there is deliberately nothing beside
+          those — and not replacing the resume either. It dims what is already
+          there, so you keep seeing what you have while it is being changed.
+          The pane already did exactly this for a preview reload.
+        */}
+        {wait?.scope === 'pane' ? (
+          <div className="absolute inset-0 z-10 flex animate-[fadeIn_180ms_ease-out] items-center justify-center bg-ground-band px-8">
+            <div className="w-full max-w-[290px]">
+              <Stages
+                steps={wait.steps}
+                done={wait.done}
+                percent={wait.percent}
+                estimate={wait.estimate}
+                reassure={REASSURE}
+                onSettled={() => setWait(null)}
+              />
+            </div>
+          </div>
+        ) : null}
         </aside>
       </div>
     </main>

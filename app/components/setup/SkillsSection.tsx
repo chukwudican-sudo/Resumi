@@ -320,7 +320,7 @@ export default function SkillsSection({
       </div>
 
       <div className="mt-8 flex items-center justify-between border-t border-rule pt-6">
-        <span className="text-[13px] text-ink-faint">{saved ? 'Saved' : 'Not saved yet'}</span>
+        <span className="text-[13px] text-ink-faint">{pending ? 'Saving…' : saved ? 'Saved' : 'Not saved yet'}</span>
         <button
           type="button"
           onClick={save}

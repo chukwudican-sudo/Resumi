@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { polishMasterResume, undoPolish } from '../../server/actions';
 import { useUndo } from '../undo/UndoProvider';
 import { useEscape } from '../useEscape';
+import { POLISH_STEPS, REASSURE } from '../../lib/waits';
+import type { WaitControl } from './waitControl';
 
 /**
  * Hands the editorial decisions to the model, and shows what it decided.
@@ -18,9 +20,18 @@ import { useEscape } from '../useEscape';
 export default function PolishButton({
   stale,
   disabled = false,
+  wait,
 }: {
   stale: boolean;
   disabled?: boolean;
+  /**
+   * The preview pane, which carries the twenty-odd seconds this takes.
+   *
+   * Not a message next to this button — that was ruled out, and rightly: the
+   * pane is where the polished resume appears, so it is where the waiting for it
+   * belongs.
+   */
+  wait: WaitControl;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -64,13 +75,23 @@ export default function PolishButton({
     // pass itself is a different mechanism entirely, and it lives in the panel
     // below: three tables restored at once, not one row put back.
     dismiss();
+    // The pane, not the window: polish changes the RESUME, and hiding the
+    // rail and the editor would claim it was touching those too.
+    wait.start({
+      title: 'Tidying your resume.',
+      steps: POLISH_STEPS,
+      estimate: 'Usually about twenty seconds.',
+      scope: 'pane',
+    });
     startTransition(async () => {
       try {
         const outcome = await polishMasterResume();
         setResult({ warnings: outcome.warnings, corrections: outcome.corrections });
         setUndoState('ready');
+        wait.finish();
         router.refresh();
       } catch {
+        wait.cancel();
         setError("That didn't go through. Try again in a moment.");
       }
     });
@@ -93,7 +114,7 @@ export default function PolishButton({
           type="button"
           onClick={run}
           disabled={pending || disabled}
-          className="flex items-center gap-2 rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-50"
+          className="flex items-center gap-2 rounded bg-accent px-4 py-2 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:pointer-events-none disabled:opacity-50"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8-4.9-3.6L7.1 18l1.9-5.8L4 8.8h6.1z" />

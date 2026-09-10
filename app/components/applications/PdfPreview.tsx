@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Spinner from '../Spinner';
 
 /**
  * The actual PDF, drawn onto a canvas by us.
@@ -149,7 +150,14 @@ export default function PdfPreview({
             pages ? 'bg-ground-band/60' : 'aspect-[8.5/11] border border-rule-field bg-ground-surface'
           }`}
         >
-          <span className="text-[13px] text-ink-muted">
+          {/*
+            A compile, a 400KB library chunk and a 1.26MB worker, in series,
+            before one pixel is drawn — announced until now by a line of static
+            text. Several seconds of a sentence that never moves is the thing
+            people read as a hang.
+          */}
+          <span className="flex items-center gap-3 text-[13px] text-ink-muted" role="status" aria-live="polite">
+            <Spinner />
             {pages ? 'Rebuilding…' : 'Building your resume…'}
           </span>
         </div>

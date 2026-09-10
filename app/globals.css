@@ -54,3 +54,19 @@ textarea::placeholder {
 em.font-serif {
   font-style: italic;
 }
+
+/*
+ * The one entrance in the app.
+ *
+ * A wait that snaps in is startling on a screen somebody just pressed a button
+ * on; 180ms is long enough to read as arriving and short enough not to be a
+ * thing you sit through.
+ */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[fadeIn_180ms_ease-out\] { animation: none; }
+}

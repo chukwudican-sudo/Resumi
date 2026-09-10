@@ -71,6 +71,15 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     if (err instanceof LatexCompileError) {
+      // Busy is not broken: the service holds two slots and refuses the third,
+      // which a retry a moment later gets past. Saying "on us, it has been
+      // logged" for that tells somebody to stop trying.
+      if (err.kind === 'busy') {
+        return NextResponse.json(
+          { error: 'Too many resumes building at once. This will sort itself out in a moment.' },
+          { status: 503 },
+        );
+      }
       console.error(`[Resumi] Preview failed to compile for ${userId}:\n${err.log}`);
       return NextResponse.json(
         {

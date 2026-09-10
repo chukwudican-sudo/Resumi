@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { saveContactDetails, saveOnboardingGoal } from '../../server/actions';
 import { useResumeUpload } from '../ResumeUpload';
+import Takeover from '../Takeover';
+import { IMPORT_STEPS } from '../../lib/waits';
 import { validateContact, validateContactField, type ContactField } from '../../lib/contactValidation';
 import type { ResumeStructure } from '../../lib/types';
 
@@ -169,7 +171,7 @@ export default function OnboardingFlow({
   // The same reader the setup rail uses. It was written here first and inlined
   // here only; a second copy on /setup would be the one that stops matching.
   const upload = useResumeUpload({ onDone: () => router.push('/setup') });
-  const parsing = upload.parsing;
+  const parsing = upload.busy;
 
   function continueToContact() {
     startTransition(async () => {
@@ -187,6 +189,25 @@ export default function OnboardingFlow({
 
   const setField_ = (key: keyof Contact) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setContact((c) => ({ ...c, [key]: e.target.value }));
+
+  // The whole window, once a file is chosen.
+  //
+  // The first attempt put the stages above the two choice cards and hid the
+  // cards — and the hiding landed on the wrong container, so the screen showed
+  // the wait AND both choices at once, one of which read "Reading your resume…".
+  // Taking the window removes the class of bug as well as the bug: there is
+  // nothing left underneath to get wrong.
+  if (parsing) {
+    return (
+      <Takeover
+        title="Reading your resume."
+        steps={IMPORT_STEPS}
+        done={upload.phase === 'done'}
+        percent={upload.phase === 'uploading' ? upload.percent : undefined}
+        estimate="Usually about thirty seconds."
+      />
+    );
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-ground font-sans text-ink">

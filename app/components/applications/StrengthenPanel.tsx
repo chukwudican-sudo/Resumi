@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Spinner from '../Spinner';
 
 interface JobQuestion {
   text: string;
@@ -170,7 +171,13 @@ export default function StrengthenPanel({
         disabled={state === 'loading'}
         className="mt-3.5 w-full rounded border border-rule-field py-2.5 text-[13.5px] text-ink-prose transition hover:border-accent hover:text-accent disabled:opacity-60"
       >
-        {state === 'loading' ? 'Working out what to ask…' : 'Show me'}
+        {state === 'loading' ? (
+          <span className="flex items-center justify-center gap-2.5">
+            <Spinner /> Working out what to ask…
+          </span>
+        ) : (
+          'Show me'
+        )}
       </button>
       {error ? <p className="mt-3 text-[13px] text-ink-muted">{error}</p> : null}
     </div>

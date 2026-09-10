@@ -73,6 +73,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     if (err instanceof LatexCompileError) {
+      if (err.kind === 'busy') {
+        // Transient, and it says so. Reported as a logged bug until now, which
+        // tells somebody to give up on a thing that would work in five seconds.
+        return NextResponse.json(
+          { error: 'Too many resumes building at once. Try again in a few seconds.' },
+          { status: 503 },
+        );
+      }
       if (err.kind === 'config') {
         console.error(`[Resumi] ${err.message}`);
         return NextResponse.json({ error: err.message }, { status: 500 });

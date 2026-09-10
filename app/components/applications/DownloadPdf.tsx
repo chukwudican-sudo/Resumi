@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { polishMasterResume } from '../../server/actions';
 import { useUndo } from '../undo/UndoProvider';
 import { useEscape } from '../useEscape';
+import { DOWNLOAD_STEPS, DOWNLOAD_WHY } from '../../lib/waits';
+import type { WaitControl } from '../setup/waitControl';
 
 /**
  * Gets the PDF onto someone's machine.
@@ -19,6 +21,7 @@ export default function DownloadPdf({
   version,
   polishFirst = false,
   disabled = false,
+  wait,
 }: {
   applicationId?: string;
   /** Which version to hand over. Omitted means the latest. */
@@ -35,6 +38,15 @@ export default function DownloadPdf({
   polishFirst?: boolean;
   /** Held shut while a form has unsaved changes that a polish would undo. */
   disabled?: boolean;
+  /**
+   * The preview pane, on /setup only.
+   *
+   * Pressing Download on a stale resume runs a full editorial pass first — two
+   * model calls, twenty-odd seconds — behind a button that says "Building…".
+   * That half belongs in the pane. The compile after it is a second or two and
+   * stays on the button, which is the right length for a label.
+   */
+  wait?: WaitControl;
 }) {
   const router = useRouter();
   const [state, setState] = useState<'idle' | 'working' | 'error'>('idle');
@@ -54,6 +66,15 @@ export default function DownloadPdf({
     setPolishNote(null);
     try {
       if (polishFirst) {
+        // One list with the PDF on the end of it. Press Download, get twenty
+        // seconds of spell-checking, and the polish reads as something that
+        // wandered in — unless you can see where it is going.
+        wait?.start({
+          title: 'Getting your resume ready.',
+          steps: DOWNLOAD_STEPS,
+          estimate: DOWNLOAD_WHY,
+          scope: 'pane',
+        });
       // A polish rewrites bullets across every entry, so any offer still
       // standing is about text that has just moved underneath it. Taking it
       // away is what stops Undo writing a pre-polish value back over the pass.
@@ -84,6 +105,8 @@ export default function DownloadPdf({
       });
 
       if (!response.ok) {
+        // The wait goes first, or the reason for the failure is behind it.
+        wait?.cancel();
         const body = await response.json().catch(() => null);
         setMessage(body?.error ?? `Something went wrong (${response.status}).`);
         // The server says what is missing; repeating "not finished" without the
@@ -108,8 +131,12 @@ export default function DownloadPdf({
       link.remove();
       URL.revokeObjectURL(url);
 
+      // Finished here, not after the polish: the compile is the last step in the
+      // list the person is looking at.
+      wait?.finish();
       setState('idle');
     } catch {
+      wait?.cancel();
       setMessage('Your internet connection dropped. Please check your connection.');
       setState('error');
     }
