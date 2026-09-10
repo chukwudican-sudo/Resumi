@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { saveSectionContent } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 import SectionHeading from './SectionHeading';
 
 /**
@@ -32,15 +33,39 @@ export default function ProseSection({
   const [draft, setDraft] = useState(text);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const { offer, dismiss } = useUndo();
+
+  /**
+   * What is in the database right now, which is what Undo has to write back.
+   *
+   * Not the `text` prop on its own: that only catches up when the refresh after
+   * a save lands, so saving twice in quick succession would offer the value
+   * from two saves ago — the offer would revert the wrong step and silently
+   * throw away what was just typed. Updated the moment a save goes out, and
+   * re-synced from the prop whenever the server's answer changes.
+   */
+  const stored = useRef(text);
+  useEffect(() => { stored.current = text; }, [text]);
 
   const words = draft.trim() ? draft.trim().split(/\s+/).length : 0;
 
   function save() {
+    const before = stored.current;
+    stored.current = draft;
     startTransition(async () => {
       await saveSectionContent(sectionKey, { text: draft });
       onDirty(false);
       setSaved(true);
       onSaved();
+      offer({
+        message: before.trim() && !draft.trim() ? `${label} cleared.` : `${label} saved.`,
+        undo: async () => {
+          stored.current = before;
+          setDraft(before);
+          await saveSectionContent(sectionKey, { text: before });
+          onSaved();
+        },
+      });
     });
   }
 
@@ -56,6 +81,9 @@ export default function ProseSection({
       <textarea
         value={draft}
         onChange={(e) => {
+          // See SkillsSection.edit: an offer left over from the last save would
+          // revert this typing along with it.
+          dismiss();
           setDraft(e.target.value);
           setSaved(false);
           onDirty(true);

@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { IBM_Plex_Sans, Instrument_Serif } from 'next/font/google';
 import { ClerkProvider } from '@clerk/nextjs';
 import { syncCurrentUser } from './server/auth';
+import UndoProvider from './components/undo/UndoProvider';
+import ConfirmProvider from './components/undo/ConfirmProvider';
 
 /**
  * The two faces the design uses. Loaded through next/font so they are
@@ -52,7 +54,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <ClerkProvider>
       <html lang="en" className={`${sans.variable} ${serif.variable}`}>
         <body>
-          {children}
+          {/*
+            Inside <body> and around everything, so the toast is reachable from
+            every page and survives the router.refresh() each save triggers —
+            that refresh re-renders the tree below, and an offer held by a page
+            component would go with it, taking the undo away half a second
+            after it appeared.
+          */}
+          <UndoProvider>
+            <ConfirmProvider>{children}</ConfirmProvider>
+          </UndoProvider>
         </body>
       </html>
     </ClerkProvider>

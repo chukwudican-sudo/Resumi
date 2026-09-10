@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { renameSection } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 
 /**
  * A section's name, which is the person's to change.
@@ -28,6 +29,7 @@ export default function SectionHeading({
   const [draft, setDraft] = useState(label);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { offer } = useUndo();
   const input = useRef<HTMLInputElement>(null);
 
   // Reset when the section changes under it, and select the whole name on open
@@ -49,11 +51,19 @@ export default function SectionHeading({
       setDraft(label);
       return;
     }
+    const before = label;
     startTransition(async () => {
       try {
         await renameSection(sectionKey, name);
         setEditing(false);
         onRenamed();
+        offer({
+          message: `Renamed to ${name}.`,
+          undo: async () => {
+            await renameSection(sectionKey, before);
+            onRenamed();
+          },
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'That name did not go through.');
       }

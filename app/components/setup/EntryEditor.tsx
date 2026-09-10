@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { saveEntry, type EntryInput } from '../../server/actions';
+import { removeEntry, saveEntry, type EntryInput } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
+import { useConfirm } from '../undo/ConfirmProvider';
 import { isLink } from '../../lib/contactValidation';
 import { CREDENTIALS } from '../../lib/degree';
 import type { DateParts, PlaceParts } from '../../lib/entryFormat';
@@ -161,6 +163,8 @@ export default function EntryEditor({
   const copy = copyFor(kind);
   const [draft, setDraft] = useState(entry);
   const [pending, startTransition] = useTransition();
+  const { offer } = useUndo();
+  const ask = useConfirm();
 
   // The same question the contact form asks of its link fields, so a link is
   // judged the same way wherever it is typed.
@@ -168,18 +172,59 @@ export default function EntryEditor({
   const canSave = draft.title.trim().length > 0 && !urlProblem;
 
   function save() {
+    // The entry as it was when this form opened. For an edit that IS the undo —
+    // saving it again writes the old values back over the new ones. For a new
+    // entry there is nothing to write back, so undoing means removing the row.
+    const before = entry;
     startTransition(async () => {
-      await saveEntry({
+      const id = await saveEntry({
         ...draft,
         kind,
         bullets: draft.bullets.map((b) => b.trim()).filter(Boolean),
       });
       onSaved();
+      const name = draft.title.trim() || 'Entry';
+      offer(
+        before.id
+          ? {
+              message: `${name} saved.`,
+              undo: async () => {
+                await saveEntry({ ...before, kind });
+                onSaved();
+              },
+            }
+          : {
+              message: `${name} added.`,
+              undo: async () => {
+                await removeEntry(id);
+                onSaved();
+              },
+            },
+      );
     });
   }
 
   const setExtra = (key: string, value: string) =>
     setDraft({ ...draft, extra: { ...draft.extra, [key]: value } });
+
+  /**
+   * Taking a bullet out, with a way back.
+   *
+   * A bullet is a sentence somebody wrote and rewrote, and the × sits directly
+   * beside the box holding it. Nothing is saved until Save, which does not help
+   * at all once the words are off the screen.
+   */
+  function removeBullet(i: number) {
+    const line = draft.bullets[i];
+    setDraft({ ...draft, bullets: draft.bullets.filter((_, j) => j !== i) });
+    offer({
+      message: line.trim() ? `${line.trim()} removed.` : 'Empty line removed.',
+      // The one bullet, back at its own position — not the list as it was, which
+      // would discard anything typed into the other boxes since.
+      undo: () =>
+        setDraft((d) => ({ ...d, bullets: [...d.bullets.slice(0, i), line, ...d.bullets.slice(i)] })),
+    });
+  }
 
   return (
     <div>
@@ -319,7 +364,7 @@ export default function EntryEditor({
                 {draft.bullets.length > 1 ? (
                   <button
                     type="button"
-                    onClick={() => setDraft({ ...draft, bullets: draft.bullets.filter((_, j) => j !== i) })}
+                    onClick={() => removeBullet(i)}
                     className="pt-3 text-ink-ghost transition hover:text-flag"
                     aria-label="Remove line"
                   >
@@ -356,7 +401,21 @@ export default function EntryEditor({
       <div className="mt-8 flex items-center justify-between border-t border-rule pt-6">
         <button
           type="button"
-          onClick={onCancel}
+          onClick={async () => {
+            // Cancel sits beside Save and throws away everything typed. Asking
+            // only when something actually changed keeps it out of the way of
+            // opening an entry, looking at it, and closing it again.
+            const changed = JSON.stringify(draft) !== JSON.stringify(entry);
+            if (changed) {
+              const ok = await ask({
+                title: 'Discard these changes?',
+                body: 'Nothing you have typed here has been saved yet.',
+                action: 'Discard',
+              });
+              if (!ok) return;
+            }
+            onCancel();
+          }}
           disabled={pending}
           className="text-sm text-ink-muted transition hover:text-ink disabled:opacity-50"
         >

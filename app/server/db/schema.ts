@@ -75,6 +75,25 @@ export const profiles = pgTable('profiles', {
   strength: integer('strength').notNull().default(0),
   composedAt: timestamp('composed_at', { withTimezone: true }),
   stale: boolean('stale').notNull().default(true),
+  /**
+   * The profile as it stood immediately before the last editorial pass.
+   *
+   * Polish is the one thing here that rewrites words somebody wrote, across
+   * every entry at once, and it can run without being asked for — it fires
+   * automatically when Download is pressed on a stale resume. There is no row
+   * to put back and no cheap reversal: applying its corrections backwards would
+   * turn every "stand-ups" into "standups", including the ones written
+   * correctly in the first place. So the state goes in whole, and comes back
+   * whole.
+   *
+   * Holds entries, facts, sections and the three profile fields the pass
+   * writes. One pass only — the most recent — and it is cleared by the next
+   * edit, because after that it is no longer safe to apply: restoring it would
+   * take the edit with it.
+   */
+  undoSnapshot: jsonb('undo_snapshot'),
+  /** When that snapshot was taken. Null means there is nothing to undo. */
+  undoAt: timestamp('undo_at', { withTimezone: true }),
   updatedAt: updatedAt(),
 }, (t) => ({
   userIdx: uniqueIndex('profiles_user_idx').on(t.userId),

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { polishMasterResume } from '../../server/actions';
+import { polishMasterResume, undoPolish } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 
 /**
  * Hands the editorial decisions to the model, and shows what it decided.
@@ -27,13 +28,41 @@ export default function PolishButton({
     corrections: { from: string; to: string; reason: string }[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { dismiss } = useUndo();
+  /**
+   * Whether this pass can still be taken back.
+   *
+   * 'gone' is the honest answer after an edit: the copy taken before the pass
+   * is thrown away by the next save, because applying it then would delete the
+   * edit along with the polish. Saying so beats a button that quietly does
+   * nothing.
+   */
+  const [undoState, setUndoState] = useState<'ready' | 'undoing' | 'done' | 'gone'>('ready');
+
+  async function revert() {
+    setUndoState('undoing');
+    try {
+      const ok = await undoPolish();
+      setUndoState(ok ? 'done' : 'gone');
+      if (ok) router.refresh();
+    } catch {
+      setUndoState('gone');
+    }
+  }
 
   function run() {
     setError(null);
+    // A polish rewrites bullets across every entry, so any offer still standing
+    // is about text that has just moved underneath it — taking it away is what
+    // stops Undo writing a pre-polish value back over the pass. Undoing the
+    // pass itself is a different mechanism entirely, and it lives in the panel
+    // below: three tables restored at once, not one row put back.
+    dismiss();
     startTransition(async () => {
       try {
         const outcome = await polishMasterResume();
         setResult({ warnings: outcome.warnings, corrections: outcome.corrections });
+        setUndoState('ready');
         router.refresh();
       } catch {
         setError("That didn't go through. Try again in a moment.");
@@ -126,6 +155,36 @@ export default function PolishButton({
           {!result.corrections.length && !result.warnings.length ? (
             <span className="text-[12.5px] text-ink-prose">Nothing to flag — this reads well.</span>
           ) : null}
+
+          {/*
+            The way back, beside the account of what happened.
+
+            Polish is the one thing here that rewrites words somebody wrote, and
+            it can run without being asked — Download triggers it on a stale
+            resume. This panel is already what says what it did, so it is where
+            the offer to take it back belongs. A toast would be wrong: the panel
+            stays until dismissed, and reading sixteen corrections takes longer
+            than ten seconds.
+          */}
+          <div className="mt-4 border-t border-rule pt-3">
+            {undoState === 'done' ? (
+              <span className="text-[12.5px] text-ink-prose">Put back the way it was.</span>
+            ) : undoState === 'gone' ? (
+              <span className="text-[12.5px] leading-snug text-flag-ink">
+                Too late to undo this pass — something has been edited since, and putting the
+                old version back would take that edit with it.
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={revert}
+                disabled={undoState === 'undoing'}
+                className="text-[12.5px] text-accent transition hover:text-accent-hover disabled:text-ink-ghost"
+              >
+                {undoState === 'undoing' ? 'Putting it back…' : 'Undo this pass'}
+              </button>
+            )}
+          </div>
         </div>
       ) : null}
     </div>

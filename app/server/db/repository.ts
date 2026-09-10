@@ -39,6 +39,19 @@ function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, '').slice(0, 22)}`;
 }
 
+/**
+ * Rows as they come out of the database, and as they go back in.
+ *
+ * These are what a delete hands back and what a restore takes: the whole row,
+ * so putting it back is putting the same thing back rather than making a new
+ * one that resembles it.
+ */
+export type ProfileEntryRow = typeof profileEntries.$inferSelect;
+export type RuleRow = typeof rules.$inferSelect;
+export type FactRow = typeof facts.$inferSelect;
+export type ProfileSectionRow = typeof profileSections.$inferSelect;
+
+
 // ── Users ──────────────────────────────────────────────────────────────────
 
 /** Called from the Clerk webhook. Idempotent: Clerk retries deliveries. */
@@ -117,6 +130,24 @@ export async function spendCredit(userId: string): Promise<number | null> {
     .where(and(eq(users.id, userId), sql`${users.credits} > 0`))
     .returning({ credits: users.credits });
   return row?.credits ?? null;
+}
+
+/**
+ * Gives one back, after a generation that produced nothing.
+ *
+ * The spend has to come first — the comment above says why — which means a
+ * failure between the spend and the finished resume has already taken the
+ * credit. Reserve, then release: the same shape as any other atomic hold.
+ *
+ * Capped at the monthly allowance so a refund can never hand out more than a
+ * month is worth, whatever else has gone wrong. Only refund where nothing was
+ * produced; a refund after a saved resume is a free generation.
+ */
+export async function refundCredit(userId: string): Promise<void> {
+  await db
+    .update(users)
+    .set({ credits: sql`least(${users.credits} + 1, ${MONTHLY_CREDITS})` })
+    .where(eq(users.id, userId));
 }
 
 // ── Profile ────────────────────────────────────────────────────────────────
@@ -383,6 +414,12 @@ export async function replaceProfileFromResume(
           strength,
           composedAt: new Date(),
           stale: true,
+          // Whatever the last editorial pass overwrote, it overwrote on a
+          // profile that no longer exists. Offering to restore it here would
+          // put somebody's previous resume back over the one they just
+          // uploaded.
+          undoSnapshot: null,
+          undoAt: null,
           updatedAt: new Date(),
         },
       });
@@ -441,14 +478,17 @@ export async function removeSectionAndEntries(
   userId: string,
   key: string,
   remaining: ResumeSection[],
-): Promise<number> {
-  let removed = 0;
+): Promise<ProfileEntryRow[]> {
+  // Full rows rather than a count, because a count cannot be undone. It also
+  // cannot be a single row and a single section: this rewrites the WHOLE plan,
+  // minting fresh ids for the survivors, so putting the section back means
+  // writing the previous plan again — which the caller holds — alongside these.
+  let removed: ProfileEntryRow[] = [];
   await db.transaction(async (tx) => {
-    const gone = await tx
+    removed = await tx
       .delete(profileEntries)
       .where(and(eq(profileEntries.userId, userId), eq(profileEntries.kind, key)))
-      .returning({ id: profileEntries.id });
-    removed = gone.length;
+      .returning();
 
     await tx.delete(profileSections).where(eq(profileSections.userId, userId));
     const rows = sectionRows(userId, remaining);
@@ -588,8 +628,167 @@ function sectionRows(userId: string, sections: ResumeSection[]) {
     }));
 }
 
+/**
+ * The whole profile as it stands, kept so one editorial pass can be taken back.
+ *
+ * Polish writes across `profile_entries`, `facts` and `profile_sections` at
+ * once, and there is no row to put back afterwards. Reversing its corrections
+ * is not an option either: applying them backwards would turn EVERY
+ * "stand-ups" into "standups", including the ones somebody wrote correctly
+ * themselves. So the state goes in whole and comes back whole.
+ */
+interface PolishSnapshot {
+  entries: ProfileEntryRow[];
+  facts: FactRow[];
+  sections: ProfileSectionRow[];
+  /** The three fields the pass writes on `profiles` itself. */
+  profile: { resumeStructure: unknown; strength: number; stale: boolean };
+}
+
+/**
+ * Taken immediately before the pass applies anything, never before the model
+ * calls — a pass that fails on the call has changed nothing and should leave no
+ * snapshot behind claiming otherwise.
+ */
+export async function snapshotForPolish(userId: string): Promise<void> {
+  const [entryRows, factRows, sectionRowsRead, profile] = await Promise.all([
+    db.select().from(profileEntries).where(eq(profileEntries.userId, userId)),
+    db.select().from(facts).where(eq(facts.userId, userId)),
+    db.select().from(profileSections).where(eq(profileSections.userId, userId)),
+    getProfile(userId),
+  ]);
+
+  const snapshot: PolishSnapshot = {
+    entries: entryRows,
+    facts: factRows,
+    sections: sectionRowsRead,
+    profile: {
+      resumeStructure: profile?.resumeStructure ?? {},
+      strength: profile?.strength ?? 0,
+      stale: profile?.stale ?? true,
+    },
+  };
+
+  await db
+    .update(profiles)
+    .set({ undoSnapshot: snapshot, undoAt: new Date() })
+    .where(eq(profiles.userId, userId));
+}
+
+/**
+ * Puts all of it back, and returns false when there is nothing to put back.
+ *
+ * `stale` is restored along with the rest, and that is not a detail: the resume
+ * was stale before the pass ran, and coming back from an undo still claiming to
+ * be polished would stop the next pass ever running.
+ *
+ * Facts are deleted before entries because they reference them. The other order
+ * is a foreign-key violation that takes the whole transaction with it.
+ */
+export async function restoreFromPolishSnapshot(userId: string): Promise<boolean> {
+  const profile = await getProfile(userId);
+  const snapshot = profile?.undoSnapshot as PolishSnapshot | null;
+  if (!snapshot || !profile?.undoAt) return false;
+
+  await db.transaction(async (tx) => {
+    await tx.delete(facts).where(eq(facts.userId, userId));
+    await tx.delete(profileEntries).where(eq(profileEntries.userId, userId));
+    await tx.delete(profileSections).where(eq(profileSections.userId, userId));
+
+    if (snapshot.entries?.length) {
+      await tx.insert(profileEntries).values(snapshot.entries.map((r) => entryValues(userId, r)));
+    }
+    if (snapshot.facts?.length) {
+      await tx.insert(facts).values(snapshot.facts.map((r) => factValues(userId, r)));
+    }
+    if (snapshot.sections?.length) {
+      await tx.insert(profileSections).values(snapshot.sections.map((r) => sectionValues(userId, r)));
+    }
+
+    await tx
+      .update(profiles)
+      .set({
+        resumeStructure: snapshot.profile?.resumeStructure ?? {},
+        strength: snapshot.profile?.strength ?? 0,
+        stale: snapshot.profile?.stale ?? true,
+        // Spent. A snapshot left behind would let the same pass be undone twice,
+        // the second time over whatever came after it.
+        undoSnapshot: null,
+        undoAt: null,
+      })
+      .where(eq(profiles.userId, userId));
+  });
+
+  return true;
+}
+
+/**
+ * Throws the snapshot away.
+ *
+ * Called after every save, and this is the part that would otherwise cause real
+ * damage: polish, edit five entries, then undo, and without this the five edits
+ * go with it. The snapshot is honest from the pass until the next thing the
+ * person changes, and not one moment longer.
+ */
+export async function clearPolishSnapshot(userId: string): Promise<void> {
+  await db
+    .update(profiles)
+    .set({ undoSnapshot: null, undoAt: null })
+    .where(and(eq(profiles.userId, userId), isNotNull(profiles.undoAt)));
+}
+
+/** Column by column, and the timestamps re-made — see entryValues. */
+function factValues(userId: string, row: FactRow) {
+  return {
+    id: row.id,
+    userId,
+    entryId: row.entryId,
+    category: row.category,
+    text: row.text,
+    hasNumber: row.hasNumber,
+    confidence: row.confidence,
+    source: row.source,
+    sourceTurnId: row.sourceTurnId,
+    status: row.status,
+    createdAt: toDate(row.createdAt) ?? new Date(),
+  };
+}
+
+function sectionValues(userId: string, row: ProfileSectionRow) {
+  return {
+    id: row.id,
+    userId,
+    key: row.key,
+    label: row.label,
+    shape: row.shape,
+    content: row.content,
+    orderIndex: row.orderIndex,
+    createdAt: toDate(row.createdAt) ?? new Date(),
+    updatedAt: toDate(row.updatedAt) ?? new Date(),
+  };
+}
+
+/**
+ * Says the resume no longer matches the rows behind it.
+ *
+ * Also throws away the polish snapshot, in the same statement. Somebody has
+ * changed something, which is exactly the moment the copy taken before the last
+ * pass stops being safe to apply: restoring it now would take the change with
+ * it. Erring towards clearing is deliberate — clearing too eagerly costs an
+ * undo, and clearing too late destroys work.
+ *
+ * **The editorial pass must never route through here.** It writes across the
+ * same tables straight after taking its snapshot, and calling this from inside
+ * it would delete the snapshot it had just taken — leaving a pass that reports
+ * an undo it cannot perform. Nothing on that path does today: it goes through
+ * applyCorrections*, saveSkillGroups, saveSections and saveMasterResume, none
+ * of which touch this.
+ */
 export async function markProfileStale(userId: string) {
-  await db.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
+  await db
+    .update(profiles)
+    .set({ stale: true, undoSnapshot: null, undoAt: null })
+    .where(eq(profiles.userId, userId));
 }
 
 // ── Rules ──────────────────────────────────────────────────────────────────
@@ -641,8 +840,37 @@ export async function setRuleActive(userId: string, ruleId: string, active: bool
     .where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
 }
 
-export async function deleteRule(userId: string, ruleId: string) {
-  await db.delete(rules).where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
+export async function deleteRule(userId: string, ruleId: string): Promise<RuleRow | null> {
+  const [row] = await db
+    .delete(rules)
+    .where(and(eq(rules.userId, userId), eq(rules.id, ruleId)))
+    .returning();
+  return row ?? null;
+}
+
+/**
+ * Puts a deleted rule back where it was in the order.
+ *
+ * `createRule` appends, which for a rule is not a detail: the prompt reads them
+ * in sequence, so restoring one to the bottom silently reprioritises the rest.
+ * The row already carries its `orderIndex`, so it goes back into its own place.
+ */
+export async function restoreRule(userId: string, row: RuleRow): Promise<boolean> {
+  const inserted = await db
+    .insert(rules)
+    .values({
+      id: row.id,
+      userId,
+      text: row.text,
+      active: row.active,
+      orderIndex: row.orderIndex,
+      source: row.source,
+      createdAt: toDate(row.createdAt) ?? new Date(),
+      updatedAt: toDate(row.updatedAt) ?? new Date(),
+    })
+    .onConflictDoNothing()
+    .returning({ id: rules.id });
+  return inserted.length > 0;
 }
 
 /**
@@ -919,11 +1147,87 @@ export async function applyCorrectionsToSkillFacts(
   return changed;
 }
 
-export async function deleteEntry(userId: string, entryId: string) {
-  await db
+/**
+ * Deletes an entry and hands back the row, so it can be offered back.
+ *
+ * The row is the whole point of the return value. Without it a mistaken delete
+ * left nothing at all — working out which job had gone meant reading timestamps
+ * in the database, and putting it back meant retyping it.
+ */
+export async function deleteEntry(
+  userId: string,
+  entryId: string,
+): Promise<ProfileEntryRow | null> {
+  const [row] = await db
     .delete(profileEntries)
-    .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, entryId)));
+    .where(and(eq(profileEntries.userId, userId), eq(profileEntries.id, entryId)))
+    .returning();
+  if (!row) return null;
   await markProfileStale(userId);
+  return row;
+}
+
+/**
+ * Puts deleted entries back exactly as they were.
+ *
+ * Deliberately not routed through `upsertEntry`, which is the obvious-looking
+ * shortcut and the wrong one: that path mints a fresh id, forces
+ * `source: 'manual'` and appends to the end of the section. An undone entry
+ * would come back as a different thing, in a different place — the person
+ * pressed Undo, so the correct outcome is the row that was there.
+ *
+ * `userId` is the server's, never the row's: these rows have been out to the
+ * browser and back, so the id in one is a request rather than proof.
+ *
+ * onConflictDoNothing makes a second call harmless. A double-fired restore
+ * would otherwise be a duplicate insert, and an id that belongs to somebody
+ * else quietly does nothing instead of anything worse.
+ */
+export async function restoreEntries(userId: string, rows: ProfileEntryRow[]): Promise<number> {
+  if (!rows.length) return 0;
+  const inserted = await db
+    .insert(profileEntries)
+    .values(rows.map((row) => entryValues(userId, row)))
+    .onConflictDoNothing()
+    .returning({ id: profileEntries.id });
+  if (inserted.length) await markProfileStale(userId);
+  return inserted.length;
+}
+
+/**
+ * The row, column by column.
+ *
+ * Spreading it would be shorter and wrong twice over: an extra key the client
+ * invented becomes an unknown column and takes the insert down, and a timestamp
+ * that arrived as a string rather than a Date is exactly the mismatch a type
+ * annotation cannot catch — the type claims Date, the wire delivers a string.
+ */
+function entryValues(userId: string, row: ProfileEntryRow) {
+  return {
+    id: row.id,
+    userId,
+    kind: row.kind,
+    title: row.title,
+    org: row.org,
+    city: row.city,
+    region: row.region,
+    country: row.country,
+    location: row.location,
+    startMonth: row.startMonth,
+    startYear: row.startYear,
+    endMonth: row.endMonth,
+    endYear: row.endYear,
+    isCurrent: row.isCurrent,
+    datesDisplay: row.datesDisplay,
+    url: row.url,
+    extra: row.extra,
+    orderIndex: row.orderIndex,
+    bullets: row.bullets,
+    tech: row.tech,
+    source: row.source,
+    createdAt: toDate(row.createdAt) ?? new Date(),
+    updatedAt: toDate(row.updatedAt) ?? new Date(),
+  };
 }
 
 /** Replaces the skills block. Grouped as `Category: items`. */
@@ -1012,7 +1316,12 @@ export async function addFactsFromAnswers(
   // Every other fact writer in this file does this and this one did not, so an
   // answer given to the strengthen questions never triggered a rebuild — the
   // rows landed and the resume carried on as though nothing had been said.
-  await db.update(profiles).set({ stale: true }).where(eq(profiles.userId, userId));
+  //
+  // Through markProfileStale rather than its own update, so it also expires the
+  // polish snapshot. Answering a strengthen question adds facts; undoing a
+  // polish replaces every fact from the copy; the two together would delete the
+  // answers somebody had just given.
+  await markProfileStale(userId);
 }
 
 // ── Interview ──────────────────────────────────────────────────────────────
@@ -1113,6 +1422,15 @@ export async function saveInterviewTurn(
           source: 'interview' as const, sourceTurnId: f.sourceTurnId,
         })),
       );
+
+      // Undoing a polish puts every fact back from the copy, so a copy older
+      // than these answers would delete them. Only the snapshot goes — `stale`
+      // is left alone, because whether an interview should trigger a rebuild is
+      // a separate question this is not the place to answer.
+      await tx
+        .update(profiles)
+        .set({ undoSnapshot: null, undoAt: null })
+        .where(eq(profiles.userId, userId));
     }
 
     await tx

@@ -15,6 +15,7 @@ import {
   ensureSections,
   saveMasterResume,
   saveSections,
+  snapshotForPolish,
 } from './db/repository';
 
 /**
@@ -64,6 +65,14 @@ export async function runPolish(
       items: g.items.map((item) => correctText(item, polish.corrections)).join(', '),
     }))
     .filter((g) => g.items.trim());
+
+  // Here, and not a line earlier.
+  //
+  // Everything above is model calls, which change nothing — a pass that fails
+  // there must not leave a snapshot behind implying it ran. Everything below
+  // writes. This is the last moment the profile is still the one the person
+  // had, so this is where the copy is taken.
+  await snapshotForPolish(userId);
 
   await Promise.all([
     applyCorrectionsToEntries(userId, polish.corrections),

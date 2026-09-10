@@ -27,7 +27,8 @@
       "Bash(node smoke6_new_features.js)",
       "Bash(node -e ' *)",
       "Bash(node debug_popup.js)",
-      "Bash(node smoke7_full_e2e.js)"
+      "Bash(node smoke7_full_e2e.js)",
+      "Bash(echo \"--- exit: $? ---\")"
     ]
   }
 }

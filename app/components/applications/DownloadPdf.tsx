@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { polishMasterResume } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 
 /**
  * Gets the PDF onto someone's machine.
@@ -39,6 +40,7 @@ export default function DownloadPdf({
   const [message, setMessage] = useState<string | null>(null);
   const [blocking, setBlocking] = useState<{ message: string }[]>([]);
   const [polishNote, setPolishNote] = useState<string | null>(null);
+  const { dismiss } = useUndo();
 
   async function download() {
     setState('working');
@@ -47,6 +49,15 @@ export default function DownloadPdf({
     setPolishNote(null);
     try {
       if (polishFirst) {
+      // A polish rewrites bullets across every entry, so any offer still
+      // standing is about text that has just moved underneath it. Taking it
+      // away is what stops Undo writing a pre-polish value back over the pass.
+      //
+      // The pass still records what it overwrote, and undoing it lives on the
+      // Polish button rather than here: offering to unpick an edit from the
+      // button that just handed over a PDF made from it would be a question
+      // about the wrong thing at the wrong moment.
+        dismiss();
         const outcome = await polishMasterResume();
         const parts = [
           outcome.corrections.length

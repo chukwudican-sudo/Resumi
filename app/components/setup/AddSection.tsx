@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { addSection } from '../../server/actions';
+import { addSection, removeSection } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 import { ADDABLE, LAYOUTS, keyFor } from '../../lib/sections';
 import type { SectionShape } from '../../lib/types';
 
@@ -23,12 +24,19 @@ export default function AddSection({
   taken,
   disabled,
   onAdded,
+  onUndone,
 }: {
   /** Keys already on this resume, so the list only offers what is missing. */
   taken: Set<string>;
   /** Held shut while a form has unsaved changes — adding refreshes the page. */
   disabled: boolean;
   onAdded: (key: string) => void;
+  /**
+   * Taking the new section away again, which is not the same gesture as adding
+   * one: the screen is sitting on the section that just stopped existing, so it
+   * has to move somewhere as well as refresh.
+   */
+  onUndone: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [naming, setNaming] = useState(false);
@@ -36,6 +44,7 @@ export default function AddSection({
   const [shape, setShape] = useState<SectionShape>('entries');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { offer } = useUndo();
   const panel = useRef<HTMLDivElement>(null);
 
   // Resolved through keyFor, not by slugging the label here. A second way of
@@ -87,6 +96,16 @@ export default function AddSection({
         const key = await addSection(name, withShape);
         close();
         onAdded(key);
+        offer({
+          // Removing it again is the undo, and it is safe to offer without a
+          // confirmation: the section was made a second ago, so there is
+          // nothing filed under it yet for the count to warn about.
+          message: `${name.trim()} added.`,
+          undo: async () => {
+            await removeSection(key);
+            onUndone();
+          },
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'That did not go through.');
       }

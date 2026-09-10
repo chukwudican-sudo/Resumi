@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { saveSectionContent } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 import SectionHeading from './SectionHeading';
 
 /**
@@ -28,21 +29,68 @@ export default function ListSection({
   const [rows, setRows] = useState<string[]>(items.length ? items : ['']);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const { offer, dismiss } = useUndo();
+
+  // The list as the database holds it. See ProseSection for why this is a ref
+  // and not the prop: the prop lags a save by one refresh, and an offer built
+  // from a lagging value reverts two steps instead of one.
+  //
+  // Compared by VALUE, not by identity. `items` is built fresh on every render
+  // of the page above, so a dependency on the array itself would re-run this on
+  // every keystroke — putting the pre-save value back into the ref moments
+  // after the save had moved it on, which is the two-step revert all over again.
+  const stored = useRef(items);
+  const itemsKey = JSON.stringify(items);
+  useEffect(() => { stored.current = items; }, [itemsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wrapped rather than reported at each call site: there are four ways to edit
   // this list, and remembering at each of them is how one gets missed.
   const edit = (next: string[]) => {
+    // Typing makes the offer above stale — "Skills saved · Undo" standing while
+    // new words go in would revert the save AND throw the new words away. One
+    // offer, and it belongs to the last thing that happened.
+    dismiss();
     setSaved(false);
     onDirty(true);
     setRows(next);
   };
 
+  // `edit` without the dismiss — see SkillsSection.
+  const editWith = (fn: (prev: string[]) => string[]) => {
+    setSaved(false);
+    onDirty(true);
+    setRows(fn);
+  };
+
+  // Same as SkillsSection: the line only leaves the form until Save, but a line
+  // deleted by accident is still a line you have to remember and retype. And
+  // the one line goes back, not the whole list — see SkillsSection.removeRow.
+  function removeRow(i: number) {
+    const line = rows[i];
+    edit(rows.filter((_, j) => j !== i));
+    offer({
+      message: line.trim() ? `${line.trim()} removed.` : 'Empty line removed.',
+      undo: () => editWith((prev) => [...prev.slice(0, i), line, ...prev.slice(i)]),
+    });
+  }
+
   function save() {
+    const before = stored.current;
+    stored.current = rows;
     startTransition(async () => {
       await saveSectionContent(sectionKey, { items: rows });
       onDirty(false);
       setSaved(true);
       onSaved();
+      offer({
+        message: `${label} saved.`,
+        undo: async () => {
+          stored.current = before;
+          setRows(before.length ? before : ['']);
+          await saveSectionContent(sectionKey, { items: before });
+          onSaved();
+        },
+      });
     });
   }
 
@@ -65,7 +113,7 @@ export default function ListSection({
             />
             <button
               type="button"
-              onClick={() => edit(rows.filter((_, j) => j !== i))}
+              onClick={() => removeRow(i)}
               aria-label={`Remove line ${i + 1}`}
               className="shrink-0 rounded p-2 text-ink-faint transition hover:bg-ground-panel hover:text-ink"
             >

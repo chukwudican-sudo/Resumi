@@ -1,16 +1,21 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { removeSection } from '../../server/actions';
+import { removeSection, restoreSection } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
+import { useConfirm } from '../undo/ConfirmProvider';
 
 /**
  * Getting rid of a section, and everything in it.
  *
- * Armed before it fires, and it says how much goes — the same shape of
- * confirmation deleting a single entry gets, for the same reason: the delete is
- * a hard delete, so afterwards there is nothing to say the section ever
- * existed. Somebody removed an entry that way while testing once and neither
- * they nor the database could tell later that it had happened.
+ * Asks first, like every other delete now does, and the question carries the
+ * one fact this screen cannot show: how many entries go with it. They are filed
+ * under the section rather than displayed on it, so "3 entries go with it" is
+ * not something you could have worked out by looking.
+ *
+ * It used to arm itself inline instead — a row of small words appearing where
+ * the button was. That was a second pattern for the same job, and the app ended
+ * up with two of those and two deletes with no question at all.
  *
  * Sits under whichever editor is open rather than inside each of the five, so
  * the editors know nothing about it.
@@ -27,17 +32,40 @@ export default function RemoveSection({
   entries: number;
   onRemoved: () => void;
 }) {
-  const [armed, setArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { offer } = useUndo();
+  const ask = useConfirm();
 
-  function remove() {
+  async function remove() {
+    const confirmed = await ask({
+      title: `Remove ${label}?`,
+      body:
+        entries > 0
+          ? `${entries} ${entries === 1 ? 'entry goes' : 'entries go'} with it.`
+          : 'The section comes off your resume.',
+      action: 'Remove',
+    });
+    if (!confirmed) return;
+
     setError(null);
     startTransition(async () => {
       try {
-        await removeSection(sectionKey);
-        setArmed(false);
+        const gone = await removeSection(sectionKey);
         onRemoved();
+        offer({
+          message:
+            gone.count > 0
+              ? `${label} removed, with ${gone.count} ${gone.count === 1 ? 'entry' : 'entries'}.`
+              : `${label} removed.`,
+          // The whole previous plan, not the one section. Removing a section
+          // re-inserts every survivor with a fresh id, so putting one row back
+          // would leave the rest of the plan holding ids nobody has.
+          undo: async () => {
+            await restoreSection(gone.previous, gone.entries);
+            onRemoved();
+          },
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'That did not go through.');
       }
@@ -46,37 +74,14 @@ export default function RemoveSection({
 
   return (
     <div className="mt-10 border-t border-rule pt-5">
-      {armed ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-[13px] text-flag-ink">
-            Remove {label} for good?
-            {entries > 0 ? ` ${entries} ${entries === 1 ? 'entry goes' : 'entries go'} with it.` : ''}
-          </span>
-          <button
-            type="button"
-            onClick={remove}
-            disabled={pending}
-            className="text-[13px] font-medium text-flag transition hover:text-flag-ink disabled:opacity-50"
-          >
-            {pending ? 'Removing…' : 'Yes, remove'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setArmed(false)}
-            className="text-[13px] text-ink-muted transition hover:text-ink"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setArmed(true)}
-          className="text-[13px] text-ink-faint transition hover:text-flag"
-        >
-          Remove this section
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={remove}
+        disabled={pending}
+        className="text-[13px] text-ink-faint transition hover:text-flag disabled:opacity-50"
+      >
+        {pending ? 'Removing…' : 'Remove this section'}
+      </button>
       {error ? <p className="mt-2 text-[12.5px] text-flag">{error}</p> : null}
     </div>
   );

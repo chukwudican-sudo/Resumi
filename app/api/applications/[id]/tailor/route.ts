@@ -13,6 +13,7 @@ import {
   getApplication,
   getProfile,
   getSupportingFacts,
+  refundCredit,
   saveResume,
   spendCredit,
 } from '../../../../server/db/repository';
@@ -71,50 +72,54 @@ export async function POST(_request: Request, { params }: { params: { id: string
     );
   }
 
-  // Polished after the gate, not before it.
-  //
-  // Tailoring reads the master resume, so it should read the good version of
-  // it — feeding the model "Uses Python for backend algorithm work" as a skill
-  // wastes the call it is about to make. But this runs the editorial pass,
-  // which is two model calls of its own, and it used to run before anybody
-  // checked whether there was a credit to spend. So somebody at zero paid
-  // about three cents for a polish on every attempt and was then refused.
-  const polished = await polishIfStale(userId);
-  const structure = ((await getProfile(userId))?.resumeStructure ?? profileStructure) as ResumeStructure;
-
-  const posting = record.posting;
-
-  // Things they have told us that never made it onto the page. Offered as
-  // material the tailor may use, never as licence to invent: each line is
-  // something the person said in their own words, so working one in is
-  // reporting rather than embellishing.
-  const said = supporting.length
-    ? [
-        'Also true of this person, in their own words, from questions they have answered. These are NOT yet on the resume. Use any that the posting makes relevant — worked into an existing entry rather than added as a new one — and ignore the rest. They are the only other thing you may draw on, and you may not extrapolate beyond what each one says:',
-        supporting.map((f) => `- ${f.text}`).join('\n'),
-      ].join('\n')
-    : null;
-
-  const content = [
-    {
-      type: 'text' as const,
-      text: [
-        'Their profile — the Resume Structure to edit. This is the resume of record; keep the same entries, dates, and section identities, and rewrite freely within them:',
-        '```json',
-        JSON.stringify(structure, null, 2),
-        '```',
-        said,
-        `Job posting — Company: ${posting?.company ?? '(not provided)'}, Role: ${posting?.role ?? '(not provided)'}\n${posting?.description ?? '(no description)'}`,
-        said
-          ? 'Produce the tailored resume now via submit_tailored_resume. The structure and the lines above it are your only sources for what this person has done — tailor within them and invent nothing to fill gaps.'
-          : 'Produce the tailored resume now via submit_tailored_resume. The structure above is your only source for what this person has done, so tailor within it and invent nothing to fill gaps.',
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
-    },
-  ];
-
+  // Everything after the spend is inside the try, so there is no path that takes
+  // a credit and leaves without either a resume or a refund. The editorial pass
+  // below swallows its own failures, but the reads around it do not, and the
+  // rule is easier to keep than to check line by line.
   try {
+    // Polished after the gate, not before it.
+    //
+    // Tailoring reads the master resume, so it should read the good version of
+    // it — feeding the model "Uses Python for backend algorithm work" as a skill
+    // wastes the call it is about to make. But this runs the editorial pass,
+    // which is two model calls of its own, and it used to run before anybody
+    // checked whether there was a credit to spend. So somebody at zero paid
+    // about three cents for a polish on every attempt and was then refused.
+    const polished = await polishIfStale(userId);
+    const structure = ((await getProfile(userId))?.resumeStructure ?? profileStructure) as ResumeStructure;
+
+    const posting = record.posting;
+
+    // Things they have told us that never made it onto the page. Offered as
+    // material the tailor may use, never as licence to invent: each line is
+    // something the person said in their own words, so working one in is
+    // reporting rather than embellishing.
+    const said = supporting.length
+      ? [
+          'Also true of this person, in their own words, from questions they have answered. These are NOT yet on the resume. Use any that the posting makes relevant — worked into an existing entry rather than added as a new one — and ignore the rest. They are the only other thing you may draw on, and you may not extrapolate beyond what each one says:',
+          supporting.map((f) => `- ${f.text}`).join('\n'),
+        ].join('\n')
+      : null;
+
+    const content = [
+      {
+        type: 'text' as const,
+        text: [
+          'Their profile — the Resume Structure to edit. This is the resume of record; keep the same entries, dates, and section identities, and rewrite freely within them:',
+          '```json',
+          JSON.stringify(structure, null, 2),
+          '```',
+          said,
+          `Job posting — Company: ${posting?.company ?? '(not provided)'}, Role: ${posting?.role ?? '(not provided)'}\n${posting?.description ?? '(no description)'}`,
+          said
+            ? 'Produce the tailored resume now via submit_tailored_resume. The structure and the lines above it are your only sources for what this person has done — tailor within them and invent nothing to fill gaps.'
+            : 'Produce the tailored resume now via submit_tailored_resume. The structure above is your only source for what this person has done, so tailor within it and invent nothing to fill gaps.',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+      },
+    ];
+
     const { toolInput } = await callClaude<TailorResult>({
       userId,
       kind: 'tailor',
@@ -174,6 +179,13 @@ export async function POST(_request: Request, { params }: { params: { id: string
       polished: polished ? { corrections: polished.corrections, warnings: polished.warnings } : null,
     });
   } catch (error) {
+    // Nothing was produced, so the credit goes back.
+    //
+    // Every failure below lands here, and `saveResume` is the last thing before
+    // the success return — so reaching this catch means there is no tailored
+    // resume anywhere. Charging for that is charging for an outage.
+    await refundCredit(userId);
+
     const refused = capacityResponse(error);
     if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {

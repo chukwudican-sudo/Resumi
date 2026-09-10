@@ -22,8 +22,14 @@ import {
   ensureSections,
   listSections,
   removeSectionAndEntries,
+  clearPolishSnapshot,
+  restoreEntries,
+  restoreFromPolishSnapshot,
+  restoreRule as restoreRuleRow,
   saveSections,
   updateSectionContent,
+  type ProfileEntryRow,
+  type RuleRow,
 } from './db/repository';
 import { buildResume, entryFromRow, type EntryWithBullets } from '../lib/buildResume';
 import type { ResumeStructure } from '../lib/types';
@@ -41,7 +47,7 @@ import {
   withSectionRemoved,
   withSectionRenamed,
 } from '../lib/sections';
-import type { SectionShape } from '../lib/types';
+import type { ResumeSection, SectionShape } from '../lib/types';
 
 /**
  * Mutations the UI can call directly.
@@ -126,6 +132,17 @@ async function refreshMasterResume(userId: string) {
 
   const structure = buildResume(entries, factRows, plan);
   await saveMasterResume(userId, structure, profileStrength(structure));
+
+  // The polish snapshot expires here, and this is the line that stops it doing
+  // damage. Every save in the app comes through this function, so "until the
+  // next edit" is enforced in one place rather than remembered at fifteen. Undo
+  // a polish after editing five entries and, without this, the five edits go
+  // with it.
+  //
+  // After the write, not before: a failure above leaves both the resume and the
+  // snapshot as they were rather than throwing away the way back for a save
+  // that never happened.
+  await clearPolishSnapshot(userId);
   return structure;
 }
 
@@ -155,7 +172,7 @@ export interface EntryInput {
   extra: Record<string, string>;
 }
 
-export async function saveEntry(entry: EntryInput) {
+export async function saveEntry(entry: EntryInput): Promise<string> {
   const userId = await requireUserId();
 
   // Still a whitelist, just no longer a constant one. Anything outside the
@@ -169,16 +186,65 @@ export async function saveEntry(entry: EntryInput) {
   ]);
   if (!allowed.has(entry.kind)) throw new Error(`Unknown entry kind: ${entry.kind}`);
 
-  await upsertEntryRow(userId, entry);
+  const id = await upsertEntryRow(userId, entry);
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
+  // Returned so a newly added entry can be taken back out: undoing an edit
+  // writes the old values, but undoing an ADD means removing a row that did
+  // not exist a moment ago, and that needs its id.
+  return id;
+}
+
+/**
+ * Deletes an entry and returns the row, so the screen can offer it back.
+ *
+ * No confirmation in front of this any more. It used to arm itself and ask
+ * "Remove for good?", which was a speed bump rather than information — one
+ * visible thing is going and the person is looking at it. Undo is the real
+ * protection, and the row coming back from here is what makes it possible.
+ */
+export async function removeEntry(entryId: string): Promise<ProfileEntryRow | null> {
+  const userId = await requireUserId();
+  const removed = await deleteEntryRow(userId, entryId);
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
+  return removed;
+}
+
+/**
+ * Puts a deleted entry back, in its own section and its own position.
+ *
+ * The row came from the browser, so it is a request and not proof: it gets the
+ * same `kind` whitelist `saveEntry` has. Without it an entry can be filed under
+ * a section that does not exist, where nothing renders it and nothing in the
+ * rail can reach it — invisible, and unreachable afterwards.
+ */
+export async function restoreEntry(row: ProfileEntryRow): Promise<void> {
+  const userId = await requireUserId();
+  await restoreEntriesFor(userId, [row]);
   await refreshMasterResume(userId);
   revalidatePath('/setup');
 }
 
-export async function removeEntry(entryId: string) {
-  const userId = await requireUserId();
-  await deleteEntryRow(userId, entryId);
-  await refreshMasterResume(userId);
-  revalidatePath('/setup');
+/** The whitelist and the insert, shared by restoring one entry and a section's worth. */
+async function restoreEntriesFor(userId: string, rows: ProfileEntryRow[]) {
+  if (!rows.length) return;
+  const allowed = new Set([
+    'experience',
+    'education',
+    'project',
+    ...(await listSections(userId)).map((s) => entryKindFor(s.key)),
+  ]);
+  const keep = rows.filter((row) => allowed.has(row.kind));
+  // Logged rather than passed over in silence. If this ever fires, somebody
+  // pressed Undo and got less back than they asked for, and the only way to
+  // find out otherwise would be noticing an entry missing days later.
+  if (keep.length !== rows.length) {
+    console.error(
+      `[Resumi] Refused to restore ${rows.length - keep.length} entr(ies): no section to file them under.`,
+    );
+  }
+  await restoreEntries(userId, keep);
 }
 
 export async function saveSkills(groups: { category: string; items: string }[]) {
@@ -297,11 +363,21 @@ export async function renameSection(key: string, label: string): Promise<void> {
 /**
  * Removes a section, and everything filed under it.
  *
- * Destructive and irreversible, so the screen arms it first and says how many
- * entries go with it — the same shape of confirmation deleting a single entry
- * already gets, for the same reason: there is no undo and no trace afterwards.
+ * The one delete the screen still arms first, and the count is why: the entries
+ * going with it are not visible from the section being removed, so "3 entries go
+ * with it" is a fact nothing else on the page can tell you. Deleting a single
+ * entry no longer asks, because there it is the thing being looked at.
+ *
+ * Everything needed to put it back comes out in the return value.
  */
-export async function removeSection(key: string): Promise<number> {
+export async function removeSection(key: string): Promise<{
+  /** How many entries went with it. What the confirmation counted. */
+  count: number;
+  /** Those entries, whole, so they can come back. */
+  entries: ProfileEntryRow[];
+  /** The plan as it was. Restoring needs this, not the one section — see below. */
+  previous: ResumeSection[];
+}> {
   const userId = await requireUserId();
 
   // The four the conventional fallback restores. Removing one would be a button
@@ -311,10 +387,35 @@ export async function removeSection(key: string): Promise<number> {
   const sections = await listSections(userId);
   if (!sections.some((s) => s.key === key)) throw new Error(`No such section: ${key}`);
 
-  const removed = await removeSectionAndEntries(userId, key, withSectionRemoved(sections, key));
+  const entries = await removeSectionAndEntries(userId, key, withSectionRemoved(sections, key));
   await refreshMasterResume(userId);
   revalidatePath('/setup');
-  return removed;
+  return { count: entries.length, entries, previous: sections };
+}
+
+/**
+ * Puts a removed section back, with everything that was filed under it.
+ *
+ * Takes the whole previous plan rather than the one section, because removing a
+ * section rewrites every row: the survivors are re-inserted with fresh ids. Put
+ * the single section back on its own and the rest of the plan is left carrying
+ * ids nobody holds — so the plan that existed before goes back wholesale, which
+ * is what `saveSections` already does.
+ *
+ * Sections first, then the entries: the entry whitelist checks against sections
+ * that exist, so restoring in the other order drops every entry it just saved.
+ */
+export async function restoreSection(
+  previous: ResumeSection[],
+  entries: ProfileEntryRow[],
+): Promise<void> {
+  const userId = await requireUserId();
+  if (!previous.length) throw new Error('Nothing to restore.');
+
+  await saveSections(userId, previous);
+  await restoreEntriesFor(userId, entries);
+  await refreshMasterResume(userId);
+  revalidatePath('/setup');
 }
 
 /**
@@ -361,12 +462,14 @@ export async function saveContactAndRefresh(details: {
  * look at.
  */
 
-export async function addRule(text: string) {
+/** Returns the new rule's id, which is what makes adding one undoable. */
+export async function addRule(text: string): Promise<string | null> {
   const userId = await requireUserId();
   const trimmed = text.trim();
-  if (!trimmed) return;
-  await createRuleRow(userId, trimmed.slice(0, RULE_MAX_LENGTH));
+  if (!trimmed) return null;
+  const id = await createRuleRow(userId, trimmed.slice(0, RULE_MAX_LENGTH));
   revalidatePath('/rules');
+  return id;
 }
 
 export async function editRule(ruleId: string, text: string) {
@@ -383,9 +486,17 @@ export async function toggleRule(ruleId: string, active: boolean) {
   revalidatePath('/rules');
 }
 
-export async function removeRule(ruleId: string) {
+export async function removeRule(ruleId: string): Promise<RuleRow | null> {
   const userId = await requireUserId();
-  await deleteRuleRow(userId, ruleId);
+  const removed = await deleteRuleRow(userId, ruleId);
+  revalidatePath('/rules');
+  return removed;
+}
+
+/** Puts a deleted rule back at its own position in the order. */
+export async function restoreRule(row: RuleRow): Promise<void> {
+  const userId = await requireUserId();
+  await restoreRuleRow(userId, row);
   revalidatePath('/rules');
 }
 
@@ -397,6 +508,22 @@ export async function reorderRules(orderedIds: string[]) {
 
 
 // ── Polish ─────────────────────────────────────────────────────────────────
+
+/**
+ * Puts the profile back as it was before the last editorial pass.
+ *
+ * Returns false when there is nothing to undo, which is not an error and has to
+ * be said out loud rather than silently doing nothing: the snapshot is thrown
+ * away by the next edit, so "I polished, then changed something, then pressed
+ * Undo" is a real sequence and the honest answer is that it is too late. The
+ * alternative — applying it anyway — would delete the change.
+ */
+export async function undoPolish(): Promise<boolean> {
+  const userId = await requireUserId();
+  const restored = await restoreFromPolishSnapshot(userId);
+  if (restored) revalidatePath('/setup');
+  return restored;
+}
 
 /**
  * Runs the editorial pass over the master resume.

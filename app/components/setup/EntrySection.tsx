@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { removeEntry } from '../../server/actions';
+import { removeEntry, restoreEntry } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
+import { useConfirm } from '../undo/ConfirmProvider';
 import { formatDates, formatPlace } from '../../lib/entryFormat';
 import { SCORED_KINDS, hasQuantity } from '../../lib/profileStrength';
 import { inPrintOrder, type EntryWithBullets } from '../../lib/buildResume';
@@ -80,21 +82,8 @@ export default function EntrySection({
   const mine = inPrintOrder(entries.filter((e) => e.kind === kind));
   const [editing, setEditing] = useState<EditableEntry | null>(null);
   const [pending, startTransition] = useTransition();
-
-  /**
-   * Which entry has been asked about, before it is actually removed.
-   *
-   * Removing was one click, with no confirmation, no undo and no record — the
-   * delete is a hard delete, so afterwards there is nothing to say a job ever
-   * existed. Somebody removed one while testing and neither they nor the
-   * database could tell later that it had happened; working out where the job
-   * went took reading timestamps.
-   *
-   * Arming rather than a browser confirm(), which is a modal nobody reads and
-   * looks nothing like the rest of this page. One at a time, so the armed
-   * button is always the one being looked at.
-   */
-  const [arming, setArming] = useState<string | null>(null);
+  const { offer } = useUndo();
+  const ask = useConfirm();
 
   function open(entry?: EntryWithBullets) {
     onDirty(true);
@@ -128,10 +117,40 @@ export default function EntrySection({
     });
   }
 
-  function remove(id: string) {
+  /**
+   * Asks first, removes, then offers it back.
+   *
+   * Both, and they are not the same protection. Remove sits an inch from Edit
+   * on every card, and it gets hit by accident — the dialog is what stops that
+   * misclick becoming a delete at all. Undo is for the deliberate press you
+   * regret a second later, which the dialog cannot help with because you meant
+   * it at the time.
+   *
+   * Worth having because the delete is a hard delete: once it happened there
+   * was no trace a job had ever existed. Somebody removed one while testing and
+   * neither they nor the database could say so afterwards; working out where it
+   * went took reading timestamps.
+   */
+  async function remove(entry: EntryWithBullets) {
+    const name = entry.title?.trim();
+    const confirmed = await ask({
+      title: `Remove ${name || 'this entry'}?`,
+      body: 'It comes off your resume straight away.',
+      action: 'Remove',
+    });
+    if (!confirmed) return;
+
     startTransition(async () => {
-      await removeEntry(id);
+      const removed = await removeEntry(entry.id);
       onChange();
+      if (!removed) return;
+      offer({
+        message: `${entry.title?.trim() || 'Entry'} removed.`,
+        undo: async () => {
+          await restoreEntry(removed);
+          onChange();
+        },
+      });
     });
   }
 
@@ -209,40 +228,17 @@ export default function EntrySection({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  {arming === entry.id ? (
-                    <>
-                      <span className="text-[13px] text-flag-ink">Remove for good?</span>
-                      <button
-                        type="button"
-                        onClick={() => { setArming(null); remove(entry.id); }}
-                        disabled={pending}
-                        className="text-[13px] font-medium text-flag transition hover:text-flag-ink disabled:opacity-50"
-                      >
-                        {pending ? 'Removing…' : 'Yes, remove'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setArming(null)}
-                        className="text-[13px] text-ink-muted transition hover:text-ink"
-                      >
-                        Keep
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => open(entry)} className="text-[13px] text-accent transition hover:text-accent-hover">
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setArming(entry.id)}
-                        disabled={pending}
-                        className="text-[13px] text-ink-faint transition hover:text-flag disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </>
-                  )}
+                  <button type="button" onClick={() => open(entry)} className="text-[13px] text-accent transition hover:text-accent-hover">
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(entry)}
+                    disabled={pending}
+                    className="text-[13px] text-ink-faint transition hover:text-flag disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
 

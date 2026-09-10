@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { addRule, editRule, removeRule, reorderRules, toggleRule } from '../../server/actions';
+import {
+  addRule,
+  editRule,
+  removeRule,
+  reorderRules,
+  restoreRule,
+  toggleRule,
+} from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
+import { useConfirm } from '../undo/ConfirmProvider';
 import { RULE_MAX_LENGTH } from '../../lib/rules';
 
 export interface Rule {
@@ -32,6 +41,8 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [pending, startTransition] = useTransition();
+  const { offer, dismiss } = useUndo();
+  const ask = useConfirm();
 
   const rules = initialRules;
   const activeCount = rules.filter((r) => r.active).length;
@@ -40,14 +51,20 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    startTransition(() => addRule(text));
+    startTransition(async () => {
+      const id = await addRule(text);
+      if (id) offer({ message: 'Rule added.', undo: () => removeRule(id) });
+    });
   }
 
   function move(index: number, direction: -1 | 1) {
     const next = [...rules];
     const target = index + direction;
     if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target], next[index]];
+    // Reordering offers nothing — moving it back is the undo — but it still has
+    // to take away an offer standing from the last change. An offer that
+    // outlives the change it belongs to reverts the wrong step.
+    dismiss();
     startTransition(() => reorderRules(next.map((r) => r.id)));
   }
 
@@ -137,8 +154,15 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
                         type="button"
                         onClick={() => {
                           const text = editingText;
+                          const before = rule.text;
                           setEditingId(null);
-                          startTransition(() => editRule(rule.id, text));
+                          startTransition(async () => {
+                            await editRule(rule.id, text);
+                            offer({
+                              message: 'Rule updated.',
+                              undo: () => editRule(rule.id, before),
+                            });
+                          });
                         }}
                         disabled={!editingText.trim()}
                         className="rounded bg-accent px-4 py-1.5 text-[13px] font-medium text-ground transition hover:bg-accent-hover disabled:opacity-50"
@@ -184,7 +208,11 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
                   <div className="mt-2.5 flex items-center justify-between border-t border-rule pt-2.5 pl-7">
                     <button
                       type="button"
-                      onClick={() => startTransition(() => toggleRule(rule.id, !rule.active))}
+                      onClick={() => {
+                        // On and off is its own undo. The offer still goes.
+                        dismiss();
+                        startTransition(() => toggleRule(rule.id, !rule.active));
+                      }}
                       className="flex items-center gap-2 text-[12.5px] text-ink-muted transition hover:text-ink"
                     >
                       <span
@@ -210,7 +238,29 @@ export default function RulesShell({ initialRules }: { initialRules: Rule[] }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => startTransition(() => removeRule(rule.id))}
+                        onClick={async () => {
+                          // Quoted back, because a rule is a sentence somebody
+                          // wrote and the list can be long — "delete a rule?"
+                          // would not tell you WHICH one you were about to lose.
+                          const confirmed = await ask({
+                            title: 'Delete this rule?',
+                            body:
+                              rule.text.length > 120
+                                ? `“${rule.text.slice(0, 117)}…”`
+                                : `“${rule.text}”`,
+                            action: 'Delete',
+                          });
+                          if (!confirmed) return;
+                          startTransition(async () => {
+                            const removed = await removeRule(rule.id);
+                            if (removed) {
+                              offer({
+                                message: 'Rule deleted.',
+                                undo: () => restoreRule(removed),
+                              });
+                            }
+                          });
+                        }}
                         disabled={pending}
                         className="text-[12.5px] text-ink-faint transition hover:text-flag disabled:opacity-50"
                       >

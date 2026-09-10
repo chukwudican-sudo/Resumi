@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { saveContactAndRefresh } from '../../server/actions';
+import { useUndo } from '../undo/UndoProvider';
 import { validateContact, validateContactField, type ContactField } from '../../lib/contactValidation';
 
 export interface Contact {
@@ -32,12 +33,20 @@ const FIELDS: { key: keyof Contact; label: string; placeholder: string; optional
 
 export default function ContactSection({
   contact,
+  stored,
   onChange,
   onSaved,
   onNext,
   onDirty,
 }: {
+  /** What is in the boxes, which the page above owns as you type. */
   contact: Contact;
+  /**
+   * What is in the database. Not the same thing as `contact`, which is the
+   * draft — and Undo has to write back the saved details, not the half-typed
+   * ones the boxes happened to be holding.
+   */
+  stored: Contact;
   onChange: (c: Contact) => void;
   onSaved: () => void;
   onNext: () => void;
@@ -45,6 +54,13 @@ export default function ContactSection({
 }) {
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
+  const { offer, dismiss } = useUndo();
+
+  // Updated the moment a save goes out rather than waiting for the refresh to
+  // bring a new `stored` down. Saving twice quickly would otherwise offer the
+  // details from two saves ago — an offer that reverts the wrong step.
+  const lastSaved = useRef(stored);
+  useEffect(() => { lastSaved.current = stored; }, [stored]);
 
   // Shown only once a field has been left. Telling somebody their email is
   // wrong after they have typed one letter of it is the classic way to make a
@@ -60,12 +76,23 @@ export default function ContactSection({
       setTouched(Object.fromEntries(FIELDS.map((f) => [f.key, true])));
       return;
     }
+    const before = lastSaved.current;
+    lastSaved.current = contact;
     startTransition(async () => {
       await saveContactAndRefresh(contact);
       onSaved();
       setSaved(true);
       onDirty(false);
       if (andContinue) onNext();
+      offer({
+        message: 'Contact details saved.',
+        undo: async () => {
+          lastSaved.current = before;
+          onChange(before);
+          await saveContactAndRefresh(before);
+          onSaved();
+        },
+      });
     });
   }
 
@@ -89,6 +116,9 @@ export default function ContactSection({
               type="text"
               value={contact[f.key]}
               onChange={(e) => {
+                // See SkillsSection.edit: a "saved · Undo" offer still standing
+                // would revert this typing along with the save.
+                dismiss();
                 setSaved(false);
                 onDirty(true);
                 onChange({ ...contact, [f.key]: e.target.value });

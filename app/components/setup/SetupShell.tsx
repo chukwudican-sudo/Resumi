@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
 import { hasQuantity, profileStrength } from '../../lib/profileStrength';
@@ -18,6 +17,7 @@ import SkillsSection, { type SkillGroup } from './SkillsSection';
 import ProseSection from './ProseSection';
 import ListSection from './ListSection';
 import AddSection from './AddSection';
+import { useConfirm } from '../undo/ConfirmProvider';
 import RemoveSection from './RemoveSection';
 
 /**
@@ -54,6 +54,27 @@ export default function SetupShell({
   savedAt: string;
 }) {
   const router = useRouter();
+  const ask = useConfirm();
+
+  /**
+   * Getting out of a section with unsaved changes in it.
+   *
+   * The rail used to just call `setDirty(false)` and move, which threw the
+   * changes away without a word — a summary typed and not saved, gone for
+   * clicking the next thing in a list. It is the one loss neither the
+   * confirmation on a delete nor the undo offer can reach, because nothing was
+   * ever written down to put back.
+   *
+   * Only asks when there is something to lose.
+   */
+  async function mayLeave(): Promise<boolean> {
+    if (!dirty) return true;
+    return ask({
+      title: 'Leave without saving?',
+      body: `Your changes to ${open?.label ?? 'this section'} have not been saved yet.`,
+      action: 'Discard',
+    });
+  }
 
   // Which section opens is local state, not a route — but it can be aimed from
   // outside. The cards elsewhere that offer to add a missing skill need to land
@@ -195,12 +216,22 @@ export default function SetupShell({
           ) : null}
           {usable ? <PolishButton stale={stale} disabled={dirty || !contactSaved} /> : null}
           {usable ? <DownloadPdf polishFirst={stale} disabled={dirty || !contactSaved} /> : null}
-          <Link
-            href="/applications"
+          {/*
+            A button rather than a Link, so leaving the page asks the same
+            question the rail does. A <Link> navigates before anything can be
+            said about the unsaved form underneath it.
+          */}
+          <button
+            type="button"
+            onClick={async () => {
+              if (!(await mayLeave())) return;
+              setDirty(false);
+              router.push('/applications');
+            }}
             className="rounded bg-accent px-5 py-2.5 text-sm font-medium text-ground transition hover:bg-accent-hover"
           >
             Done
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -212,7 +243,11 @@ export default function SetupShell({
               <button
                 key={s.key}
                 type="button"
-                onClick={() => { setDirty(false); setSection(s.key); }}
+                onClick={async () => {
+                  if (!(await mayLeave())) return;
+                  setDirty(false);
+                  setSection(s.key);
+                }}
                 className={`flex shrink-0 items-center gap-3 rounded-md px-3 py-2.5 text-left transition lg:w-full ${
                   section === s.key ? 'bg-accent-tint' : 'hover:bg-ground-panel'
                 }`}
@@ -248,6 +283,7 @@ export default function SetupShell({
             taken={new Set(status.map((s) => s.key))}
             disabled={dirty}
             onAdded={(key) => { setDirty(false); setSection(key); }}
+            onUndone={() => { setDirty(false); setSection(previousKey); afterSave(); }}
           />
 
           {/*
@@ -332,6 +368,10 @@ export default function SetupShell({
             {!open || open.shape === 'contact' ? (
               <ContactSection
                 contact={contact}
+                // The server's copy, straight from the prop rather than from the
+                // state above: that state is the draft and never re-syncs, so it
+                // cannot say what is actually stored.
+                stored={initialContact}
                 onChange={setContact}
                 onSaved={() => { setContactSaved(true); afterSave(); }}
                 onNext={() => setSection(nextKey)}
