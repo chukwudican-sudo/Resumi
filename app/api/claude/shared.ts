@@ -209,6 +209,69 @@ export const EXTRA_SECTIONS_SCHEMA = {
   },
 };
 
+/**
+ * The resume as a TAILORING pass may return it.
+ *
+ * A narrower copy of RESUME_STRUCTURE_SCHEMA, because the two jobs are not the
+ * same. Reading somebody's PDF has to capture everything on it. Tailoring
+ * rewrites bullets and ordering — and `validateTailored` then overwrites
+ * everything else with the profile's own values. Asking for those fields bought
+ * nothing but tokens, and nothing streams, so every one of them was time
+ * somebody spent waiting.
+ *
+ * Gone: `name`, `contact`, `education[].degree`, `education[].location`,
+ * `projects[].url`, `certifications`, `awards` — each assigned straight from the
+ * source afterwards, or refused outright.
+ *
+ * **Kept, and this is the part that looks wrong and is not:** `org`, `dates`,
+ * `location` on experience, `school` and `dates` on education, `name`, `tech`
+ * and `dates` on projects. They are also overwritten — but `pairUp` uses them to
+ * work out WHICH entry came back. Remove them and the guard cannot tell two
+ * roles at the same employer apart, which is the exact failure its comments
+ * record being built to catch.
+ */
+const TAILORED_STRUCTURE_SCHEMA = {
+  ...RESUME_STRUCTURE_SCHEMA,
+  properties: {
+    summary: RESUME_STRUCTURE_SCHEMA.properties.summary,
+    education: {
+      ...RESUME_STRUCTURE_SCHEMA.properties.education,
+      items: {
+        type: 'object' as const,
+        properties: {
+          // Identity for pairUp. Not editable, and not optional.
+          school: { type: 'string' as const },
+          dates: { type: 'string' as const },
+          bullets: {
+            type: 'array' as const,
+            items: { type: 'string' as const },
+            description: 'Relevant coursework, honours, thesis. Often empty.',
+          },
+        },
+        required: ['school', 'dates'],
+        additionalProperties: false as const,
+      },
+    },
+    experience: RESUME_STRUCTURE_SCHEMA.properties.experience,
+    projects: {
+      ...RESUME_STRUCTURE_SCHEMA.properties.projects,
+      items: {
+        type: 'object' as const,
+        properties: {
+          name: { type: 'string' as const },
+          tech: { type: 'string' as const },
+          dates: { type: 'string' as const },
+          bullets: { type: 'array' as const, items: { type: 'string' as const } },
+        },
+        required: ['name', 'tech', 'dates', 'bullets'],
+        additionalProperties: false as const,
+      },
+    },
+    skills: RESUME_STRUCTURE_SCHEMA.properties.skills,
+  },
+  required: ['education', 'experience', 'projects', 'skills'],
+};
+
 export const TAILOR_TOOL: Anthropic.Tool = {
   name: 'submit_tailored_resume',
   description: 'Submit the fully tailored resume as an edited ResumeStructure along with a change log, match score, structural change flags, and any warnings.',
@@ -216,13 +279,25 @@ export const TAILOR_TOOL: Anthropic.Tool = {
     type: 'object',
     properties: {
       structure: {
-        ...RESUME_STRUCTURE_SCHEMA,
+        ...TAILORED_STRUCTURE_SCHEMA,
         description: 'The tailored resume content as a ResumeStructure — the same shape as the input structure, with fields/bullets edited for the job. Name, contact, and dates must be identical to the input.',
       },
+      /**
+       * Capped, because this was a third of everything the call produced.
+       *
+       * Asked for "every content change and why", the model wrote a sentence
+       * per reworded bullet — 28 lines and 4,113 characters on a resume of 28
+       * bullets, about a fifth of the whole wait, for text that scrolls past
+       * underneath the resume. Measured on one real posting: 59.4s and 3,235
+       * output tokens uncapped, 47-50s and ~2,500 capped, across three runs.
+       *
+       * Six lines is a summary of what changed, which is what the page is for.
+       * The per-bullet detail is visible in the resume itself.
+       */
       log: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Plain-English bullet list of every content change made and why, in Canadian English. No leading bullet characters needed. General tailoring changes (rewording bullets, reordering skills, tightening language) go here. Do NOT log structural changes here instead of in structuralChanges — if a change qualifies as structural, it must appear in structuralChanges (not only in log).',
+        description: 'The substantive changes you made, at most 6 lines, one short sentence each, in Canadian English. No leading bullet characters needed. Summarise rather than enumerate: "Rewrote the Shopify bullets around credit risk modelling" covers five edited bullets in one line. Do not write a line per reworded bullet. Structural changes still belong in structuralChanges and must appear there — do not put one here instead, and do not repeat one here that you have already named there.',
       },
       matchScore: {
         type: 'integer',
@@ -232,18 +307,6 @@ export const TAILOR_TOOL: Anthropic.Tool = {
         type: 'array',
         items: { type: 'string' },
         description: 'Specific named skills/requirements from the job posting that are not present in the About Me PDF or Base Resume (e.g. "Docker", "CI/CD experience"). Empty array if the resume already covers everything material.',
-      },
-      vague: {
-        type: 'boolean',
-        description: 'True if the job posting lacks enough detail to tailor effectively.',
-      },
-      vagueReason: {
-        type: 'string',
-        description: 'Explain why the job posting is vague. Empty string if vague is false.',
-      },
-      estimatedPages: {
-        type: 'integer',
-        description: 'Estimated resume length in pages (1, 2, or 3+) based on word/character count.',
       },
       structuralChanges: {
         type: 'array',
@@ -269,12 +332,57 @@ export const TAILOR_TOOL: Anthropic.Tool = {
       'log',
       'matchScore',
       'missingRequirements',
-      'vague',
-      'vagueReason',
-      'estimatedPages',
       'structuralChanges',
       'warnings',
     ],
+    additionalProperties: false,
+  },
+};
+
+/**
+ * Reading one rule: what can be verified in it, and what it argues with.
+ *
+ * Deliberately NOT asked to rewrite the rule. The person's sentence is the rule
+ * — this extracts a machine-checkable reading to keep beside it. Rewriting
+ * somebody's own words into tidier ones is how a section called "Real Projects"
+ * came back as "Projects", and it cost a commit to undo.
+ */
+export const RULE_INTAKE_TOOL: Anthropic.Tool = {
+  name: 'submit_rule_reading',
+  description:
+    'Submit a machine-checkable reading of one rule, if it has one, and any existing rule it contradicts.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      checkKind: {
+        type: 'string',
+        enum: ['forbidden_text', 'max_bullet_chars', 'none'],
+        description:
+          'How this rule could be verified against a finished resume by a program, with no judgement. "forbidden_text" when the rule forbids specific words or names appearing anywhere — "never say spearheaded", "call it Ontario Tech not UOIT" (forbid UOIT), "do not put my GPA on anything" (forbid GPA). "max_bullet_chars" when it caps bullet length. "none" for everything else, which is most rules: anything about emphasis, ordering, tone, what to lead with, or how something should read is guidance a program cannot check. Choose "none" rather than stretching — a wrong check reports failures that are not real, and the person cannot tell why.',
+      },
+      terms: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'For forbidden_text only: the exact words or phrases that must not appear, as they would be written on a resume. Bare terms, no quotes, no explanation. Matched whole-word and case-insensitively, so give the root a person would type ("spearheaded", not "spearhead(ed|ing)"). Empty for any other kind.',
+      },
+      limit: {
+        type: 'integer',
+        description:
+          'For max_bullet_chars only: the maximum characters a single bullet may run to. One line on this resume template is roughly 110 characters; two is roughly 220. 0 for any other kind.',
+      },
+      conflictsWith: {
+        type: 'integer',
+        description:
+          'The 1-based number of an existing rule this one genuinely contradicts — where following both is impossible or one plainly undoes the other. 0 when there is no conflict, which is the usual answer. Rules that merely cover different ground do not conflict.',
+      },
+      conflictReason: {
+        type: 'string',
+        description:
+          'One short sentence saying what the contradiction is, addressed to the person who wrote both. Empty when conflictsWith is 0.',
+      },
+    },
+    required: ['checkKind', 'terms', 'limit', 'conflictsWith', 'conflictReason'],
     additionalProperties: false,
   },
 };

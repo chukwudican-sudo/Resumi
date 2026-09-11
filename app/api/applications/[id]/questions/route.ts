@@ -110,6 +110,20 @@ function handle(error: unknown) {
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
     return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
   }
+  // A timeout is not a dropped connection, and saying so sends people to
+  // check a router that is working fine. APIConnectionTimeoutError EXTENDS
+  // APIConnectionError in this SDK, so the branch below swallowed it — and it
+  // only started firing once the client was given a real timeout, at which
+  // point the slowest call in the app began blaming the person's internet.
+  if (error instanceof Anthropic.APIConnectionTimeoutError) {
+    return errorResponse(
+      {
+        type: 'network',
+        message: 'That took longer than we allow and was stopped. Try again in a moment.',
+      },
+      504,
+    );
+  }
   if (error instanceof Anthropic.APIConnectionError) {
     return errorResponse({ type: 'network', message: 'Your internet connection dropped.' }, 503);
   }

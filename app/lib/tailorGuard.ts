@@ -434,6 +434,14 @@ export function validateTailored(source: ResumeStructure, tailored: unknown): Ta
     // Certifications stored as entries leave this field empty, so it stopped
     // being a corner case and started being everybody who has any.
     if (!src.length) return fallback;
+    // Never asked for is not the same as dropped.
+    //
+    // The tailoring schema no longer carries these — the model was filling them
+    // in, and everything it filled in was thrown away here anyway. Without this
+    // line, an absent field reads as a deletion and every single tailor reports
+    // "your certifications were missing and have been put back". These fields
+    // were optional even before that, so an omission was never proof of a loss.
+    if (from === undefined) return src;
     const out = asList<string>(from).filter((v) => typeof v === 'string' && v.trim());
     const missing = src.filter((v) => !out.some((o) => norm(o) === norm(v)));
     if (!missing.length) return out;

@@ -1,19 +1,8 @@
-import Link from 'next/link';
+import NavTabs, { type NavKey } from './NavTabs';
 import UserMenu from './UserMenu';
 import { creditsLabel } from '../lib/credits';
 
-// 'account' is deliberately absent from ITEMS below: /account renders this bar
-// with nothing highlighted. It used to borrow the key belonging to the item
-// labelled "Resume", so standing on the account page underlined a tab that led
-// somewhere else entirely.
-export type NavKey = 'applications' | 'insights' | 'profile' | 'rules' | 'account';
-
-const ITEMS: { key: NavKey; href: string; label: string }[] = [
-  { key: 'applications', href: '/applications', label: 'Applications' },
-  { key: 'insights', href: '/insights', label: 'Insights' },
-  { key: 'profile', href: '/setup', label: 'Resume' },
-  { key: 'rules', href: '/rules', label: 'Rules' },
-];
+export type { NavKey } from './NavTabs';
 
 /**
  * The bar across every signed-in page.
@@ -26,35 +15,7 @@ const ITEMS: { key: NavKey; href: string; label: string }[] = [
 export default function AppNav({ active, credits }: { active: NavKey; credits?: number }) {
   return (
     <header className="flex h-[62px] items-center justify-between border-b border-rule bg-ground-surface px-9">
-      <div className="flex items-center gap-10">
-        <Link href="/applications" className="flex items-center gap-2.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
-          </svg>
-          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
-        </Link>
-
-        <nav className="flex items-center gap-7">
-          {ITEMS.map((item) =>
-            item.key === active ? (
-              <span
-                key={item.key}
-                className="border-b-2 border-accent py-[19px] text-sm text-ink"
-              >
-                {item.label}
-              </span>
-            ) : (
-              <Link
-                key={item.key}
-                href={item.href}
-                className="text-sm text-ink-muted transition hover:text-ink"
-              >
-                {item.label}
-              </Link>
-            ),
-          )}
-        </nav>
-      </div>
+      <NavTabs active={active} />
 
       <div className="flex items-center gap-4">
         {typeof credits === 'number' ? (

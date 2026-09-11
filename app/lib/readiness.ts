@@ -72,6 +72,28 @@ export function hasEnoughToTailor(structure: ResumeStructure | null | undefined)
   return somethingDone(structure);
 }
 
+/**
+ * Enough of a POSTING to tailor towards.
+ *
+ * The one question the pre-tailor page exists to ask. Tailoring rewrites a
+ * resume around what a role is asking for, so a posting nobody could read
+ * produces a rewrite aimed at nothing — and charges a credit for it.
+ *
+ * `requirements` is the evidence, because it is the extractor's own structured
+ * read of the posting rather than a length. An empty list means the extractor
+ * looked for named skills and found none, which is what a pasted page of
+ * navigation chrome or a bare job title looks like from here. The description
+ * falls back to the raw pasted text when extraction finds no prose, so it is
+ * checked for presence and nothing more.
+ */
+export function postingReadyToTailor(posting: {
+  description?: string | null;
+  requirements?: string[] | null;
+}): boolean {
+  if (!posting.description?.trim()) return false;
+  return (posting.requirements ?? []).length > 0;
+}
+
 /** A skill entry that reads as a sentence rather than a term. */
 function readsAsProse(items: string): boolean {
   return items

@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { NoToolUseError, callClaude } from '../../../../lib/anthropic';
+import { NoToolUseError, REQUEST_BUDGET_MS, callClaude } from '../../../../lib/anthropic';
 import { TAILOR_INVARIANT, buildUserContext } from '../../../../lib/systemPrompt';
 import type { ResumeStructure } from '../../../../lib/types';
 import { surfaceRepairs, validateTailored } from '../../../../lib/tailorGuard';
 import { requireUserId } from '../../../../server/auth';
 import { MONTHLY_CREDITS } from '../../../../lib/credits';
-import { polishIfStale } from '../../../../server/polishProfile';
 import { hasEnoughToTailor } from '../../../../lib/readiness';
 import {
   getActiveRules,
@@ -27,9 +26,6 @@ interface TailorResult {
   log: string[];
   matchScore: number;
   missingRequirements: string[];
-  vague: boolean;
-  vagueReason: string;
-  estimatedPages: number;
   structuralChanges: { description: string; reason: string }[];
   warnings: string[];
 }
@@ -37,6 +33,11 @@ interface TailorResult {
 /** Rewrites the profile around one job posting and keeps the result. */
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const userId = await requireUserId();
+  // The budget lives beside the per-attempt timeouts in lib/anthropic.ts, not
+  // here. Held apart, the two numbers drifted: this route budgeted 52s while
+  // the tailor's own timeout was 45s, so the timeout always fired first and the
+  // budget never once ran.
+  const deadline = Date.now() + REQUEST_BUDGET_MS;
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 500);
@@ -81,16 +82,17 @@ export async function POST(_request: Request, { params }: { params: { id: string
   // below swallows its own failures, but the reads around it do not, and the
   // rule is easier to keep than to check line by line.
   try {
-    // Polished after the gate, not before it.
+    // The editorial pass used to run here, and it was half the wait.
     //
-    // Tailoring reads the master resume, so it should read the good version of
-    // it — feeding the model "Uses Python for backend algorithm work" as a skill
-    // wastes the call it is about to make. But this runs the editorial pass,
-    // which is two model calls of its own, and it used to run before anybody
-    // checked whether there was a credit to spend. So somebody at zero paid
-    // about three cents for a polish on every attempt and was then refused.
-    const polished = await polishIfStale(userId);
-    const structure = ((await getProfile(userId))?.resumeStructure ?? profileStructure) as ResumeStructure;
+    // The reasoning was sound — tailoring reads the master resume, so it should
+    // read the tidy version rather than skills still written as sentences. What
+    // was wrong was the moment: two model calls and some twenty-five serialised
+    // database round trips, in front of somebody waiting on a job application.
+    //
+    // It runs when you press Done on /setup instead, where you have already
+    // stopped. By the time you get here the resume is tidy and this is one call.
+    // Narrowed by hasEnoughToTailor above, which requires a name.
+    const structure = profileStructure!;
 
     const posting = record.posting;
 
@@ -111,7 +113,10 @@ export async function POST(_request: Request, { params }: { params: { id: string
         text: [
           'Their profile — the Resume Structure to edit. This is the resume of record; keep the same entries, dates, and section identities, and rewrite freely within them:',
           '```json',
-          JSON.stringify(structure, null, 2),
+          // Minified. The two-space indent was about three hundred tokens of
+          // pure whitespace re-sent on every tailor, and the model does not read
+          // it any better for being pretty.
+          JSON.stringify(structure),
           '```',
           said,
           `Job posting — Company: ${posting?.company ?? '(not provided)'}, Role: ${posting?.role ?? '(not provided)'}\n${posting?.description ?? '(no description)'}`,
@@ -137,6 +142,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       }),
       content,
       tool: TAILOR_TOOL,
+      deadline,
     });
 
     // Checked before it is stored, because a tailored resume came back missing
@@ -171,7 +177,9 @@ export async function POST(_request: Request, { params }: { params: { id: string
       // fourteen of sixteen.
       log: [...surfaced.log, ...structural, ...(toolInput.log ?? [])],
       warnings: [...surfaced.warnings, ...(toolInput.warnings ?? [])],
-      estimatedPages: toolInput.estimatedPages ?? null,
+      // The column exists and nothing has ever read it back, so the model is
+      // no longer asked to produce a number for it.
+      estimatedPages: null,
     });
 
     // Said out loud rather than done quietly: polishing regroups skills and
@@ -180,7 +188,6 @@ export async function POST(_request: Request, { params }: { params: { id: string
     return NextResponse.json({
       resumeId,
       creditsLeft: remaining,
-      polished: polished ? { corrections: polished.corrections, warnings: polished.warnings } : null,
     });
   } catch (error) {
     // Nothing was produced, so the credit goes back.
@@ -190,10 +197,41 @@ export async function POST(_request: Request, { params }: { params: { id: string
     // resume anywhere. Charging for that is charging for an outage.
     await refundCredit(userId);
 
+    // Our own budget ran out, not the network's. Distinguishable because the
+    // SDK throws this only for a caller-supplied signal — a timeout throws
+    // APIConnectionTimeoutError instead.
+    if (error instanceof Anthropic.APIUserAbortError) {
+      return errorResponse(
+        {
+          type: 'generic',
+          message:
+            'That took longer than we allow and was stopped. Your credit was not used — try again.',
+        },
+        504,
+      );
+    }
+
     const refused = capacityResponse(error);
     if (refused) return refused;
     if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
       return errorResponse({ type: 'auth', message: 'Your API key may be invalid or out of credits.' }, 401);
+    }
+    // A timeout is not a dropped connection, and saying so sends people to
+    // check a router that is working fine. APIConnectionTimeoutError EXTENDS
+    // APIConnectionError in this SDK, so the branch below swallowed it — and it
+    // only started firing once the client was given a real timeout, at which
+    // point the slowest call in the app began blaming the person's internet.
+    if (error instanceof Anthropic.APIConnectionTimeoutError) {
+      return errorResponse(
+        {
+          type: 'network',
+          // The refund above already ran, and saying so is the difference
+            // between trying again and assuming it cost something.
+            message:
+              'That took longer than we allow and was stopped. Your credit was not used — try again.',
+        },
+        504,
+      );
     }
     if (error instanceof Anthropic.APIConnectionError) {
       return errorResponse({ type: 'network', message: 'Your internet connection dropped.' }, 503);

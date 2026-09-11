@@ -311,6 +311,19 @@ export const applications = pgTable('applications', {
   /** Set when marked applied. Drives the follow-up nudge that keeps people coming back. */
   followUpDueAt: timestamp('follow_up_due_at', { withTimezone: true }),
   notes: text('notes'),
+  /**
+   * Deleted, but not gone.
+   *
+   * A hard delete would take the posting copy with it, and the form that takes
+   * a posting promises the opposite in as many words: listings come down within
+   * weeks and you will want it back the day before an interview. Undo also has
+   * to be able to hand the whole thing back — resume versions included — and
+   * re-inserting a row graph from a browser tab is not a thing to rely on.
+   *
+   * Null means live. Every read that lists or opens an application filters on
+   * it; `restoreApplication` is the one function that deliberately does not.
+   */
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({
@@ -356,8 +369,26 @@ export const rules = pgTable('rules', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   text: text('text').notNull(),
   active: boolean('active').notNull().default(true),
+  /**
+   * Position, and therefore priority.
+   *
+   * The page has always said "Applied in this order" and the model was never
+   * told the order meant anything — it received a numbered list and no statement
+   * that 1 outranks 2. The prompt says so now.
+   */
   orderIndex: integer('order_index').notNull().default(0),
   source: text('source').notNull().default('user'),
+  /**
+   * The app's reading of the rule, as something it can verify. Null for most.
+   *
+   * Derived once by a model from the sentence somebody typed, and kept BESIDE
+   * their words rather than replacing them — the point of this feature is that
+   * a preference is visible and theirs. See RuleCheck in app/lib/rules.ts.
+   *
+   * Null means guidance: a rule with no machine-checkable reading still goes to
+   * the model, and the page says plainly that nothing is being verified.
+   */
+  check: jsonb('check'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => ({

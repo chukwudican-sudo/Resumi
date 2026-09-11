@@ -4,11 +4,15 @@ import { revalidatePath } from 'next/cache';
 import { requireUserId } from './auth';
 import {
   createRule as createRuleRow,
+  deleteApplication as deleteApplicationRow,
+  restoreApplication as restoreApplicationRow,
   deleteUserData,
   deleteEntry as deleteEntryRow,
   deleteRule as deleteRuleRow,
   reorderRules as reorderRulesRow,
   setRuleActive as setRuleActiveRow,
+  setRuleCheck,
+  listRules,
   updateRule as updateRuleRow,
   getResumeInputs,
   restoreResumeVersion as restoreResumeVersionRow,
@@ -36,7 +40,8 @@ import type { ResumeStructure } from '../lib/types';
 import { profileStrength } from '../lib/profileStrength';
 import { runPolish } from './polishProfile';
 import { getProfile, getUser } from './db/repository';
-import { RULE_MAX_LENGTH } from '../lib/rules';
+import { RULE_MAX_LENGTH, type RuleCheck } from '../lib/rules';
+import { readRule } from '../lib/ruleIntake';
 import { isKnownLocale } from '../lib/locales';
 import {
   SHAPES,
@@ -469,6 +474,7 @@ export async function addRule(text: string): Promise<string | null> {
   if (!trimmed) return null;
   const id = await createRuleRow(userId, trimmed.slice(0, RULE_MAX_LENGTH));
   revalidatePath('/rules');
+  revalidateApplications();
   return id;
 }
 
@@ -476,21 +482,107 @@ export async function editRule(ruleId: string, text: string) {
   const userId = await requireUserId();
   const trimmed = text.trim();
   if (!trimmed) return;
+  // updateRule clears the old check: it described the sentence being replaced.
+  // The caller re-derives.
   await updateRuleRow(userId, ruleId, trimmed.slice(0, RULE_MAX_LENGTH));
   revalidatePath('/rules');
+  revalidateApplications();
 }
 
 export async function toggleRule(ruleId: string, active: boolean) {
   const userId = await requireUserId();
   await setRuleActiveRow(userId, ruleId, active);
   revalidatePath('/rules');
+  revalidateApplications();
 }
 
 export async function removeRule(ruleId: string): Promise<RuleRow | null> {
   const userId = await requireUserId();
   const removed = await deleteRuleRow(userId, ruleId);
   revalidatePath('/rules');
+  revalidateApplications();
   return removed;
+}
+
+/**
+ * Works out how a rule can be checked, after it has already been saved.
+ *
+ * A second call on purpose. Writing a rule stays instant — the row is there
+ * before this runs — and if the model is down or slow you are left with a rule
+ * that works as guidance rather than with no rule at all. A preference somebody
+ * took the trouble to write down must never be lost to an outage.
+ *
+ * Returns the conflict, if there is one, for the page to show while it is still
+ * actionable. It is deliberately not stored: a saved contradiction goes stale
+ * the moment either rule is edited, and a stale one is worse than none.
+ */
+export async function deriveRuleCheck(ruleId: string): Promise<{
+  check: RuleCheck | null;
+  conflict: { index: number; text: string; reason: string } | null;
+}> {
+  const userId = await requireUserId();
+
+  const all = await listRules(userId);
+  const rule = all.find((r) => r.id === ruleId);
+  if (!rule) return { check: null, conflict: null };
+
+  const others = all.filter((r) => r.id !== ruleId);
+
+  try {
+    const reading = await readRule(userId, rule.text, others.map((r) => r.text));
+    await setRuleCheck(userId, ruleId, reading.check);
+    revalidatePath('/rules');
+    revalidateApplications();
+
+    const clash = reading.conflictsWith ? others[reading.conflictsWith - 1] : null;
+    return {
+      check: reading.check,
+      conflict:
+        clash && reading.conflictReason
+          ? { index: reading.conflictsWith!, text: clash.text, reason: reading.conflictReason }
+          : null,
+    };
+  } catch (error) {
+    // Guidance is a perfectly good outcome. The rule still reaches the model on
+    // every tailor; it simply is not verified afterwards.
+    console.error('[Resumi] Could not read a rule; leaving it as guidance.', error);
+    return { check: null, conflict: null };
+  }
+}
+
+/**
+ * A rules card renders on an application, so a rule change has to reach it.
+ *
+ * Every rule action revalidated only /rules, which was correct while rules were
+ * invisible everywhere else. Without this, editing a rule leaves an open
+ * application describing rules that no longer exist.
+ */
+function revalidateApplications() {
+  revalidatePath('/applications/[id]', 'page');
+}
+
+/**
+ * Takes one application off the list.
+ *
+ * Returns whether there is anything to offer an undo for. A second press on a
+ * row mid-removal would otherwise put a toast up for a deletion it did not
+ * perform, and pressing undo on THAT would restore something the person had
+ * already decided twice to get rid of.
+ */
+export async function removeApplication(applicationId: string): Promise<boolean> {
+  const userId = await requireUserId();
+  const removed = await deleteApplicationRow(userId, applicationId);
+  revalidatePath('/applications');
+  revalidateApplications();
+  return removed !== null;
+}
+
+/** Puts one back, with its posting and every resume version still attached. */
+export async function restoreApplication(applicationId: string): Promise<void> {
+  const userId = await requireUserId();
+  await restoreApplicationRow(userId, applicationId);
+  revalidatePath('/applications');
+  revalidateApplications();
 }
 
 /** Puts a deleted rule back at its own position in the order. */
@@ -498,12 +590,14 @@ export async function restoreRule(row: RuleRow): Promise<void> {
   const userId = await requireUserId();
   await restoreRuleRow(userId, row);
   revalidatePath('/rules');
+  revalidateApplications();
 }
 
 export async function reorderRules(orderedIds: string[]) {
   const userId = await requireUserId();
   await reorderRulesRow(userId, orderedIds);
   revalidatePath('/rules');
+  revalidateApplications();
 }
 
 

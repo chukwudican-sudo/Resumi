@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { buildResume, isResumeUsable, sectionStatus, type ContactFact, type EntryWithBullets } from '../../lib/buildResume';
 import { hasQuantity, profileStrength } from '../../lib/profileStrength';
@@ -22,10 +21,12 @@ import SetupUpload from './SetupUpload';
 import ReadinessPanel from './ReadinessPanel';
 import Stages from '../Stages';
 import Takeover from '../Takeover';
-import { REASSURE } from '../../lib/waits';
+import NavTabs from '../NavTabs';
+import { POLISH_STEPS, REASSURE } from '../../lib/waits';
 import type { WaitControl, WaitRequest } from './waitControl';
 import { useConfirm } from '../undo/ConfirmProvider';
 import RemoveSection from './RemoveSection';
+import { polishMasterResume } from '../../server/actions';
 
 /**
  * Which section is open. Any key this person's resume actually has, plus
@@ -299,22 +300,23 @@ export default function SetupShell({
     <main className="flex h-screen flex-col overflow-hidden bg-ground font-sans text-ink">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-rule bg-ground-surface px-8">
         {/*
-          A link, like it is on every page that renders AppNav. This bar is
-          /setup's own, and the mark in it was inert markup — which on a page
-          with no nav meant the one exit was the Done button in the far corner.
+          The same left-hand side as every other signed-in page.
+          
+          This bar is /setup's own rather than AppNav, because it also carries
+          Polish, Download and Done — and the cost of that was the one screen
+          that IS a nav tab being the only one you could not navigate from.
 
-          There is deliberately no back arrow beside it. The browser already has
-          one, an inch above this bar, and a second arrow underneath the first
-          is a control competing with the one people already know. Done is the
-          labelled exit, and it asks about unsaved work; the browser's arrow is
-          the quick one, and does not.
+          Through mayLeave, because every way off this page has to ask the same
+          question. A plain Link would be the quickest route to losing a form.
         */}
-        <Link href="/applications" className="flex items-center gap-2.5 transition hover:opacity-70">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
-            <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
-          </svg>
-          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
-        </Link>
+        <NavTabs
+          active="profile"
+          onNavigate={async () => {
+            if (!(await mayLeave())) return false;
+            setDirty(false);
+            return true;
+          }}
+        />
 
         <div className="flex items-center gap-4">
           <span className="text-[13px] text-ink-muted">{doneCount} of {status.length} sections</span>
@@ -328,11 +330,41 @@ export default function SetupShell({
             question the rail does. A <Link> navigates before anything can be
             said about the unsaved form underneath it.
           */}
+          {/*
+            Done tidies up on the way out.
+            
+            The editorial pass used to run when you pressed Tailor on a job
+            application — two model calls in front of somebody waiting on a
+            resume, and half of a two-minute wait. The work is worth doing; the
+            moment was wrong. Here you have already finished, and the pane is
+            free to carry it.
+            
+            Only when the resume has actually changed since the last pass, and
+            never at the cost of leaving: a failure still lets you go.
+          */}
           <button
             type="button"
             onClick={async () => {
               if (!(await mayLeave())) return;
               setDirty(false);
+
+              if (usable && stale && contactSaved) {
+                waitControl.start({
+                  title: 'Tidying your resume.',
+                  steps: POLISH_STEPS,
+                  estimate: 'Usually about twenty seconds.',
+                  scope: 'pane',
+                });
+                try {
+                  await polishMasterResume();
+                  waitControl.finish();
+                } catch {
+                  // Not a reason to trap somebody on this page. The resume is
+                  // simply untidied, and the next Polish or Download does it.
+                  waitControl.cancel();
+                }
+              }
+
               router.push('/applications');
             }}
             className="rounded bg-accent px-5 py-2.5 text-sm font-medium text-ground transition hover:bg-accent-hover"

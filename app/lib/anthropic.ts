@@ -31,25 +31,82 @@ export type UsageKind =
   | 'interview_turn'
   | 'compose'
   | 'polish'
-  | 'proofread';
+  | 'proofread'
+  | 'rule';
 
-/** Per-kind model + budget. Keeps model choice out of the handlers. */
-const CALL_CONFIG: Record<UsageKind, { model: string; maxTokens: number; effort: Effort }> = {
-  extract: { model: 'claude-sonnet-4-6', maxTokens: 4000, effort: 'low' },
-  extract_resume: { model: 'claude-sonnet-4-6', maxTokens: 4000, effort: 'low' },
-  tailor: { model: 'claude-sonnet-4-6', maxTokens: 8000, effort: 'medium' },
-  instruct: { model: 'claude-sonnet-4-6', maxTokens: 8000, effort: 'medium' },
-  interview_turn: { model: 'claude-sonnet-4-6', maxTokens: 2000, effort: 'low' },
-  compose: { model: 'claude-sonnet-4-6', maxTokens: 8000, effort: 'medium' },
+/**
+ * The model every call in the app uses.
+ *
+ * Sonnet 5, and the move off Sonnet 4.6 was made for speed, measured on this
+ * app's own tailor call with the same profile and posting: 46.8s at 52 output
+ * tokens/sec on 4.6, 27.8s at 116 on 5, for the same tailored resume and the
+ * same match score. Latency here is output tokens divided by tokens per second
+ * — nothing else moves it — so the generation rate IS the wait.
+ *
+ * It is also slightly cheaper per resume despite counting ~36% more tokens for
+ * the same text; see the tokenizer note in lib/pricing.ts, which is where the
+ * arithmetic lives.
+ */
+const MODEL = 'claude-sonnet-5';
+
+/**
+ * What one whole REQUEST gets, shared across every call it makes.
+ *
+ * It lives here, beside the per-attempt timeouts, because keeping the two
+ * numbers apart is what caused the bug this constant now prevents: the tailor
+ * route budgeted 52s while this file gave the tailor a 45s per-attempt timeout,
+ * so the shorter leash always won and the budget was dead code. The call took
+ * 44-50s. It timed out on the median, and the error said "took longer than we
+ * allow", which is how it read as a budget stop for a whole day.
+ *
+ * Sits a few seconds under `maxDuration = 60` so the budget runs out before the
+ * platform kills the function — a kill happens outside any catch, so no refund
+ * and no message.
+ */
+export const REQUEST_BUDGET_MS = 52_000;
+
+/**
+ * Per-kind model + budget. Keeps model choice out of the handlers.
+ *
+ * **maxTokens is not comparable to the numbers that were here before.** Sonnet
+ * 5's tokenizer counts about 36% more tokens for identical text, so every
+ * budget is ~1.4x its old value to buy the same amount of writing. Left alone,
+ * the small ones would have started truncating tool calls mid-JSON — a broken
+ * result rather than a slow one. Raising them costs nothing: max_tokens is not
+ * counted against the output-tokens-per-minute rate limit, only tokens actually
+ * generated are.
+ *
+ * **timeoutMs bounds ONE ATTEMPT, never the request.** Any kind whose route
+ * passes a `deadline` must keep this at or above REQUEST_BUDGET_MS, or it
+ * preempts the deadline and the budget stops meaning anything. Enforced by a
+ * test in anthropic.test.ts rather than by memory.
+ */
+export const CALL_CONFIG: Record<
+  UsageKind,
+  { model: string; maxTokens: number; effort: Effort; timeoutMs: number; retries: number }
+> = {
+  extract: { model: MODEL, maxTokens: 5600, effort: 'low', timeoutMs: 40000, retries: 0 },
+  extract_resume: { model: MODEL, maxTokens: 5600, effort: 'low', timeoutMs: 40000, retries: 0 },
+  tailor: { model: MODEL, maxTokens: 11200, effort: 'medium', timeoutMs: 55000, retries: 0 },
+  instruct: { model: MODEL, maxTokens: 11200, effort: 'medium', timeoutMs: 55000, retries: 0 },
+  interview_turn: { model: MODEL, maxTokens: 2800, effort: 'low', timeoutMs: 25000, retries: 1 },
+  compose: { model: MODEL, maxTokens: 11200, effort: 'medium', timeoutMs: 55000, retries: 0 },
   // Short input, short output, and it runs whenever a resume changes — so it is
   // budgeted as the cheap frequent call it is, not as a generation.
-  polish: { model: 'claude-sonnet-4-6', maxTokens: 2000, effort: 'low' },
+  polish: { model: MODEL, maxTokens: 2800, effort: 'low', timeoutMs: 25000, retries: 1 },
+  // The smallest call in the app: one 280-character rule in, a handful of
+  // fields out. It runs once when a rule is written and never again, which is
+  // the whole economics of checking rules — pay once to learn what one means,
+  // then verify it for nothing on every resume after.
+  rule: { model: MODEL, maxTokens: 1200, effort: 'low', timeoutMs: 15000, retries: 1 },
   // Reads the whole resume and returns a short list, so the budget is for
   // input rather than output.
-  proofread: { model: 'claude-sonnet-4-6', maxTokens: 1500, effort: 'low' },
+  proofread: { model: MODEL, maxTokens: 2100, effort: 'low', timeoutMs: 25000, retries: 1 },
 };
 
-/** The model used for the GET health check. */
+/** Kinds whose route hands `callClaude` a deadline. See the timeoutMs note. */
+export const DEADLINE_GOVERNED: UsageKind[] = ['tailor'];
+
 export const HEALTH_CHECK_MODEL = CALL_CONFIG.tailor.model;
 
 export interface CallClaudeOptions {
@@ -77,6 +134,21 @@ export interface CallClaudeOptions {
    * the hit rate would collapse to what one person can reuse alone.
    */
   systemSuffix?: string;
+  /**
+   * When this whole request has to be finished, as a wall-clock instant.
+   *
+   * The SDK's `timeout` bounds ONE ATTEMPT, not the call — its own note says so:
+   * "request timeouts are retried by default, so in a worst-case scenario you
+   * may wait much longer than this timeout". A route that must fit inside
+   * `maxDuration` needs the other thing: a budget for everything it does,
+   * shared across however many calls it makes.
+   *
+   * Passed down as an AbortSignal, which the SDK checks between attempts and
+   * hands to fetch, so it stops a request mid-flight and during a retry sleep.
+   * It surfaces as APIUserAbortError — distinguishable from a timeout, so the
+   * two can say different things to the person waiting.
+   */
+  deadline?: number;
 }
 
 export interface CallClaudeResult<T> {
@@ -106,19 +178,37 @@ export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaude
   await assertWithinLimits(opts.userId, opts.kind);
 
   /**
-   * Given a budget that fits inside the function's.
+   * Two clocks, doing different jobs, and the order between them matters.
    *
    * Bare, this takes the SDK defaults: a **ten-minute** timeout and two
-   * automatic retries — inside routes that declare `maxDuration = 60`. A single
-   * 529 therefore became three sequential attempts, the platform killed the
-   * function partway through the second, and the person got a platform error
-   * page instead of this app's own capacity message. The SDK's timeout was an
-   * order of magnitude larger than the budget and could never fire.
+   * automatic retries, inside routes declaring `maxDuration = 60`. A single 529
+   * became three sequential attempts and the platform killed the function part
+   * way through — the person got a platform error page rather than this app's
+   * own capacity message.
    *
-   * One retry, and a timeout that leaves room for the response to be read and
-   * the usage row written before the function is cut off.
+   * `timeout` bounds ONE ATTEMPT. The SDK says so itself, and its source
+   * confirms it: the timer is armed around the `fetch` call and cleared when
+   * fetch resolves, which is at response HEADERS. For these non-streaming calls
+   * headers arrive with the body so that distinction is moot — but it stops
+   * being moot the moment anything here streams, and only the deadline below
+   * would still be guarding the body.
+   *
+   * `retries` is 0 for the heavy calls: the SDK retries a timeout
+   * UNCONDITIONALLY — harder than a 429, which at least goes through
+   * shouldRetry — and retrying a call that was too slow buys another call that
+   * is too slow, for twice the wait.
+   *
+   * The deadline is the one that bounds the REQUEST, so a per-attempt timeout
+   * below REQUEST_BUDGET_MS silently takes the deadline's job. See the note on
+   * CALL_CONFIG; a test holds the invariant.
    */
-  const client = new Anthropic({ timeout: 50_000, maxRetries: 1 });
+  const client = new Anthropic({ timeout: config.timeoutMs, maxRetries: config.retries });
+
+  // What is left of the request's budget, if the caller set one. Nothing here
+  // may outlive it — that is the whole point of a deadline over a timeout.
+  const remaining = opts.deadline ? opts.deadline - Date.now() : null;
+  if (remaining !== null && remaining <= 0) throw new Anthropic.APIUserAbortError();
+  const signal = remaining !== null ? AbortSignal.timeout(remaining) : undefined;
 
   // The system prompt is the stable part of every request, so it carries the
   // cache breakpoint. Anything volatile must stay in the user content or the
@@ -143,7 +233,7 @@ export async function callClaude<T>(opts: CallClaudeOptions): Promise<CallClaude
     tools: [opts.tool],
     tool_choice: { type: 'tool', name: opts.tool.name },
     messages: [{ role: 'user', content: opts.content }],
-  } as any);
+  } as any, signal ? { signal } : undefined);
 
   const toolUse = response.content.find((block: any) => block.type === 'tool_use') as
     | Anthropic.ToolUseBlock

@@ -20,10 +20,28 @@ const CACHE_WRITE_MULTIPLIER = 1.25;
 const CACHE_READ_MULTIPLIER = 0.1;
 
 const RATES: Record<string, ModelRates> = {
+  // Verified at claude.com/pricing. Sonnet 5 launched at these rates as
+  // introductory pricing through 31 Aug 2026; the scheduled rise to $3/$15 was
+  // cancelled and $2/$10 is now the standard price.
+  //
+  // Cheaper per token AND cheaper per resume, which is not the same claim:
+  // Sonnet 5 uses a denser tokenizer and counts about 36% more tokens for the
+  // identical text (measured with count_tokens on this app's own tailor
+  // prompt — 4,253 tokens on 4.6, 5,805 on 5). The 33% lower rate more than
+  // covers that, but any reasoning from token COUNTS across these two models
+  // has to account for it. See maxTokens in lib/anthropic.ts.
+  'claude-sonnet-5': { input: 2, output: 10 },
   'claude-sonnet-4-6': { input: 3, output: 15 },
 };
 
-/** Used when a model has no entry in RATES — see estimateCostUsd. */
+/**
+ * Used when a model has no entry in RATES — see estimateCostUsd.
+ *
+ * Deliberately the DEARER of the two known models rather than the current one.
+ * The ceiling's failure mode is asymmetric: an overstated rate stops spending
+ * slightly early, while an understated one lets the ceiling fire late, which is
+ * exactly when it matters most.
+ */
 const FALLBACK_RATES: ModelRates = RATES['claude-sonnet-4-6'];
 
 export interface TokenCounts {

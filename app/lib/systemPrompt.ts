@@ -120,7 +120,13 @@ export function buildUserContext(opts: {
     lines.push(
       '',
       "THIS PERSON'S OWN RULES — they wrote these, they apply to every resume they make, and they",
-      'rank above job-specific tailoring but below the Universal Rules above:',
+      'rank above job-specific tailoring but below the Universal Rules above.',
+      // The page has said "Applied in this order" since it was written, and
+      // nothing ever told the model the order meant anything — it received a
+      // numbered list and no reason to read the numbers as rank. The person
+      // orders the list themselves; this is the half that was missing.
+      'They are listed in THEIR priority order: where two of these cannot both be',
+      'satisfied, the lower number wins.',
       ...active.map((r, i) => `${i + 1}. ${r.text.trim()}`),
     );
   }

@@ -36,6 +36,20 @@
       "when": 1789010838761,
       "tag": "0004_new_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789069042988,
+      "tag": "0005_cool_big_bertha",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789146671926,
+      "tag": "0006_fancy_mole_man",
+      "breakpoints": true
     }
   ]
 }

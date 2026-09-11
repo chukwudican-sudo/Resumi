@@ -1,26 +1,28 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ResumeStructure } from '../../lib/types';
 import DownloadPdf from './DownloadPdf';
 import Stages from '../Stages';
 import Takeover from '../Takeover';
-import { INSTRUCT_STEPS, REASSURE, tailorSteps } from '../../lib/waits';
+import { INSTRUCT_STEPS, REASSURE, TAILOR_STEPS } from '../../lib/waits';
+import type { RuleResult } from '../../lib/rules';
 import StatusPicker from './StatusPicker';
 import VersionPicker, { type ResumeVersion } from './VersionPicker';
 import type { ApplicationStatus } from './ApplicationRow';
 import PdfPreview from './PdfPreview';
 import StrengthenPanel from './StrengthenPanel';
 import { restoreResumeVersion } from '../../server/actions';
+import { takeTailorFailure } from './handoff';
 
 interface Props {
   applicationId: string;
   /** False while an older version is being read. Then the screen is read-only. */
   isLatest: boolean;
-  /** Whether a tailor will run the editorial pass first — three calls, not one. */
-  polishFirst: boolean;
+  /** How each of the person's rules fared on this version. Computed, not stored. */
+  ruleResults: RuleResult[];
   status: ApplicationStatus;
   posting: {
     company: string | null;
@@ -41,12 +43,13 @@ interface Props {
   versions: ResumeVersion[];
 }
 
-export default function ApplicationView({ applicationId, isLatest, polishFirst, status, posting, resume, versions }: Props) {
+export default function ApplicationView({ applicationId, isLatest, ruleResults, status, posting, resume, versions }: Props) {
   const router = useRouter();
   const [tailoring, setTailoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'review' | 'posting'>('review');
   const [instruction, setInstruction] = useState('');
+  const composer = useRef<HTMLTextAreaElement>(null);
   const [editing, setEditing] = useState(false);
   const [editsLeft, setEditsLeft] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
@@ -104,6 +107,21 @@ export default function ApplicationView({ applicationId, isLatest, polishFirst, 
     }
   }
 
+  /*
+   * Why the first tailor did not happen, when it was tried on the way in.
+   *
+   * The form tailors before it navigates here, so a failure happens on a screen
+   * the person is already leaving. Without this they arrive at "Ready when you
+   * are." on a resume they just asked for and did not get, which reads as
+   * though nothing was attempted at all.
+   *
+   * Read once and cleared, so a refresh does not replay a stale complaint.
+   */
+  useEffect(() => {
+    const failure = takeTailorFailure(applicationId);
+    if (failure) setError(failure);
+  }, [applicationId]);
+
   // One flag for "something is happening", covering both the request and the
   // re-render that follows it.
   const busy = tailoring || pending;
@@ -114,9 +132,13 @@ export default function ApplicationView({ applicationId, isLatest, polishFirst, 
     return (
       <Takeover
         title="Rewriting your resume for this one."
-        steps={tailorSteps(polishFirst)}
+        steps={TAILOR_STEPS}
         done={!busy}
-        estimate="Usually about a minute."
+        // No estimate here on purpose. The steps already say what is happening
+        // and they move; a static line under moving steps either repeats them or
+        // puts a number on it, and a number this large makes the wait feel
+        // longer than it is. The 25-second line still catches the long tail,
+        // and only appears when something is genuinely unusual.
       />
     );
   }
@@ -375,6 +397,95 @@ export default function ApplicationView({ applicationId, isLatest, polishFirst, 
                         If you have touched any of these, say so above and it goes in. If not,
                         leave it &mdash; nothing gets invented.
                       </p>
+                    </div>
+                  ) : null}
+
+                  {/*
+                    What your own rules did to this version.
+                    
+                    Measured, not asked. The model is never questioned about
+                    whether it obeyed — this app has been caught by a self-report
+                    before, when a tailor dropped a fifteen-month job and its own
+                    change log mentioned the role in none of its sixteen entries.
+                    A rule that can be checked is checked; a rule that cannot says
+                    so plainly rather than showing a tick it has not earned.
+                  */}
+                  {ruleResults.length ? (
+                    <div className="rounded-md border border-rule p-[18px]">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[11px] uppercase tracking-[0.12em] text-ink-faint">
+                          Your rules
+                        </span>
+                        <span className="text-[12px] text-ink-muted">
+                          {ruleResults.filter((r) => r.verdict === 'pass').length} of{' '}
+                          {ruleResults.filter((r) => r.verdict !== 'guidance').length} checked
+                        </span>
+                      </div>
+
+                      <ul className="mt-3 flex flex-col gap-2.5">
+                        {ruleResults.map((r) => (
+                          <li key={r.ruleId} className="flex items-start gap-2.5">
+                            <span className="mt-[3px] grid h-3.5 w-3.5 shrink-0 place-items-center">
+                              {r.verdict === 'pass' ? (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                  <path d="M20 6L9 17l-5-5" />
+                                </svg>
+                              ) : r.verdict === 'fail' ? (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8A6414" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+                                  <path d="M18 6L6 18M6 6l12 12" />
+                                </svg>
+                              ) : (
+                                <span aria-hidden="true" className="h-px w-2.5 bg-ink-ghost" />
+                              )}
+                            </span>
+
+                            <span className="min-w-0">
+                              <span
+                                className={`block text-[12.5px] leading-snug ${
+                                  r.verdict === 'guidance' ? 'text-ink-muted' : 'text-ink-prose'
+                                }`}
+                              >
+                                {r.text}
+                              </span>
+
+                              {r.verdict === 'fail' ? (
+                                <>
+                                  <span className="mt-1 block text-[12px] leading-snug text-flag-ink">
+                                    {r.evidence}
+                                  </span>
+                                  {/*
+                                    The free way out. Instructions are ten per
+                                    tailor and cost nothing, so a broken rule is
+                                    fixable without spending a credit — and
+                                    without the app rewriting a sentence blind.
+                                  */}
+                                  {isLatest && r.fix ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setInstruction(r.fix!);
+                                        // The composer is in another column, so
+                                        // it has to be brought to you. The
+                                        // example chips beside it never needed
+                                        // this.
+                                        composer.current?.scrollIntoView({ block: 'nearest' });
+                                        composer.current?.focus();
+                                      }}
+                                      className="mt-1.5 text-[12px] text-accent transition hover:text-accent-hover"
+                                    >
+                                      Ask it to fix this &mdash; free
+                                    </button>
+                                  ) : null}
+                                </>
+                              ) : r.verdict === 'guidance' ? (
+                                <span className="mt-0.5 block text-[11.5px] leading-snug text-ink-faint">
+                                  Guidance &mdash; nothing to check automatically
+                                </span>
+                              ) : null}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   ) : null}
 

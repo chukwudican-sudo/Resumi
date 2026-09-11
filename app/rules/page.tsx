@@ -20,6 +20,7 @@ export default async function RulesPage() {
     text: r.text,
     active: r.active,
     source: r.source,
+    check: (r.check as Rule['check']) ?? null,
   }));
 
   return (

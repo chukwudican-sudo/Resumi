@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lte, notInArray, sql } from 'drizzle-orm';
 import { db } from './client';
 import type { ResumeStructure } from '../../lib/types';
 import { MONTHLY_CREDITS, nextReset } from '../../lib/credits';
@@ -846,7 +846,24 @@ export async function createRule(userId: string, text: string): Promise<string> 
 export async function updateRule(userId: string, ruleId: string, text: string) {
   await db
     .update(rules)
-    .set({ text: text.trim(), updatedAt: new Date() })
+    // The check goes with the text it was derived from. Left behind, it would
+    // keep enforcing the sentence somebody just replaced — a rule reading
+    // "never say utilised" still failing resumes over "spearheaded".
+    .set({ text: text.trim(), check: null, updatedAt: new Date() })
+    .where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
+}
+
+/**
+ * Stores the app's reading of a rule. Null clears it.
+ *
+ * Separate from updateRule because they happen at different moments: the rule is
+ * written and saved at once, and the reading arrives a few seconds later. A
+ * model outage must never stop somebody writing down a preference.
+ */
+export async function setRuleCheck(userId: string, ruleId: string, check: unknown) {
+  await db
+    .update(rules)
+    .set({ check: check ?? null, updatedAt: new Date() })
     .where(and(eq(rules.userId, userId), eq(rules.id, ruleId)));
 }
 
@@ -1479,7 +1496,7 @@ export async function listApplications(userId: string) {
     })
     .from(applications)
     .leftJoin(jobPostings, eq(applications.postingId, jobPostings.id))
-    .where(eq(applications.userId, userId))
+    .where(and(eq(applications.userId, userId), isNull(applications.deletedAt)))
     .orderBy(desc(applications.updatedAt));
 }
 
@@ -1488,9 +1505,46 @@ export async function getApplication(userId: string, applicationId: string) {
     .select({ application: applications, posting: jobPostings })
     .from(applications)
     .leftJoin(jobPostings, eq(applications.postingId, jobPostings.id))
-    .where(and(eq(applications.userId, userId), eq(applications.id, applicationId)))
+    .where(
+      and(eq(applications.userId, userId), eq(applications.id, applicationId), isNull(applications.deletedAt)),
+    )
     .limit(1);
   return row ?? null;
+}
+
+/**
+ * Takes an application out of the list, keeping everything it holds.
+ *
+ * Soft, because undo has to be able to hand the whole thing back — the posting
+ * copy, every resume version, the status and its dates — and because the form
+ * that takes a posting promises to keep it for exactly the moment you need it
+ * again. See the note on `applications.deletedAt`.
+ */
+export async function deleteApplication(userId: string, applicationId: string) {
+  const now = new Date();
+  const [row] = await db
+    .update(applications)
+    .set({ deletedAt: now, updatedAt: now })
+    .where(
+      and(eq(applications.userId, userId), eq(applications.id, applicationId), isNull(applications.deletedAt)),
+    )
+    .returning({ id: applications.id });
+  // Null when it was already gone, so a double-press cannot offer an undo for
+  // something this call did not do.
+  return row?.id ?? null;
+}
+
+/**
+ * Puts one back.
+ *
+ * The one write that deliberately ignores `deletedAt` — everything else in this
+ * file filters on it, which is what makes this function the only way back.
+ */
+export async function restoreApplication(userId: string, applicationId: string) {
+  await db
+    .update(applications)
+    .set({ deletedAt: null, updatedAt: new Date() })
+    .where(and(eq(applications.userId, userId), eq(applications.id, applicationId)));
 }
 
 /**
@@ -1552,6 +1606,7 @@ export async function getDueFollowUps(userId: string) {
     .where(
       and(
         eq(applications.userId, userId),
+        isNull(applications.deletedAt),
         eq(applications.status, 'applied'),
         isNotNull(applications.followUpDueAt),
         lte(applications.followUpDueAt, new Date()),
@@ -1654,7 +1709,7 @@ export async function listApplicationsForDisplay(userId: string) {
       order by version desc
       limit 1
     ) r on true
-    where a.user_id = ${userId}
+    where a.user_id = ${userId} and a.deleted_at is null
     order by a.updated_at desc
   `);
 
@@ -1671,7 +1726,7 @@ export async function countApplicationsByStatus(userId: string) {
   const rows = await db
     .select({ status: applications.status, count: sql<number>`count(*)::int` })
     .from(applications)
-    .where(eq(applications.userId, userId))
+    .where(and(eq(applications.userId, userId), isNull(applications.deletedAt)))
     .groupBy(applications.status);
   return Object.fromEntries(rows.map((r) => [r.status, r.count])) as Record<string, number>;
 }
@@ -1879,6 +1934,10 @@ export async function getSkillGaps(userId: string, minDemand = 2): Promise<Skill
     select lower(req) as requirement, count(distinct ${jobPostings.id})::int as demand
     from ${jobPostings}, jsonb_array_elements_text(${jobPostings.requirements}) as req
     where ${jobPostings.userId} = ${userId}
+      and exists (
+        select 1 from ${applications} a
+        where a.posting_id = ${jobPostings.id} and a.deleted_at is null
+      )
     group by 1
     having count(distinct ${jobPostings.id}) >= ${minDemand}
     order by demand desc

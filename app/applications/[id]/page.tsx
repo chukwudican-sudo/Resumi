@@ -3,7 +3,9 @@ import ApplicationView from '../../components/applications/ApplicationView';
 import type { ApplicationStatus } from '../../components/applications/ApplicationRow';
 import type { ResumeStructure } from '../../lib/types';
 import { requireUserId } from '../../server/auth';
-import { getApplication, getLatestResume, getProfile, getResumeVersion, listResumeVersions } from '../../server/db/repository';
+import { getActiveRules, getApplication, getLatestResume, getResumeVersion, listResumeVersions } from '../../server/db/repository';
+import { runChecks } from '../../lib/ruleCheck';
+import type { RuleCheck } from '../../lib/rules';
 
 /**
  * One application: its posting, and the resume written for it.
@@ -30,10 +32,10 @@ export default async function ApplicationPage({
   const asked = Number(searchParams?.v);
   const wanted = Number.isFinite(asked) && asked > 0 ? asked : null;
 
-  const [latest, versions, profile] = await Promise.all([
+  const [latest, versions, rules] = await Promise.all([
     getLatestResume(userId, params.id),
     listResumeVersions(userId, params.id),
-    getProfile(userId),
+    getActiveRules(userId),
   ]);
 
   // An unknown version falls back rather than 404s: a stale link should show
@@ -50,10 +52,22 @@ export default async function ApplicationPage({
     <ApplicationView
       applicationId={params.id}
       isLatest={isLatest}
-      // Whether a tailor will run the editorial pass first. It changes how long
-      // the wait is and what it can honestly say it is doing — a stale profile
-      // means three model calls, not one.
-      polishFirst={profile?.stale ?? true}
+      /*
+       * Checked here, not stored.
+       *
+       * Scanning a resume for a forbidden word costs nothing, so there is no
+       * reason to persist a verdict that could go stale. Running it on render
+       * also means a rule written today is applied to a resume tailored last
+       * week — and says so.
+       */
+      ruleResults={
+        viewed
+          ? runChecks(
+              viewed.structure as ResumeStructure,
+              rules.map((r) => ({ id: r.id, text: r.text, check: (r.check as RuleCheck) ?? null })),
+            )
+          : []
+      }
       versions={versions.map((v) => ({ ...v, createdAt: v.createdAt.toISOString() }))}
       status={record.application.status as ApplicationStatus}
       posting={{

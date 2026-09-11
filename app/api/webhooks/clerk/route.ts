@@ -56,15 +56,44 @@ export async function POST(request: Request) {
   // the bytes and the signature would never match.
   const payload = await request.text();
 
-  let event: ClerkUserEvent;
+  /*
+   * Verify, then parse. Two steps, and it has to be two.
+   *
+   * svix 1.x returned the parsed payload from verify(); 2.x returns nothing and
+   * only throws. The `as unknown as ClerkUserEvent` cast on the old call papered
+   * over exactly that change — TypeScript was told the answer's shape rather than
+   * asked, so `event` silently became undefined and `event.type` below threw on
+   * every single delivery. Sixty-four failures, all of them this, and the
+   * webhook had never once succeeded.
+   *
+   * The lesson is in the cast: `as unknown as X` is a promise the compiler
+   * cannot check, so it is the one place a library's breaking change arrives
+   * with no warning at all.
+   */
   try {
-    event = new Webhook(secret).verify(payload, {
+    new Webhook(secret).verify(payload, {
       'svix-id': svixId,
       'svix-timestamp': svixTimestamp,
       'svix-signature': svixSignature,
-    }) as unknown as ClerkUserEvent;
+    });
   } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  }
+
+  // Separate from the signature failure above on purpose: a verified body that
+  // will not parse is a different problem from a forged one, and saying so is
+  // what stops the next person debugging the wrong thing.
+  let event: ClerkUserEvent;
+  try {
+    event = JSON.parse(payload) as ClerkUserEvent;
+  } catch {
+    console.error('[Resumi] Webhook payload verified but would not parse.');
+    return NextResponse.json({ error: 'Malformed payload' }, { status: 400 });
+  }
+
+  if (!event?.type || !event.data?.id) {
+    console.error('[Resumi] Webhook payload is missing "type" or "data.id".');
+    return NextResponse.json({ error: 'Malformed payload' }, { status: 400 });
   }
 
   try {
