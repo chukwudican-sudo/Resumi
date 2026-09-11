@@ -70,7 +70,7 @@ export async function syncCurrentUser() {
     clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ??
     clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) {
-    console.error(`[Resumi] Clerk user ${userId} has no email address; cannot create their row.`);
+    console.error(`[Resumi9] Clerk user ${userId} has no email address; cannot create their row.`);
     return null;
   }
 

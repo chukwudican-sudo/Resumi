@@ -246,7 +246,7 @@ async function restoreEntriesFor(userId: string, rows: ProfileEntryRow[]) {
   // find out otherwise would be noticing an entry missing days later.
   if (keep.length !== rows.length) {
     console.error(
-      `[Resumi] Refused to restore ${rows.length - keep.length} entr(ies): no section to file them under.`,
+      `[Resumi9] Refused to restore ${rows.length - keep.length} entr(ies): no section to file them under.`,
     );
   }
   await restoreEntries(userId, keep);
@@ -545,7 +545,7 @@ export async function deriveRuleCheck(ruleId: string): Promise<{
   } catch (error) {
     // Guidance is a perfectly good outcome. The rule still reaches the model on
     // every tailor; it simply is not verified afterwards.
-    console.error('[Resumi] Could not read a rule; leaving it as guidance.', error);
+    console.error('[Resumi9] Could not read a rule; leaving it as guidance.', error);
     return { check: null, conflict: null };
   }
 }
@@ -654,7 +654,7 @@ export async function polishMasterResume(): Promise<{
 // ── Deleting everything ────────────────────────────────────────────────────
 
 /**
- * Removes everything Resumi holds about this person.
+ * Removes everything Resumi9 holds about this person.
  *
  * Every table referencing users cascades, so one delete takes the profile,
  * entries, facts, rules, applications, resumes, interview history and usage

@@ -22,7 +22,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[Resumi] Unhandled error:', error);
+    console.error('[Resumi9] Unhandled error:', error);
   }, [error]);
 
   return (

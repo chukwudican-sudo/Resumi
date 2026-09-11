@@ -27,7 +27,7 @@ export default function AuthFrame({
             <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
           <span className="text-[13px] uppercase tracking-[0.16em]" style={{ color: '#57544E' }}>
-            Resumi
+            Resumi9
           </span>
         </Link>
       </div>

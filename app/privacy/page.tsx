@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { currentUserId } from '../server/auth';
 
 /**
- * What Resumi does with what people give it.
+ * What Resumi9 does with what people give it.
  *
  * Written from the code rather than from a template: every claim below was
  * checked against the schema and the request paths, because a privacy policy
@@ -10,8 +10,8 @@ import { currentUserId } from '../server/auth';
  * it is a promise nobody kept.
  */
 export const metadata = {
-  title: 'Privacy — Resumi',
-  description: 'What Resumi stores, who else sees it, and how to delete it.',
+  title: 'Privacy — Resumi9',
+  description: 'What Resumi9 stores, who else sees it, and how to delete it.',
 };
 
 const UPDATED = '5 September 2026';
@@ -26,7 +26,7 @@ export default async function PrivacyPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
             <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
-          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
+          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi9</span>
         </Link>
         <Link href="/sign-in" className="text-sm text-ink-prose transition hover:text-ink">
           Sign in
@@ -36,7 +36,7 @@ export default async function PrivacyPage() {
       <article className="mx-auto max-w-[680px] px-6 py-16 sm:px-8">
         <h1 className="font-serif text-[40px] leading-[1.08]">Privacy</h1>
         <p className="mt-4 text-[16.5px] leading-relaxed text-ink-prose">
-          Resumi holds your employment history, which is personal in a way that matters. This says
+          Resumi9 holds your employment history, which is personal in a way that matters. This says
           exactly what is kept, who else sees it, and how to remove it. It describes what the
           software actually does, not what would be convenient to claim.
         </p>
@@ -45,7 +45,7 @@ export default async function PrivacyPage() {
         <Section title="What is stored">
           <P>
             <B>Your account.</B> Your email address and your name. Sign-in itself is handled by
-            Clerk &mdash; Resumi never sees or stores a password.
+            Clerk &mdash; Resumi9 never sees or stores a password.
           </P>
           <P>
             <B>Your resume.</B> Everything you type into it: jobs, education, projects, the bullet
@@ -75,7 +75,7 @@ export default async function PrivacyPage() {
             where something came from.
           </P>
           <P>
-            <B>Payment details.</B> There are none. Resumi does not take payments.
+            <B>Payment details.</B> There are none. Resumi9 does not take payments.
           </P>
           <P>
             <B>Anything about how you browse.</B> There is no analytics, no tracking pixel, no
@@ -85,7 +85,7 @@ export default async function PrivacyPage() {
 
         <Section title="Who else sees it">
           <P>
-            Resumi is a small application built on a few services. Each one sees only the part it
+            Resumi9 is a small application built on a few services. Each one sees only the part it
             needs.
           </P>
           <Party name="Clerk" what="Holds your sign-in. Sees your email address and name; never sees your resume." />
@@ -116,14 +116,14 @@ export default async function PrivacyPage() {
             is no copy to restore from.
           </P>
           <P>
-            Your sign-in belongs to Clerk rather than to Resumi, so it is deleted separately, from
+            Your sign-in belongs to Clerk rather than to Resumi9, so it is deleted separately, from
             the account menu. Deleting either one does not delete the other.
           </P>
         </Section>
 
         <Section title="How long things are kept">
           <P>
-            Until you delete them. Resumi does not expire old resumes or applications, because
+            Until you delete them. Resumi9 does not expire old resumes or applications, because
             somebody coming back after six months away expects their history to be where they left
             it.
           </P>
@@ -146,7 +146,7 @@ export default async function PrivacyPage() {
             >
               chukwudi.can@gmail.com
             </a>
-            . Resumi is currently run by one person, so the answer comes from someone who knows how
+            . Resumi9 is currently run by one person, so the answer comes from someone who knows how
             it works.
           </P>
         </Section>
@@ -162,7 +162,7 @@ export default async function PrivacyPage() {
             href={signedIn ? '/applications' : '/'}
             className="text-[14px] text-accent transition hover:text-accent-hover"
           >
-            &larr; {signedIn ? 'Back to your applications' : 'Back to Resumi'}
+            &larr; {signedIn ? 'Back to your applications' : 'Back to Resumi9'}
           </Link>
           <Link href="/terms" className="text-[14px] text-ink-muted transition hover:text-ink">
             Terms

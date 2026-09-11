@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
           { status: 503 },
         );
       }
-      console.error(`[Resumi] Preview failed to compile for ${userId}:\n${err.log}`);
+      console.error(`[Resumi9] Preview failed to compile for ${userId}:\n${err.log}`);
       return NextResponse.json(
         {
           error:

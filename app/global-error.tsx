@@ -18,7 +18,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[Resumi] Root layout error:', error);
+    console.error('[Resumi9] Root layout error:', error);
   }, [error]);
 
   return (
@@ -35,7 +35,7 @@ export default function GlobalError({
           }}
         >
           <div style={{ maxWidth: 440 }}>
-            <h1 style={{ fontSize: 30, fontWeight: 400, margin: 0 }}>Resumi could not start.</h1>
+            <h1 style={{ fontSize: 30, fontWeight: 400, margin: 0 }}>Resumi9 could not start.</h1>
             <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.6, color: '#4A463F' }}>
               Nothing you saved has been affected. Reloading usually clears it.
             </p>

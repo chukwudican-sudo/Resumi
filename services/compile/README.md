@@ -6,7 +6,7 @@ Turns LaTeX into a PDF. That is the whole job.
 
 `tectonic` has to run somewhere, and it cannot run on Vercel — the app's
 serverless functions have no TeX installation and no way to get one. Without
-this, a deployed Resumi cannot produce a PDF for anybody.
+this, a deployed Resumi9 cannot produce a PDF for anybody.
 
 ## What it is allowed to know
 

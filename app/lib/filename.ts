@@ -1,4 +1,4 @@
-// Universal PDF filename rule (Resumi change-spec, Section 11):
+// Universal PDF filename rule (Resumi9 change-spec, Section 11):
 //   FirstName_LastName_RoleTitle_Company_Resume.pdf
 // No spaces, no special characters, no dates/version numbers, max 50 chars
 // before ".pdf" (truncate the role title first if it doesn't fit).

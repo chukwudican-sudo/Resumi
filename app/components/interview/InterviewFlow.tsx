@@ -151,7 +151,7 @@ export default function InterviewFlow({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
               <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
             </svg>
-            <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
+            <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi9</span>
           </div>
           <div className="hidden items-center gap-[18px] lg:flex">
             {PHASES.map((p, i) => (

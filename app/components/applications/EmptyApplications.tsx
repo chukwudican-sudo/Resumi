@@ -54,7 +54,7 @@ export default function EmptyApplications({
           </h1>
           <p className="mt-5 max-w-[400px] text-base leading-relaxed text-ink-prose">
             {hasProfile
-              ? 'Paste in a job posting and Resumi rewrites your resume around it. Everything you make stays here — most people end up with thirty or forty.'
+              ? 'Paste in a job posting and Resumi9 rewrites your resume around it. Everything you make stays here — most people end up with thirty or forty.'
               : 'Upload a resume and we will pull everything out of it, or type it in yourself. It takes about five minutes and you only do it once.'}
           </p>
 

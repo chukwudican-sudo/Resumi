@@ -62,7 +62,7 @@ export interface TokenCounts {
 export function estimateCostUsd(model: string, tokens: TokenCounts): number {
   const rates = RATES[model];
   if (!rates) {
-    console.warn(`[Resumi] No pricing entry for model "${model}" — falling back to Sonnet rates. Add it to lib/pricing.ts.`);
+    console.warn(`[Resumi9] No pricing entry for model "${model}" — falling back to Sonnet rates. Add it to lib/pricing.ts.`);
   }
   const { input, output } = rates ?? FALLBACK_RATES;
 

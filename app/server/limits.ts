@@ -90,7 +90,7 @@ export function checkLimits(usage: UsageWindow, budget: Budget): CapacityError |
   if (usage.spentLast24hUsd >= budget.globalDailyUsd) {
     return new CapacityError(
       `Global 24h spend ceiling reached: $${usage.spentLast24hUsd.toFixed(2)} of $${budget.globalDailyUsd}.`,
-      'Resumi is at capacity right now. This is on us, not you — please try again later.',
+      'Resumi9 is at capacity right now. This is on us, not you — please try again later.',
       true,
     );
   }
@@ -126,6 +126,6 @@ export async function assertWithinLimits(userId: string, kind: string): Promise<
   if (!refusal) return;
   // The figures go to the server log; the person is told only what they can act
   // on, which never includes what the budget is.
-  console.error(`[Resumi] Refused ${kind} for ${userId}: ${refusal.message}`);
+  console.error(`[Resumi9] Refused ${kind} for ${userId}: ${refusal.message}`);
   throw refusal;
 }

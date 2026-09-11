@@ -98,7 +98,7 @@ export async function POST() {
     if (error instanceof NoToolUseError) {
       return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
     }
-    console.error('[Resumi] Compose failed:', error);
+    console.error('[Resumi9] Compose failed:', error);
     return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
   }
 }

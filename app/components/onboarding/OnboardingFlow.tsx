@@ -226,7 +226,7 @@ export default function OnboardingFlow({
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
             <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
-          <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
+          <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi9</span>
         </Link>
         <div className="flex items-center gap-3.5">
           {/*
@@ -377,7 +377,7 @@ export default function OnboardingFlow({
                 <circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" />
               </svg>
               <span className="text-[13.5px] leading-relaxed text-ink-prose">
-                Either way you can edit everything afterwards. When you paste in a job posting, Resumi asks
+                Either way you can edit everything afterwards. When you paste in a job posting, Resumi9 asks
                 you a few questions about that specific role &mdash; that is where the detail that makes a
                 resume land gets added.
               </span>

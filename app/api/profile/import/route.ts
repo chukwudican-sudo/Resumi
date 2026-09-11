@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof NoToolUseError) {
       return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
     }
-    console.error('[Resumi] Profile import failed:', error);
+    console.error('[Resumi9] Profile import failed:', error);
     return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
   }
 }

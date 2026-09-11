@@ -130,6 +130,6 @@ function handle(error: unknown) {
   if (error instanceof NoToolUseError) {
     return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
   }
-  console.error('[Resumi] Job questions failed:', error);
+  console.error('[Resumi9] Job questions failed:', error);
   return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
 }

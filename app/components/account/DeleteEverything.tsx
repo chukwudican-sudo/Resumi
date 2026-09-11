@@ -24,7 +24,7 @@ export default function DeleteEverything() {
         onClick={() => setOpen(true)}
         className="text-[13px] text-ink-faint underline decoration-rule-field underline-offset-4 transition hover:text-flag"
       >
-        Delete everything Resumi knows about me
+        Delete everything Resumi9 knows about me
       </button>
     );
   }

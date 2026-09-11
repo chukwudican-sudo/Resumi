@@ -17,7 +17,7 @@ export default async function LandingPage() {
       <div className="flex h-[74px] items-center justify-between border-b border-rule px-6 sm:px-14">
         <div className="flex items-center gap-2.5">
           <Mark />
-          <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
+          <span className="text-[13px] uppercase tracking-[0.16em] text-ink-prose">Resumi9</span>
         </div>
         <div className="flex items-center gap-6">
           <Link href="/sign-in" className="text-sm text-ink-prose transition hover:text-ink">
@@ -51,7 +51,7 @@ export default async function LandingPage() {
           </h1>
 
           <p className="mt-7 max-w-[540px] text-[17px] leading-relaxed text-ink-prose sm:text-lg">
-            Resumi rewrites your resume around each posting you paste in &mdash; in about a minute,
+            Resumi9 rewrites your resume around each posting you paste in &mdash; in about a minute,
             using only what is already true about you.
           </p>
 
@@ -70,7 +70,7 @@ export default async function LandingPage() {
         <div className="mx-auto -mb-px mt-[68px] max-w-[1000px] overflow-hidden rounded-t-lg border border-rule-field bg-ground-surface shadow-[0_-1px_40px_rgba(26,24,21,0.07)]">
           <div className="flex h-12 items-center justify-between border-b border-rule-soft px-[22px]">
             <div className="flex items-center gap-[22px]">
-              <span className="text-[11px] uppercase tracking-[0.16em] text-ink-muted">Resumi</span>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-ink-muted">Resumi9</span>
               <span className="text-[12.5px] text-ink">Applications</span>
               <span className="text-[12.5px] text-ink-ghost">Profile</span>
             </div>
@@ -280,7 +280,7 @@ export default async function LandingPage() {
           <div className="col-span-2 flex flex-col gap-3 md:col-span-1">
             <div className="flex items-center gap-2.5">
               <Mark size={15} />
-              <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
+              <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi9</span>
             </div>
             <span className="max-w-[300px] text-sm leading-relaxed text-ink-muted">
               A resume that changes for every job you apply to. Built in Canada.
@@ -292,7 +292,7 @@ export default async function LandingPage() {
         </div>
 
         <div className="mx-auto mt-11 flex max-w-[1000px] items-center justify-between border-t border-rule pt-6">
-          <span className="text-[13px] text-ink-faint">&copy; 2026 Resumi</span>
+          <span className="text-[13px] text-ink-faint">&copy; 2026 Resumi9</span>
         </div>
       </footer>
     </main>
@@ -346,7 +346,7 @@ const STATS = [
 
 const STEPS = [
   { n: '1', title: 'Build your profile', body: 'Answer a few questions about your work, or upload a resume you already have. This happens once.' },
-  { n: '2', title: 'Paste a job posting', body: 'Paste the posting itself. Resumi reads it and works out what the role actually wants.' },
+  { n: '2', title: 'Paste a job posting', body: 'Paste the posting itself. Resumi9 reads it and works out what the role actually wants.' },
   { n: '3', title: 'Get a resume for that job', body: 'A typeset PDF, rewritten around the posting, ready to send. Every one you make is kept.' },
 ];
 

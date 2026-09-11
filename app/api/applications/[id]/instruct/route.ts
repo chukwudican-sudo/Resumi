@@ -174,7 +174,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return errorResponse({ type: 'network', message: 'Your internet connection dropped.' }, 503);
     }
     if (error instanceof NoToolUseError) return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
-    console.error('[Resumi] Instruct failed.', error);
+    console.error('[Resumi9] Instruct failed.', error);
     return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
   }
 }

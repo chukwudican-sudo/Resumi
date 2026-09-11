@@ -502,7 +502,7 @@ export function logRequestInputs(
   },
 ) {
   const { aboutMe, rules, jobPosting, structureSummary, content } = args;
-  console.log(`\n[Resumi] ${label} — inputs being sent to Claude`);
+  console.log(`\n[Resumi9] ${label} — inputs being sent to Claude`);
   console.log(
     `  About Me PDF      : ${aboutMe?.base64 ? `present (${kb(aboutMe.base64)}, ${aboutMe.mimeType || 'application/pdf'}) — sent as a document block; content is opaque to the server, Claude reads it natively` : 'MISSING'}`,
   );

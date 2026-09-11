@@ -40,7 +40,7 @@ function displayName(data: ClerkUserEvent['data']): string | undefined {
 export async function POST(request: Request) {
   const secret = process.env.CLERK_WEBHOOK_SECRET;
   if (!secret) {
-    console.error('[Resumi] CLERK_WEBHOOK_SECRET is not set — refusing to process the webhook.');
+    console.error('[Resumi9] CLERK_WEBHOOK_SECRET is not set — refusing to process the webhook.');
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
   }
 
@@ -87,12 +87,12 @@ export async function POST(request: Request) {
   try {
     event = JSON.parse(payload) as ClerkUserEvent;
   } catch {
-    console.error('[Resumi] Webhook payload verified but would not parse.');
+    console.error('[Resumi9] Webhook payload verified but would not parse.');
     return NextResponse.json({ error: 'Malformed payload' }, { status: 400 });
   }
 
   if (!event?.type || !event.data?.id) {
-    console.error('[Resumi] Webhook payload is missing "type" or "data.id".');
+    console.error('[Resumi9] Webhook payload is missing "type" or "data.id".');
     return NextResponse.json({ error: 'Malformed payload' }, { status: 400 });
   }
 
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
         const email = primaryEmail(event.data);
         if (!email) {
           // Nothing useful to store, but not Clerk's fault to retry over.
-          console.warn(`[Resumi] ${event.type} for ${event.data.id} carried no email address.`);
+          console.warn(`[Resumi9] ${event.type} for ${event.data.id} carried no email address.`);
           break;
         }
         // Idempotent: Clerk retries deliveries, and the same event may arrive twice.
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   } catch (error) {
     // A 500 makes Clerk retry, which is what we want for a transient database
     // failure — the alternative is silently losing a user row.
-    console.error('[Resumi] Webhook handling failed:', error);
+    console.error('[Resumi9] Webhook handling failed:', error);
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 });
   }
 

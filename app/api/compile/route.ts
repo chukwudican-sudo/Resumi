@@ -82,13 +82,13 @@ export async function POST(req: NextRequest) {
         );
       }
       if (err.kind === 'config') {
-        console.error(`[Resumi] ${err.message}`);
+        console.error(`[Resumi9] ${err.message}`);
         return NextResponse.json({ error: err.message }, { status: 500 });
       }
       // The LaTeX was ours, so the log is our debugging material, not theirs —
       // and a TeX trace is not something to put in front of someone who only
       // asked for a PDF.
-      console.error(`[Resumi] Resume failed to compile for ${userId}:\n${err.log}`);
+      console.error(`[Resumi9] Resume failed to compile for ${userId}:\n${err.log}`);
       return NextResponse.json(
         { error: "We couldn't build that PDF. This one is on us — it has been logged." },
         { status: 500 },

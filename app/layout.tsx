@@ -26,7 +26,7 @@ const serif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: 'Resumi',
+  title: 'Resumi9',
   description: 'A resume that changes for every job you apply to.',
 };
 
@@ -47,7 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // travelling or a page that reads headers gets rendered statically and
     // serves one person's data to the next.
     if ((error as { digest?: string })?.digest === 'DYNAMIC_SERVER_USAGE') throw error;
-    console.error('[Resumi] Could not sync the signed-in user; rendering anyway.', error);
+    console.error('[Resumi9] Could not sync the signed-in user; rendering anyway.', error);
   }
 
   return (

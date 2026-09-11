@@ -1,6 +1,6 @@
-# Resumi
+# Resumi9
 
-Resumi tailors your resume to a specific job, and it is built around the fact
+Resumi9 tailors your resume to a specific job, and it is built around the fact
 that a job search is thirty to fifty of those rather than one.
 
 You enter your history once. It becomes a **Profile** — entries, the bullets

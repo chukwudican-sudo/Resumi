@@ -12,7 +12,7 @@
  */
 
 import { spellingFor } from './locales';
-export const TAILOR_INVARIANT = `You are the resume-tailoring engine inside Resumi. You tailor one person's resume to one job posting.
+export const TAILOR_INVARIANT = `You are the resume-tailoring engine inside Resumi9. You tailor one person's resume to one job posting.
 
 You edit a Resume Structure: structured content JSON (name, contact, and the sections Education, Experience, Projects, Technical Skills, plus optional Summary, Certifications, Awards, each with their entries and bullets). You return an edited Resume Structure — never LaTeX, never a document. The app owns all layout and rendering; you only ever touch CONTENT.
 
@@ -134,7 +134,7 @@ export function buildUserContext(opts: {
   return lines.join('\n');
 }
 
-export const EXTRACTION_PROMPT = `You extract structured job posting information from screenshots and/or pasted text for Resumi, a resume-tailoring tool.
+export const EXTRACTION_PROMPT = `You extract structured job posting information from screenshots and/or pasted text for Resumi9, a resume-tailoring tool.
 
 Read every attached image (in a sensible reading order if there are multiple) and any pasted text. Extract:
 1. The company name
@@ -145,7 +145,7 @@ Strip out company boilerplate, marketing language, benefits descriptions, equal-
 
 If you cannot confidently determine the company name, return an empty string for "company" rather than guessing. Same for "role" if no clear job title is present. If there's no usable job content at all, return an empty string for "description".`;
 
-export const SOURCE_EXTRACTION_PROMPT = `You read an uploaded resume (a "Source Resume") and extract its content into a structured form for Resumi, a resume-tailoring tool. The uploaded file's original formatting is discarded — you are pulling out CONTENT only.
+export const SOURCE_EXTRACTION_PROMPT = `You read an uploaded resume (a "Source Resume") and extract its content into a structured form for Resumi9, a resume-tailoring tool. The uploaded file's original formatting is discarded — you are pulling out CONTENT only.
 
 Read the resume carefully and populate the ResumeStructure faithfully:
 - Extract the person's real name, contact details (phone, email, LinkedIn, GitHub, website), and every section.

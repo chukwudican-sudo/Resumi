@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { currentUserId } from '../server/auth';
 
 /**
- * What Resumi promises and what it asks in return.
+ * What Resumi9 promises and what it asks in return.
  *
  * Kept to the clauses that actually apply to a free tool run by one person.
  * The three that carry weight are further down: the resume is the user's to
@@ -10,8 +10,8 @@ import { currentUserId } from '../server/auth';
  * stop. Everything else is here because leaving it out would be worse.
  */
 export const metadata = {
-  title: 'Terms — Resumi',
-  description: 'What Resumi promises, and what it asks of you.',
+  title: 'Terms — Resumi9',
+  description: 'What Resumi9 promises, and what it asks of you.',
 };
 
 const UPDATED = '5 September 2026';
@@ -26,7 +26,7 @@ export default async function TermsPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2F5D50" strokeWidth="1.5" strokeLinecap="round">
             <path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" />
           </svg>
-          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi</span>
+          <span className="text-[12.5px] uppercase tracking-[0.16em] text-ink-prose">Resumi9</span>
         </Link>
         <Link href="/sign-in" className="text-sm text-ink-prose transition hover:text-ink">
           Sign in
@@ -36,13 +36,13 @@ export default async function TermsPage() {
       <article className="mx-auto max-w-[680px] px-6 py-16 sm:px-8">
         <h1 className="font-serif text-[40px] leading-[1.08]">Terms</h1>
         <p className="mt-4 text-[16.5px] leading-relaxed text-ink-prose">
-          Resumi is free, and it is run by one person. This says what you can expect from it and
+          Resumi9 is free, and it is run by one person. This says what you can expect from it and
           what it expects from you. It is short because there is not much to say, and plain because
           terms nobody reads protect nobody.
         </p>
         <p className="mt-3 text-[13px] text-ink-faint">Last updated {UPDATED}</p>
 
-        <Section title="What Resumi is">
+        <Section title="What Resumi9 is">
           <P>
             A tool that helps you write and format a resume. It is not a career service, a
             recruiter, or an employer, and it does not promise that a resume it produces will get
@@ -60,15 +60,15 @@ export default async function TermsPage() {
             Your sign-in is yours to keep safe. Anything done through your account is treated as
             done by you.
           </P>
-          <P>Resumi is not built for children. You should be at least 16 to use it.</P>
+          <P>Resumi9 is not built for children. You should be at least 16 to use it.</P>
         </Section>
 
         <Section title="What you put in">
           <P>
-            <B>Your work stays yours.</B> Nothing you enter becomes Resumi&rsquo;s property.
+            <B>Your work stays yours.</B> Nothing you enter becomes Resumi9&rsquo;s property.
           </P>
           <P>
-            Entering it allows Resumi to store it and to send the parts that are needed to the
+            Entering it allows Resumi9 to store it and to send the parts that are needed to the
             services named in the{' '}
             <A href="/privacy">privacy policy</A>, because that is how the software functions.
             Nothing else is done with it.
@@ -87,7 +87,7 @@ export default async function TermsPage() {
             nothing to ask.
           </P>
           <P>
-            <B>Read it before you send it.</B> Resumi uses AI to write and rearrange the words
+            <B>Read it before you send it.</B> Resumi9 uses AI to write and rearrange the words
             describing your work, and AI gets things wrong. It can put something more strongly than
             you meant, imply a result you never claimed, or simply make a mistake. Every resume is
             shown to you before it goes anywhere, and checking that it is accurate is your
@@ -95,7 +95,7 @@ export default async function TermsPage() {
           </P>
           <P>
             This one matters more than it sounds. A resume that overstates what you did is a
-            serious problem for you and not for anyone else, and Resumi cannot catch it on your
+            serious problem for you and not for anyone else, and Resumi9 cannot catch it on your
             behalf &mdash; only you know what actually happened.
           </P>
         </Section>
@@ -116,7 +116,7 @@ export default async function TermsPage() {
         </Section>
 
         <Section title="No charge, and no guarantees">
-          <P>Resumi is free. There is nothing to pay and nothing to cancel.</P>
+          <P>Resumi9 is free. There is nothing to pay and nothing to cancel.</P>
           <P>
             That also means it is offered as it is. It may have bugs, it may be unavailable, and it
             may change. Nothing here promises that it will work perfectly, stay available, or keep
@@ -126,7 +126,7 @@ export default async function TermsPage() {
 
         <Section title="Where responsibility ends">
           <P>
-            Resumi is not responsible for what follows from using it &mdash; a job you did not get,
+            Resumi9 is not responsible for what follows from using it &mdash; a job you did not get,
             a mistake in a resume you sent, or work lost to a failure or a deletion. Keep your own
             copy of anything that matters to you.
           </P>
@@ -142,7 +142,7 @@ export default async function TermsPage() {
             your data, and your sign-in is removed separately through the account menu.
           </P>
           <P>
-            Resumi can close an account for the reasons above, and the service itself may stop
+            Resumi9 can close an account for the reasons above, and the service itself may stop
             running. If it is shutting down for good, notice will appear here and go out by email
             with enough time to take your resumes with you.
           </P>
@@ -151,7 +151,7 @@ export default async function TermsPage() {
         <Section title="Changes">
           <P>
             If these terms change, the date at the top changes with them, and continuing to use
-            Resumi means accepting the new version. Anything significant will be said plainly rather
+            Resumi9 means accepting the new version. Anything significant will be said plainly rather
             than slipped into a revision.
           </P>
         </Section>
@@ -162,7 +162,7 @@ export default async function TermsPage() {
 
         <Section title="Asking about any of this">
           <P>
-            Write to <A href="mailto:chukwudi.can@gmail.com">chukwudi.can@gmail.com</A>. Resumi is
+            Write to <A href="mailto:chukwudi.can@gmail.com">chukwudi.can@gmail.com</A>. Resumi9 is
             currently run by one person, so the answer comes from someone who knows how it works.
           </P>
         </Section>
@@ -178,7 +178,7 @@ export default async function TermsPage() {
             href={signedIn ? '/applications' : '/'}
             className="text-[14px] text-accent transition hover:text-accent-hover"
           >
-            &larr; {signedIn ? 'Back to your applications' : 'Back to Resumi'}
+            &larr; {signedIn ? 'Back to your applications' : 'Back to Resumi9'}
           </Link>
           <Link href="/privacy" className="text-[14px] text-ink-muted transition hover:text-ink">
             Privacy

@@ -89,7 +89,7 @@ async function main() {
   let totalCost = 0;
   let totalCacheRead = 0;
 
-  console.log(`${BOLD}Resumi interview harness${RESET}`);
+  console.log(`${BOLD}Resumi9 interview harness${RESET}`);
   console.log(`${DIM}:skip to skip · :state to inspect · :quit to stop${RESET}\n`);
 
   while (!state.finished) {

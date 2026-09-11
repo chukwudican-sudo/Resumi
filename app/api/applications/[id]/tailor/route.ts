@@ -158,7 +158,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       // Countable without a database query. An entry going missing is the
       // model breaking a rule it was given, and it should be visible that it
       // happens rather than only that it was caught.
-      console.error(`[Resumi] Tailoring dropped ${restored} entr${restored === 1 ? 'y' : 'ies'}; restored from the profile.`);
+      console.error(`[Resumi9] Tailoring dropped ${restored} entr${restored === 1 ? 'y' : 'ies'}; restored from the profile.`);
     }
 
     // The model reports its own structural decisions and this was thrown away.
@@ -239,7 +239,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     if (error instanceof NoToolUseError) {
       return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
     }
-    console.error('[Resumi] Tailoring failed:', error);
+    console.error('[Resumi9] Tailoring failed:', error);
     return errorResponse({ type: 'generic', message: SERVICE_UNAVAILABLE }, 502);
   }
 }

@@ -49,7 +49,7 @@ export async function runPolish(
     proofread(userId, structure, structure.name).catch((error) => {
       // A resume with an uncorrected typo is worse than one without; a resume
       // nobody can download is worse than both.
-      console.error('[Resumi] Proofreading failed; continuing without it.', error);
+      console.error('[Resumi9] Proofreading failed; continuing without it.', error);
       return [];
     }),
   ]);
@@ -136,7 +136,7 @@ export async function polishIfStale(userId: string): Promise<PolishResult | null
   try {
     return await runPolish(userId, structure, user?.locale ?? null);
   } catch (error) {
-    console.error('[Resumi] Automatic polish failed; continuing unpolished.', error);
+    console.error('[Resumi9] Automatic polish failed; continuing unpolished.', error);
     return null;
   }
 }

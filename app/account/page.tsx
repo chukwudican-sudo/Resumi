@@ -88,7 +88,7 @@ export default async function AccountPage() {
               Your data
             </span>
             <p className="mt-2.5 text-[13.5px] leading-relaxed text-ink-prose">
-              Everything Resumi holds about you &mdash; your resume, your entries, your rules and
+              Everything Resumi9 holds about you &mdash; your resume, your entries, your rules and
               every application &mdash; can be removed permanently.
             </p>
             <div className="mt-4">
